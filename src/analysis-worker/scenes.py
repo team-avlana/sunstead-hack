@@ -27,47 +27,47 @@ def detect_shots(video_path: str) -> list[dict]:
     Returns list of dicts: {idx, start_sec, end_sec, content_score}.
     content_score is the maximum per-frame detector score within the shot,
     or None if stats were not captured.
+
+    Falls back to a single-shot result when OpenCV can't decode the file
+    (e.g. HEVC/H.265 without a compatible codec, or a zero-dimension frame).
     """
-    stats_manager = StatsManager()
-    video = open_video(video_path)
-    manager = SceneManager(stats_manager=stats_manager)
-    detector = ContentDetector()
-    manager.add_detector(detector)
-    manager.detect_scenes(video)
-
-    scene_list = manager.get_scene_list()
-
-    # Build per-frame score map from stats manager for content_score per shot
-    frame_scores: dict[int, float] = {}
     try:
-        for frame_num, metrics in stats_manager._frame_metrics.items():
-            score = metrics.get("content_val", metrics.get("delta_lum", None))
-            if score is not None:
-                frame_scores[frame_num] = float(score)
-    except Exception:
-        pass
+        stats_manager = StatsManager()
+        video = open_video(video_path)
+        manager = SceneManager(stats_manager=stats_manager)
+        manager.add_detector(ContentDetector())
+        manager.detect_scenes(video)
 
-    shots = []
-    for idx, (start_tc, end_tc) in enumerate(scene_list):
-        start_sec = start_tc.get_seconds()
-        end_sec = end_tc.get_seconds()
+        scene_list = manager.get_scene_list()
 
-        # Max score in this shot's frame range
-        start_fn = start_tc.get_frames()
-        end_fn = end_tc.get_frames()
-        shot_scores = [v for k, v in frame_scores.items() if start_fn <= k < end_fn]
-        content_score = float(max(shot_scores)) if shot_scores else None
+        frame_scores: dict[int, float] = {}
+        try:
+            for frame_num, metrics in stats_manager._frame_metrics.items():
+                score = metrics.get("content_val", metrics.get("delta_lum", None))
+                if score is not None:
+                    frame_scores[frame_num] = float(score)
+        except Exception:
+            pass
 
-        shots.append({
-            "idx": idx,
-            "start_sec": start_sec,
-            "end_sec": end_sec,
-            "content_score": content_score,
-        })
+        shots = []
+        for idx, (start_tc, end_tc) in enumerate(scene_list):
+            start_sec = start_tc.get_seconds()
+            end_sec = end_tc.get_seconds()
+            start_fn = start_tc.get_frames()
+            end_fn = end_tc.get_frames()
+            shot_scores = [v for k, v in frame_scores.items() if start_fn <= k < end_fn]
+            shots.append({
+                "idx": idx,
+                "start_sec": start_sec,
+                "end_sec": end_sec,
+                "content_score": float(max(shot_scores)) if shot_scores else None,
+            })
 
-    # Treat entire video as a single shot if nothing was detected
-    if not shots:
-        duration = _video_duration_ffprobe(video_path)
-        shots = [{"idx": 0, "start_sec": 0.0, "end_sec": duration, "content_score": None}]
+        if shots:
+            return shots
 
-    return shots
+    except Exception as exc:
+        print(f"Scene detection failed ({type(exc).__name__}: {exc}) — falling back to single shot")
+
+    duration = _video_duration_ffprobe(video_path)
+    return [{"idx": 0, "start_sec": 0.0, "end_sec": duration, "content_score": None}]

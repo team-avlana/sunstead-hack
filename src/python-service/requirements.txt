@@ -1,0 +1,6 @@
+fastmcp>=3.0.0
+psycopg[binary,pool]
+yt-dlp
+uvicorn[standard]
+starlette
+tomli ; python_version < "3.11"
