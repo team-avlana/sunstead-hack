@@ -219,3 +219,30 @@ __marimo__/
 
 .claude
 .vscode
+
+# ───────────────────── Rainy / frontend / macOS additions ─────────────────────
+# macOS
+.DS_Store
+*.swp
+
+# Xcode / Swift (src/mac-app)
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+.swiftpm/
+
+# Node / Next.js (src/canvas-ui)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Secrets / local config
+.env.local
+*.local.json
+secrets/
+
+# Agent / scratch
+scratchpad/
+.archive/

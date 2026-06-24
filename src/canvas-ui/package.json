@@ -1,0 +1,25 @@
+{
+  "name": "rainy-canvas-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rainy Canvas UI — Next.js (App Router) + tldraw infinite canvas, runs as web and inside the macOS WKWebView shell.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.5.16",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tldraw": "^5.1.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
