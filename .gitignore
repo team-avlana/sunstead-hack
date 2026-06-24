@@ -246,3 +246,7 @@ secrets/
 # Agent / scratch
 scratchpad/
 .archive/
+
+# Un-ignore frontend source dirs that the broad Python rules above (lib/, build/) also match
+!src/canvas-ui/lib/
+!src/canvas-ui/lib/**
