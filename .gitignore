@@ -219,3 +219,12 @@ __marimo__/
 
 .claude
 .vscode
+
+docs/tasks/**
+
+# runtime artifacts
+**/tmp/**
+**/workdir/**
+
+# python-service
+src/python-service/config.toml
