@@ -1,0 +1,73 @@
+/* Rainy Canvas UI — PLACEHOLDER styling only.
+   The full brand / design system lives in design/index.html and will be applied
+   later (Adrian). Keep this minimal and neutral. */
+
+:root {
+  --accent: #d24b3f; /* Rainey red */
+  --bg: #0e0e10;
+  --panel: #161619;
+  --panel-2: #1c1c21;
+  --border: #2a2a31;
+  --text: #e7e7ea;
+  --text-dim: #9a9aa3;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.rainy-root { display: flex; height: 100vh; width: 100vw; }
+
+/* ---------- Sidebar ---------- */
+.rainy-sidebar {
+  width: 248px; flex: 0 0 248px;
+  display: flex; flex-direction: column; gap: 18px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px;
+}
+.rainy-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.rainy-brand .dot { width: 14px; height: 14px; border-radius: 4px; background: var(--accent); }
+.rainy-nav { display: flex; flex-direction: column; gap: 2px; }
+.rainy-nav button {
+  text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; cursor: pointer;
+  background: transparent; color: var(--text-dim); font-size: 13px;
+}
+.rainy-nav button:hover, .rainy-nav button.active { background: var(--panel-2); color: var(--text); }
+.rainy-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 0 0 6px 4px; }
+.rainy-projects { display: flex; flex-direction: column; gap: 2px; }
+.rainy-project { text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; cursor: pointer; background: transparent; color: var(--text); font-size: 13px; }
+.rainy-project.active { background: var(--panel-2); }
+.rainy-spacer { flex: 1; }
+.rainy-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); padding: 6px 4px; }
+.rainy-status .led { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+.rainy-status .led.connected { background: #3fb950; }
+.rainy-status .led.reconnecting { background: #d29922; }
+.rainy-status .led.mock { background: var(--accent); }
+
+/* ---------- Canvas ---------- */
+.rainy-canvas { position: relative; flex: 1 1 auto; min-width: 0; }
+
+/* ---------- Companion (Rainey) — placeholder ---------- */
+.rainey { position: fixed; right: 28px; bottom: 24px; z-index: 1000; user-select: none; cursor: grab; touch-action: none; }
+.rainey.dragging { cursor: grabbing; }
+.rainey-body { animation: rainey-bob 3s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+.rainey.dragging .rainey-body { animation: none; }
+@keyframes rainey-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.rainey-bubble {
+  position: absolute; bottom: 84px; right: 0; width: 224px;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.45;
+  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+}
+.rainey-bubble::after {
+  content: ''; position: absolute; bottom: -7px; right: 26px; width: 12px; height: 12px;
+  background: var(--panel-2); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
