@@ -2,9 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import Sidebar from './Sidebar'
-import Header from './Header'
-import PromptBar from './PromptBar'
-import ZoomControls from './ZoomControls'
+import Companion from './Companion'
 
 // ssr:false is legal here because this file is a Client Component (App Router rule).
 const CanvasWorkspace = dynamic(() => import('./CanvasWorkspace'), {
@@ -14,14 +12,10 @@ const CanvasWorkspace = dynamic(() => import('./CanvasWorkspace'), {
 
 export default function CanvasClient() {
   return (
-    <div className="page">
-      <div className="canvas-card">
-        <CanvasWorkspace />
-        <Sidebar />
-        <Header />
-        <ZoomControls />
-        <PromptBar />
-      </div>
+    <div className="rainy-root">
+      <CanvasWorkspace />
+      <Sidebar />
+      <Companion />
     </div>
   )
 }
