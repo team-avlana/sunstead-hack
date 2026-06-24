@@ -1,73 +1,126 @@
-/* Rainy Canvas UI — PLACEHOLDER styling only.
-   The full brand / design system lives in design/index.html and will be applied
-   later (Adrian). Keep this minimal and neutral. */
+/* Rainy Canvas UI — light, clean, Figma-like FIRST PASS.
+   Placeholder design system; full brand lives in design/index.html. */
 
 :root {
-  --accent: #d24b3f; /* Rainey red */
-  --bg: #0e0e10;
-  --panel: #161619;
-  --panel-2: #1c1c21;
-  --border: #2a2a31;
-  --text: #e7e7ea;
-  --text-dim: #9a9aa3;
-  color-scheme: dark;
+  --bg: #e9ecf3;
+  --canvas: #fcfdff;
+  --panel: rgba(255, 255, 255, 0.62);
+  --panel-blur: 20px;
+  --panel-hairline: rgba(255, 255, 255, 0.75);
+  --border: rgba(18, 24, 48, 0.08);
+  --ink: #191d28;
+  --ink-dim: #868d9e;
+  --accent: #3b6ef6;
+  --accent-ink: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(20, 28, 60, 0.06), 0 2px 6px rgba(20, 28, 60, 0.05);
+  --shadow-md: 0 8px 22px rgba(20, 28, 60, 0.10), 0 2px 6px rgba(20, 28, 60, 0.06);
+  --shadow-lg: 0 20px 54px rgba(20, 28, 60, 0.16), 0 4px 12px rgba(20, 28, 60, 0.08);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
 body {
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
+button, input { font-family: inherit; }
 
-.rainy-root { display: flex; height: 100vh; width: 100vw; }
+/* ---------- Page + canvas card ---------- */
+.page { position: fixed; inset: 0; padding: 14px; }
+.canvas-card {
+  position: relative; width: 100%; height: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.rainy-canvas { position: absolute; inset: 0; }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Sidebar (glassy, floats over canvas) ---------- */
 .rainy-sidebar {
-  width: 248px; flex: 0 0 248px;
-  display: flex; flex-direction: column; gap: 18px;
+  position: absolute; top: 16px; left: 16px; bottom: 16px; width: 230px;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 16px 14px;
   background: var(--panel);
-  border-right: 1px solid var(--border);
-  padding: 16px 12px;
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(165%);
+  backdrop-filter: blur(var(--panel-blur)) saturate(165%);
+  border: 1px solid var(--panel-hairline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+  z-index: 5;
 }
-.rainy-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
-.rainy-brand .dot { width: 14px; height: 14px; border-radius: 4px; background: var(--accent); }
+.rainy-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.rainy-brand .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, #ff6a5a, #d24b3f); box-shadow: var(--shadow-sm); }
 .rainy-nav { display: flex; flex-direction: column; gap: 2px; }
-.rainy-nav button {
-  text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; cursor: pointer;
-  background: transparent; color: var(--text-dim); font-size: 13px;
-}
-.rainy-nav button:hover, .rainy-nav button.active { background: var(--panel-2); color: var(--text); }
-.rainy-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 0 0 6px 4px; }
+.rainy-nav button { text-align: left; padding: 8px 10px; border-radius: 10px; border: 0; cursor: pointer; background: transparent; color: var(--ink-dim); font-size: 13px; font-weight: 500; transition: background .15s, color .15s; }
+.rainy-nav button:hover { background: rgba(18, 24, 48, 0.05); color: var(--ink); }
+.rainy-nav button.active { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
+.rainy-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); margin: 0 0 6px 4px; font-weight: 600; }
 .rainy-projects { display: flex; flex-direction: column; gap: 2px; }
-.rainy-project { text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; cursor: pointer; background: transparent; color: var(--text); font-size: 13px; }
-.rainy-project.active { background: var(--panel-2); }
+.rainy-project { text-align: left; padding: 8px 10px; border-radius: 10px; border: 0; cursor: pointer; background: transparent; color: var(--ink); font-size: 13px; transition: background .15s; }
+.rainy-project:hover { background: rgba(18, 24, 48, 0.05); }
+.rainy-project.active { background: #fff; box-shadow: var(--shadow-sm); }
 .rainy-spacer { flex: 1; }
-.rainy-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); padding: 6px 4px; }
-.rainy-status .led { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-.rainy-status .led.connected { background: #3fb950; }
-.rainy-status .led.reconnecting { background: #d29922; }
+.rainy-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); padding: 4px; }
+.rainy-status .led { width: 8px; height: 8px; border-radius: 50%; background: #c2c7d4; }
+.rainy-status .led.connected { background: #28c76f; }
+.rainy-status .led.reconnecting { background: #ff9f43; }
 .rainy-status .led.mock { background: var(--accent); }
 
-/* ---------- Canvas ---------- */
-.rainy-canvas { position: relative; flex: 1 1 auto; min-width: 0; }
+/* ---------- Header (doc title) ---------- */
+.rainy-header {
+  position: absolute; top: 16px; left: 262px; right: 16px; height: 50px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 8px 0 16px;
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(165%);
+  backdrop-filter: blur(var(--panel-blur)) saturate(165%);
+  border: 1px solid var(--panel-hairline);
+  border-radius: 15px;
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+.rainy-header .doc { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 14px; }
+.rainy-header .doc .led { width: 9px; height: 9px; border-radius: 50%; background: #28c76f; box-shadow: 0 0 0 3px rgba(40, 199, 111, .16); }
+.rainy-header .doc .sub { color: var(--ink-dim); font-weight: 400; font-size: 13px; }
+.rainy-header .grow { flex: 1; }
+.icon-btn { width: 32px; height: 32px; border-radius: 9px; border: 0; background: transparent; color: var(--ink-dim); cursor: pointer; display: grid; place-items: center; font-size: 15px; transition: background .15s, color .15s; }
+.icon-btn:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+.btn-primary { height: 34px; padding: 0 16px; border-radius: 11px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .12s, filter .15s; }
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:active { transform: translateY(1px) scale(.98); }
 
-/* ---------- Companion (Rainey) — placeholder ---------- */
-.rainey { position: fixed; right: 28px; bottom: 24px; z-index: 1000; user-select: none; cursor: grab; touch-action: none; }
-.rainey.dragging { cursor: grabbing; }
-.rainey-body { animation: rainey-bob 3s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
-.rainey.dragging .rainey-body { animation: none; }
-@keyframes rainey-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.rainey-bubble {
-  position: absolute; bottom: 84px; right: 0; width: 224px;
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.45;
-  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+/* ---------- Prompt bar (Rainey) ---------- */
+.rainy-prompt {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: min(620px, calc(100% - 320px));
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px 8px 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 6;
 }
-.rainey-bubble::after {
-  content: ''; position: absolute; bottom: -7px; right: 26px; width: 12px; height: 12px;
-  background: var(--panel-2); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
-  transform: rotate(45deg);
+.rainey-avatar { width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto; background: linear-gradient(140deg, #43d6c4, #3b6ef6); display: grid; place-items: center; box-shadow: var(--shadow-sm); }
+.rainy-prompt input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--ink); }
+.rainy-prompt input::placeholder { color: var(--ink-dim); }
+.kbd { font-size: 11px; color: var(--ink-dim); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+.send-btn { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow-sm); transition: transform .12s, filter .15s; }
+.send-btn:hover { filter: brightness(1.06); }
+.send-btn:active { transform: scale(.94); }
+
+/* ---------- Zoom pill ---------- */
+.rainy-zoom {
+  position: absolute; bottom: 20px; left: 16px;
+  display: flex; align-items: center; gap: 2px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-md); padding: 4px; z-index: 5;
 }
+.rainy-zoom button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer; font-size: 16px; line-height: 1; transition: background .15s; }
+.rainy-zoom button:hover { background: rgba(18, 24, 48, 0.06); }
+.rainy-zoom .pct { font-size: 12px; color: var(--ink-dim); min-width: 46px; text-align: center; cursor: pointer; }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-doc-theme="aurora">
+<html lang="en" data-theme="aurora" data-doc-theme="aurora">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -60,17 +60,17 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
   --ink-3: #8195A9;
   --line: #E4ECF4;
   --line-2: #CFDBE8;
-  --primary: #2B5BF0;
-  --primary-hover: #1E48D6;
+  --primary: #2E6FE0;
+  --primary-hover: #1F58C8;
   --primary-ink: #FFFFFF;
-  --primary-soft: #E6EDFF;
-  --primary-soft-ink: #1E40C9;
-  --accent: #14C3B2;     /* aurora teal */
-  --accent-2: #7A6CF5;   /* aurora violet */
-  --accent-3: #28CE7C;   /* aurora green */
-  --warm: #FF9F2E;       /* rain-gold / sunrise */
-  --danger: #F2545B;
-  --aurora-grad: linear-gradient(110deg,#28CE7C 0%, #14C3B2 26%, #2B5BF0 58%, #7A6CF5 100%);
+  --primary-soft: #E5EDFF;
+  --primary-soft-ink: #1F50C9;
+  --accent: #16C2C9;     /* ice cyan */
+  --accent-2: #6A74F0;   /* aurora indigo */
+  --accent-3: #2FD08C;   /* aurora green */
+  --warm: #1FC8A0;       /* aurora peak (cold sea-green) */
+  --danger: #E5556A;
+  --aurora-grad: linear-gradient(120deg,#2FD08C 0%, #16C2C9 30%, #2E6FE0 64%, #6A74F0 100%);
   --node-bg: #FFFFFF;
   --node-line: #E1E9F2;
   --glass-bg: rgba(255,255,255,.72);
@@ -79,7 +79,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
   --shadow-1: 0 1px 2px rgba(16,42,76,.06), 0 2px 8px rgba(16,42,76,.05);
   --shadow-2: 0 8px 28px rgba(16,42,76,.10), 0 2px 6px rgba(16,42,76,.06);
   --shadow-pop: 0 18px 50px rgba(16,42,76,.16);
-  --ring: 0 0 0 3px rgba(43,91,240,.28);
+  --ring: 0 0 0 3px rgba(46,111,224,.30);
 }
 
 /* ---- FROST : Liquid Glass, dark, native macOS pro tool ---- */
@@ -106,7 +106,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
   --accent: #45E6CE;
   --accent-2: #A08CFF;
   --accent-3: #4CE89E;
-  --warm: #FFC061;
+  --warm: #46E0B0;
   --danger: #FF6B72;
   --aurora-grad: linear-gradient(110deg,#4CE89E 0%, #45E6CE 24%, #5AA8FF 58%, #A08CFF 100%);
   --node-bg: rgba(20,28,40,.66);
@@ -120,42 +120,42 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
   --ring: 0 0 0 3px rgba(90,168,255,.4);
 }
 
-/* ---- ALMANAC : warm paper, editorial nordic field guide ---- */
-[data-theme="almanac"] {
+/* ---- FJORD : cold stone & glacier, calm Nordic editorial ---- */
+[data-theme="fjord"] {
   --font-ui: 'Inter', -apple-system, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
-  --page-bg: #E9E0CE;
-  --bg: #F1EADB;
-  --canvas-bg: #F6F1E6;
-  --grid-dot: #DCCFB5;
-  --surface: #FBF7EE;
-  --surface-2: #F0E8D7;
-  --surface-3: #E7DCC5;
-  --ink: #241C12;
-  --ink-2: #5C4E3A;
-  --ink-3: #93826A;
-  --line: #E0D5BD;
-  --line-2: #CDBD9C;
-  --primary: #284A6E;
-  --primary-hover: #1C3A59;
-  --primary-ink: #FBF7EE;
-  --primary-soft: #DCE4EC;
-  --primary-soft-ink: #284A6E;
-  --accent: #B14A2C;     /* winterberry rust */
-  --accent-2: #2F6B4B;   /* pine */
-  --accent-3: #2F6B4B;
-  --warm: #C98A2B;       /* amber */
-  --danger: #B14A2C;
-  --aurora-grad: linear-gradient(110deg,#2F6B4B 0%, #284A6E 45%, #6E5AA0 78%, #B14A2C 100%);
-  --node-bg: #FBF7EE;
-  --node-line: #DECFB2;
-  --glass-bg: rgba(251,247,238,.8);
+  --page-bg: #DBE3EB;
+  --bg: #E7EDF3;
+  --canvas-bg: #EFF4F8;
+  --grid-dot: #C6D2DE;
+  --surface: #F7FAFC;
+  --surface-2: #E2EAF1;
+  --surface-3: #D5DFE9;
+  --ink: #112230;
+  --ink-2: #42566A;
+  --ink-3: #7E8F9F;
+  --line: #D3DDE7;
+  --line-2: #BAC8D6;
+  --primary: #245C82;
+  --primary-hover: #1A4866;
+  --primary-ink: #F7FAFC;
+  --primary-soft: #DBE6EF;
+  --primary-soft-ink: #245C82;
+  --accent: #2A8C8C;     /* cold teal */
+  --accent-2: #5566B0;   /* slate indigo */
+  --accent-3: #2E9E86;   /* sea green */
+  --warm: #2E9E86;       /* aurora peak (cold sea-green) */
+  --danger: #A4566A;
+  --aurora-grad: linear-gradient(120deg,#2E9E86 0%, #2A8C8C 38%, #245C82 70%, #5566B0 100%);
+  --node-bg: #F7FAFC;
+  --node-line: #D3DDE7;
+  --glass-bg: rgba(247,250,252,.82);
   --glass-blur: 8px;
   --r-base: 10px;
-  --shadow-1: 0 1px 2px rgba(60,46,20,.10), 0 2px 6px rgba(60,46,20,.07);
-  --shadow-2: 0 8px 24px rgba(60,46,20,.14);
-  --shadow-pop: 0 18px 44px rgba(60,46,20,.2);
-  --ring: 0 0 0 3px rgba(40,74,110,.28);
+  --shadow-1: 0 1px 2px rgba(20,40,60,.10), 0 2px 6px rgba(20,40,60,.07);
+  --shadow-2: 0 8px 24px rgba(20,40,60,.14);
+  --shadow-pop: 0 18px 44px rgba(20,40,60,.2);
+  --ring: 0 0 0 3px rgba(36,92,130,.3);
 }
 
 /* ============================================================
@@ -183,7 +183,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .switcher button .sw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 .sw-dot.aurora { background: linear-gradient(135deg,#28CE7C,#2B5BF0); }
 .sw-dot.frost { background: linear-gradient(135deg,#45E6CE,#5AA8FF); }
-.sw-dot.almanac { background: linear-gradient(135deg,#C98A2B,#284A6E); }
+.sw-dot.fjord { background: linear-gradient(135deg,#2E9E86,#245C82); }
 
 /* Sidebar nav */
 .sidenav {
@@ -411,9 +411,9 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
 .n-idea.warm { border-color: color-mix(in srgb,var(--warm) 50%, var(--node-line)); }
 
 /* sticky note */
-.n-note { width:170px; padding:14px; border-radius:4px; font-size:13px; font-weight:500; line-height:1.4; color:#3a2f00;
-  background:#FFF3B0; box-shadow: var(--shadow-2); transform: rotate(-1.4deg); border:none; }
-[data-theme="frost"] .n-note{ color:#3a2f00; }
+.n-note { width:170px; padding:14px; border-radius:4px; font-size:13px; font-weight:500; line-height:1.4; color:#16384F;
+  background:#D7EAFB; box-shadow: var(--shadow-2); transform: rotate(-1.4deg); border:none; }
+[data-theme="frost"] .n-note{ color:#16384F; }
 
 /* agent presence */
 .agent-cursor { position:absolute; z-index:30; pointer-events:none; }
@@ -543,12 +543,69 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
     <ellipse cx="28.5" cy="20.5" rx="3.1" ry="4.4" fill="#fff" transform="rotate(22 28.5 20.5)"/>
     <path d="M20 13 C26 13 30 17 30 23 C30 30 26 34 20 34 C14 34 10 30 10 23 C10 17 14 13 20 13 Z" fill="#fff"/>
     <circle cx="16.6" cy="23" r="1.7" fill="#1A2A3A"/><circle cx="23.4" cy="23" r="1.7" fill="#1A2A3A"/>
-    <circle cx="20" cy="29" r="2.6" fill="#FF9F2E"/><circle cx="19.2" cy="28.2" r=".8" fill="#fff" opacity=".85"/>
+    <circle cx="20" cy="29" r="2.6" fill="#16C2C9"/><circle cx="19.2" cy="28.2" r=".8" fill="#fff" opacity=".85"/>
   </symbol>
 </svg>
 <style>
   .rainey { width:62%; height:62%; }
   .mascot-btn .rainey, .sp-mascot .rainey, .em-mascot .rainey, .mb-head .mm .rainey, .home-side .hl-brand .rainey { filter: drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
+
+  /* ===== Rainey nose loading states — single aurora dot, pure CSS ===== */
+  .ns-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:14px;
+    --nose-a:#6FE8E6; --nose-b:#16C2C9; --nose-c:#1C6FB4; --spark:#6A74F0; }
+  .ns-cell { background:var(--surface-2); border:1px solid var(--line); border-radius:16px;
+    padding:24px 12px 16px; display:flex; flex-direction:column; align-items:center; gap:16px;
+    transition:border-color .25s ease, transform .25s ease; }
+  .ns-cell:hover { border-color:color-mix(in srgb, var(--nose-b) 50%, transparent); transform:translateY(-3px); }
+  .ns-stage { width:104px; height:104px; display:flex; align-items:center; justify-content:center; position:relative; }
+  .ns-nose { width:58px; height:58px; border-radius:50%; position:relative;
+    background: radial-gradient(circle at 36% 32%, var(--nose-a) 0%, var(--nose-b) 55%, var(--nose-c) 100%); }
+  .ns-nose::after { content:""; position:absolute; top:12px; left:14px; width:15px; height:10px; border-radius:50%;
+    background:rgba(255,255,255,.6); filter:blur(1px); }
+  .ns-lbl { font-size:12.5px; letter-spacing:.03em; color:var(--ink-3); text-align:center; line-height:1.45; }
+  .ns-lbl b { color:var(--ink); font-weight:650; display:block; font-size:13px; margin-bottom:2px; }
+
+  .ns-idle .ns-nose { animation: nsPulse 2.6s ease-in-out infinite; }
+  @keyframes nsPulse { 0%,100%{ transform:scale(1); filter:brightness(1);} 50%{ transform:scale(1.07); filter:brightness(1.1);} }
+
+  .ns-think .ns-nose { animation: nsPulse 2.6s ease-in-out infinite; }
+  .ns-think .ns-orbit { position:absolute; inset:6px; animation: nsSpin 2.6s linear infinite; }
+  .ns-think .ns-orbit span { position:absolute; left:50%; width:10px; height:10px; margin-left:-5px; border-radius:50%;
+    background: radial-gradient(circle at 36% 32%, var(--nose-a), var(--nose-b) 60%, var(--nose-c)); }
+  .ns-think .ns-orbit span:nth-child(1){ top:-3px; } .ns-think .ns-orbit span:nth-child(2){ bottom:-3px; }
+  @keyframes nsSpin { to { transform:rotate(360deg);} }
+
+  .ns-idea .ns-nose { animation: nsAha 2.4s cubic-bezier(.34,1.56,.64,1) infinite; }
+  @keyframes nsAha { 0%,30%{ transform:translateY(0) scale(1);} 42%{ transform:translateY(-11px) scale(1.12);} 58%{ transform:translateY(0) scale(1);} 100%{ transform:translateY(0) scale(1);} }
+  .ns-idea .ns-burst { position:absolute; top:50%; left:50%; width:0; height:0; }
+  .ns-idea .ns-burst i { position:absolute; left:0; top:0; width:3px; height:12px; border-radius:3px; background:var(--spark);
+    transform-origin:center -20px; opacity:0; animation: nsBurst 2.4s ease-out infinite; }
+  .ns-idea .ns-burst i:nth-child(1){transform:rotate(0);}.ns-idea .ns-burst i:nth-child(2){transform:rotate(60deg);}.ns-idea .ns-burst i:nth-child(3){transform:rotate(120deg);}.ns-idea .ns-burst i:nth-child(4){transform:rotate(180deg);}.ns-idea .ns-burst i:nth-child(5){transform:rotate(240deg);}.ns-idea .ns-burst i:nth-child(6){transform:rotate(300deg);}
+  @keyframes nsBurst { 0%,34%{opacity:0;height:4px;} 44%{opacity:1;height:14px;} 62%,100%{opacity:0;height:4px;} }
+
+  .ns-done .ns-nose { animation: nsSettle 2.6s ease-in-out infinite; z-index:2; }
+  @keyframes nsSettle { 0%{transform:scale(.7);filter:brightness(.9);} 30%{transform:scale(1.12);filter:brightness(1.15);} 45%{transform:scale(1);} 100%{transform:scale(1);} }
+  .ns-done .ns-ring { position:absolute; top:50%; left:50%; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%;
+    border:3px solid var(--spark); opacity:0; animation: nsRing 2.6s ease-out infinite; }
+  @keyframes nsRing { 0%,28%{opacity:0;transform:scale(.7);} 40%{opacity:.8;} 100%{opacity:0;transform:scale(2.1);border-width:1px;} }
+
+  .ns-listen .ns-nose { animation: nsPulse 2.6s ease-in-out infinite; z-index:2; }
+  .ns-listen .ns-bit { position:absolute; top:50%; left:50%; width:8px; height:8px; margin:-4px; border-radius:50%;
+    background: radial-gradient(circle at 36% 32%, var(--nose-a), var(--nose-b)); }
+  .ns-listen .ns-bit.b1{ animation: nsAbsorb1 2s ease-in infinite;}
+  .ns-listen .ns-bit.b2{ animation: nsAbsorb2 2s ease-in infinite .5s;}
+  .ns-listen .ns-bit.b3{ animation: nsAbsorb3 2s ease-in infinite 1s;}
+  .ns-listen .ns-bit.b4{ animation: nsAbsorb4 2s ease-in infinite 1.5s;}
+  @keyframes nsAbsorb1 {0%{opacity:0;transform:translate(40px,-26px) scale(1);}20%{opacity:1;}100%{opacity:0;transform:translate(0,0) scale(.2);}}
+  @keyframes nsAbsorb2 {0%{opacity:0;transform:translate(-42px,-19px) scale(1);}20%{opacity:1;}100%{opacity:0;transform:translate(0,0) scale(.2);}}
+  @keyframes nsAbsorb3 {0%{opacity:0;transform:translate(38px,24px) scale(1);}20%{opacity:1;}100%{opacity:0;transform:translate(0,0) scale(.2);}}
+  @keyframes nsAbsorb4 {0%{opacity:0;transform:translate(-36px,26px) scale(1);}20%{opacity:1;}100%{opacity:0;transform:translate(0,0) scale(.2);}}
+
+  @media (max-width:760px){ .ns-grid{ grid-template-columns:repeat(2,1fr);} }
+  @media (prefers-reduced-motion: reduce) {
+    .ns-nose, .ns-orbit, .ns-burst i, .ns-ring, .ns-bit { animation:none !important; }
+    .ns-burst i, .ns-ring, .ns-bit { opacity:1 !important; }
+  }
 </style>
 
 <!-- ============ TOPBAR ============ -->
@@ -557,9 +614,10 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
     <span class="logo-dot" id="topbar-logo">
       <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
         <defs><linearGradient id="rl-top" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#28CE7C"/><stop offset=".5" stop-color="#14C3B2"/><stop offset="1" stop-color="#2B5BF0"/></linearGradient></defs>
+          <stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs>
         <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#rl-top)"/>
-        <path d="M16 7 C19.5 12.5 23 15.5 23 19.2 a7 7 0 1 1 -14 0 C9 15.5 12.5 12.5 16 7 Z" fill="#fff"/>
+        <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.4">
+          <path d="M10 23 C12 15 13 11 12 7" opacity=".95"/><path d="M16 25 C18 16 19 11 18 6" opacity=".82"/><path d="M22 23 C23 16 24 12 23 8" opacity=".66"/></g>
       </svg>
     </span>
     Rainy
@@ -570,7 +628,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
     <span class="lbl">Direction</span>
     <button data-theme-btn="aurora" aria-pressed="true"><span class="sw-dot aurora"></span>Aurora</button>
     <button data-theme-btn="frost" aria-pressed="false"><span class="sw-dot frost"></span>Frost</button>
-    <button data-theme-btn="almanac" aria-pressed="false"><span class="sw-dot almanac"></span>Almanac</button>
+    <button data-theme-btn="fjord" aria-pressed="false"><span class="sw-dot fjord"></span>Fjord</button>
   </div>
 </header>
 
@@ -612,14 +670,14 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
   <div class="cover-grid"></div>
   <div class="wrap">
     <span class="eyebrow">
-      <svg viewBox="0 0 32 32" width="22" height="22"><defs><linearGradient id="eb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28CE7C"/><stop offset=".5" stop-color="#14C3B2"/><stop offset="1" stop-color="#2B5BF0"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="url(#eb)"/><path d="M16 7 C19.5 12.5 23 15.5 23 19.2 a7 7 0 1 1 -14 0 C9 15.5 12.5 12.5 16 7 Z" fill="#fff"/></svg>
+      <svg viewBox="0 0 32 32" width="22" height="22"><defs><linearGradient id="eb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="url(#eb)"/><g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.4"><path d="M10 23 C12 15 13 11 12 7" opacity=".95"/><path d="M16 25 C18 16 19 11 18 6" opacity=".82"/><path d="M22 23 C23 16 24 12 23 8" opacity=".66"/></g></svg>
       Rainy — agentic video studio for creators
     </span>
-    <h1>The studio where ideas <span class="grad">branch like antlers</span> and the agent makes it rain.</h1>
-    <p class="sub">A native macOS studio + infinite canvas for content creators. Paste a link, and Rainey — your reindeer co-pilot — downloads, analyzes, finds outliers, and grows the analysis into a living mindmap, live, on the canvas.</p>
+    <h1>The studio where ideas <span class="grad">branch like antlers</span> — and the agent brings the light.</h1>
+    <p class="sub">A native macOS studio + infinite canvas for content creators. Paste a link, and Rainey — your reindeer co-pilot — analyzes, finds outliers, and grows the analysis into a living mindmap, live on the canvas. Quiet, cold, Nordic-clean.</p>
 
     <div class="meta-row">
-      <div class="m"><b>3 brand directions</b><span>Aurora · Frost · Almanac</span></div>
+      <div class="m"><b>3 brand directions</b><span>Aurora · Frost · Fjord</span></div>
       <div class="m"><b>Full canvas system</b><span>tldraw-class, MCP-driven</span></div>
       <div class="m"><b>Progressive disclosure</b><span>Brutally simple → pro</span></div>
       <div class="m"><b>macOS 27 · Liquid Glass</b><span>SwiftUI shell + web canvas</span></div>
@@ -646,19 +704,19 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
 
     <div class="grid g3" style="margin-top:8px;">
       <div class="card">
-        <div style="font-size:30px; margin-bottom:12px;">🌧️</div>
-        <h4 style="color:#2B5BF0;">Rain = making it rain</h4>
-        <p class="muted" style="font-size:14px; line-height:1.55;">For a creator, "making it rain" is reach, views, growth. Rainy turns the work of research and ideation into <b>downpour</b>: the agent's job is abundance. Raindrops, umbrellas, weather — the optimistic side of the brand.</p>
+        <div style="font-size:30px; margin-bottom:12px;">🌌</div>
+        <h4 style="color:#2E6FE0;">Aurora = the agent's light</h4>
+        <p class="muted" style="font-size:14px; line-height:1.55;">Northern lights are the sky quietly doing the impossible. Rainey <b>is</b> the aurora: it works in the cold and dark, then the patterns light up — outliers, hooks, opportunities revealed. The aurora gradient is our one expressive flourish, used like a spark, never wallpaper.</p>
       </div>
       <div class="card">
         <div style="font-size:30px; margin-bottom:12px;">🦌</div>
-        <h4 style="color:#14998C;">Antlers = branching ideas</h4>
+        <h4 style="color:#168C92;">Antlers = branching ideas</h4>
         <p class="muted" style="font-size:14px; line-height:1.55;">The killer metaphor. A reindeer's antlers <b>branch exactly like a mindmap</b>. Every idea on the canvas grows tines: a video splits into hooks, hooks into angles, angles into scripts. The canvas literally renders connections as antler branches.</p>
       </div>
       <div class="card">
         <div style="font-size:30px; margin-bottom:12px;">❄️</div>
-        <h4 style="color:#7A6CF5;">Nordic = clean &amp; calm</h4>
-        <p class="muted" style="font-size:14px; line-height:1.55;">Snow, aurora, pine, reindeer. A Scandinavian design ethic: <b>brutal clarity, generous whitespace, quiet confidence</b>. The aurora gradient is our one permitted flourish — used like a spark, never wallpaper.</p>
+        <h4 style="color:#5A66C0;">Nordic = cold &amp; calm</h4>
+        <p class="muted" style="font-size:14px; line-height:1.55;">Snow, glacier, pine, reindeer. A Scandinavian design ethic: <b>brutal clarity, generous whitespace, cold-blue restraint, quiet confidence</b>. Personality stays in the mascot; the chrome stays still.</p>
       </div>
     </div>
 
@@ -667,12 +725,12 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
       <div class="card" style="padding:18px;">
         <div style="font-family:var(--font-mono); font-size:11px; color:#94A5B7;">PRODUCT</div>
         <div style="font-size:22px; font-weight:750; letter-spacing:-.02em; margin:4px 0 6px;">Rainy</div>
-        <p class="fine" style="line-height:1.5;">The studio / the app. Lowercase-friendly, calm, weather-soft.</p>
+        <p class="fine" style="line-height:1.5;">The studio / the app. Lowercase-friendly, calm, Nordic-soft.</p>
       </div>
       <div class="card" style="padding:18px;">
         <div style="font-family:var(--font-mono); font-size:11px; color:#94A5B7;">AGENT / MASCOT</div>
         <div style="font-size:22px; font-weight:750; letter-spacing:-.02em; margin:4px 0 6px;">Rainey 🦌</div>
-        <p class="fine" style="line-height:1.5;">The reindeer co-pilot — the face of the agent on the canvas. "Rainey makes it rain."</p>
+        <p class="fine" style="line-height:1.5;">The reindeer co-pilot — the face of the agent on the canvas. "Rainey brings the light."</p>
       </div>
       <div class="card" style="padding:18px;">
         <div style="font-family:var(--font-mono); font-size:11px; color:#94A5B7;">VOICE</div>
@@ -688,7 +746,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
   <div class="wrap">
     <span class="kicker">Source moodboard</span>
     <h2>Where this came from.</h2>
-    <p class="lede">Distilled from the "How Rainey makes it Rain" board and the Sunstead creator-workflow map. Each tile below is a thread we carried into the system.</p>
+    <p class="lede">Distilled from the original moodboard and the Sunstead creator-workflow map. Each tile below is a thread we carried into the system — minus the weather.</p>
 
     <div class="grid g4">
       <div class="card" style="padding:0; overflow:hidden;">
@@ -708,10 +766,10 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
         <div style="padding:14px 16px;"><b style="font-size:13.5px;">Nordic clean → blue+white</b><p class="fine" style="margin-top:4px;">Aurora, snow, calm clarity.</p></div>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
-        <div style="height:120px; background:#111; display:grid; place-items:center;">
-          <svg width="60" height="64" viewBox="0 0 60 64" fill="#fff"><path d="M30 62 C24 50 20 44 20 36 a10 10 0 0 1 20 0 C40 44 36 50 30 62 Z"/><path d="M26 18 L18 8 M34 18 L42 8 M30 14 L30 4" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+        <div style="height:120px; background:linear-gradient(160deg,#0a1430,#102a4e); display:grid; place-items:center;">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#cfe6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 56 C22 42 24 33 22 21" opacity=".85"/><path d="M44 56 C45 42 46 35 44 25" opacity=".7"/><path d="M32 58 C34 40 35 30 33 18" stroke="#fff"/><path d="M33 26 L24 17" stroke="#fff"/><path d="M33 20 L26 13" stroke="#fff"/><path d="M33 26 L42 17" stroke="#fff"/><path d="M33 20 L40 13" stroke="#fff"/></svg>
         </div>
-        <div style="padding:14px 16px;"><b style="font-size:13.5px;">Deer / drop marks</b><p class="fine" style="margin-top:4px;">Woodcut antler + raindrop logo seeds.</p></div>
+        <div style="padding:14px 16px;"><b style="font-size:13.5px;">Antler / aurora marks</b><p class="fine" style="margin-top:4px;">Woodcut antler + northern-light bands.</p></div>
       </div>
     </div>
 
@@ -728,19 +786,22 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
 <section id="logo" class="section">
   <div class="wrap">
     <span class="kicker">Identity · Logo &amp; marks</span>
-    <h2>One mark, two souls: a raindrop that grows antlers.</h2>
-    <p class="lede">The signature mark fuses the two brand pillars — a <b>raindrop</b> (make it rain) whose tip <b>branches into antler tines</b> (ideas mindmapping). It works as a glyph, a filled app icon, or a single hairline.</p>
+    <h2>One mark: aurora light that branches into antlers.</h2>
+    <p class="lede">The signature mark fuses the two living pillars — <b>aurora curtains</b> (the agent's light) rising into <b>antler tines</b> (ideas branching). Cold, Nordic, ownable. Works as a glyph, a filled app icon, or a single hairline. No drops, no weather.</p>
 
     <!-- HERO LOCKUP -->
     <div class="card" style="display:flex; align-items:center; gap:40px; padding:42px; background:linear-gradient(120deg,#FBFCFE,#F1F6FC);">
-      <svg width="120" height="132" viewBox="0 0 64 72" aria-label="Rainy antler-drop mark">
-        <defs><linearGradient id="hero-drop" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2B5BF0"/><stop offset=".5" stop-color="#14C3B2"/><stop offset="1" stop-color="#28CE7C"/></linearGradient></defs>
-        <path d="M32 70 C20 52 14 45 14 35 a18 18 0 0 1 36 0 C50 45 44 52 32 70 Z" fill="url(#hero-drop)"/>
-        <path d="M32 40 C30 33 32 27 31 22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".92"/>
+      <svg width="120" height="132" viewBox="0 0 64 72" aria-label="Rainy aurora-antler mark">
+        <defs><linearGradient id="hero-aur" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs>
+        <g fill="none" stroke="url(#hero-aur)" stroke-linecap="round">
+          <path d="M19 67 C23 51 25 41 23 29" stroke-width="5.5" opacity=".85"/>
+          <path d="M32 69 C36 49 36 37 32 23" stroke-width="6.5"/>
+          <path d="M45 67 C47 51 47 43 44 31" stroke-width="5.5" opacity=".85"/>
+        </g>
         <g fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M32 24 C31 15 33 9 32 3"/>
-          <path d="M32 13 L23 6"/><path d="M32 9 L25 3"/>
-          <path d="M32 13 L41 6"/><path d="M32 9 L39 3"/>
+          <path d="M32 27 C31 17 33 10 32 3"/>
+          <path d="M32 15 L23 7"/><path d="M32 10 L25 4"/>
+          <path d="M32 15 L41 7"/><path d="M32 10 L39 4"/>
         </g>
       </svg>
       <div>
@@ -748,68 +809,68 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
           <span style="font-size:54px; font-weight:800; letter-spacing:-.04em; color:#0A1722;">Rain</span>
           <span style="font-size:54px; font-weight:800; letter-spacing:-.04em; background:var(--aurora-grad); -webkit-background-clip:text; background-clip:text; color:transparent;">y</span>
         </div>
-        <p class="muted" style="font-size:14px; margin-top:6px;">Primary lockup · antler-drop + wordmark. The terminal “y” catches the aurora — the only color the wordmark ever takes.</p>
+        <p class="muted" style="font-size:14px; margin-top:6px;">Primary lockup · aurora-antler + wordmark. The terminal “y” catches the aurora — the only color the wordmark ever takes.</p>
       </div>
     </div>
 
     <!-- MARK EXPLORATIONS -->
     <h3>Mark explorations</h3>
     <div class="grid g4">
-      <!-- 1: antler-drop solid -->
+      <!-- 1: aurora-antler solid -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="60" height="68" viewBox="0 0 64 72"><path d="M32 70 C20 52 14 45 14 35 a18 18 0 0 1 36 0 C50 45 44 52 32 70 Z" fill="#2B5BF0"/><g fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round"><path d="M32 24 C31 15 33 9 32 3"/><path d="M32 13 L23 6"/><path d="M32 9 L25 3"/><path d="M32 13 L41 6"/><path d="M32 9 L39 3"/></g></svg>
+          <svg width="62" height="70" viewBox="0 0 64 72"><defs><linearGradient id="m1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><g fill="none" stroke="url(#m1)" stroke-linecap="round"><path d="M19 67 C23 51 25 41 23 29" stroke-width="5.5" opacity=".85"/><path d="M32 69 C36 49 36 37 32 23" stroke-width="6.5"/><path d="M45 67 C47 51 47 43 44 31" stroke-width="5.5" opacity=".85"/></g><g fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round"><path d="M32 27 C31 17 33 10 32 3"/><path d="M32 15 L23 7"/><path d="M32 10 L25 4"/><path d="M32 15 L41 7"/><path d="M32 10 L39 4"/></g></svg>
         </div>
-        <b style="font-size:13px;">Antler-drop</b><p class="fine">Primary glyph. ★</p>
+        <b style="font-size:13px;">Aurora-antler</b><p class="fine">Primary glyph. ★</p>
       </div>
       <!-- 2: hairline -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="58" height="68" viewBox="0 0 64 72" fill="none" stroke="#0C1B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M32 69 C21 52 15 45 15 35 a17 17 0 0 1 34 0 C49 45 43 52 32 69 Z"/><path d="M32 26 C31 17 33 11 32 4"/><path d="M32 15 L24 8"/><path d="M32 11 L26 5"/><path d="M32 15 L40 8"/><path d="M32 11 L38 5"/></svg>
+          <svg width="58" height="68" viewBox="0 0 64 72" fill="none" stroke="#0C1B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 67 C23 51 25 41 23 29" opacity=".5"/><path d="M45 67 C47 51 47 43 44 31" opacity=".5"/><path d="M32 69 C36 49 35 30 32 16"/><path d="M32 27 C31 18 33 12 32 5"/><path d="M32 16 L24 8"/><path d="M32 11 L26 5"/><path d="M32 16 L40 8"/><path d="M32 11 L38 5"/></svg>
         </div>
         <b style="font-size:13px;">Hairline</b><p class="fine">Single-weight, engraving.</p>
       </div>
-      <!-- 3: woodcut deer-in-blob -->
+      <!-- 3: antler-in-stone seal -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="76" height="76" viewBox="0 0 80 80"><path d="M40 6 C58 6 74 18 74 40 C74 64 58 74 40 74 C22 74 6 64 6 40 C6 18 22 6 40 6 Z" fill="#0C1B2A"/><g fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M40 64 L40 40"/><path d="M40 40 C32 32 28 26 22 18"/><path d="M40 40 C48 32 52 26 58 18"/><path d="M30 30 L22 24"/><path d="M50 30 L58 24"/><path d="M40 34 L33 26"/><path d="M40 34 L47 26"/></g></svg>
+          <svg width="76" height="76" viewBox="0 0 80 80"><path d="M40 6 C58 6 74 18 74 40 C74 64 58 74 40 74 C22 74 6 64 6 40 C6 18 22 6 40 6 Z" fill="#102230"/><g fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M40 64 L40 40"/><path d="M40 40 C32 32 28 26 22 18"/><path d="M40 40 C48 32 52 26 58 18"/><path d="M30 30 L22 24"/><path d="M50 30 L58 24"/><path d="M40 34 L33 26"/><path d="M40 34 L47 26"/></g></svg>
         </div>
-        <b style="font-size:13px;">Antler-tree blob</b><p class="fine">From the "deer mark" tiles.</p>
+        <b style="font-size:13px;">Antler seal</b><p class="fine">Woodcut antler in stone.</p>
       </div>
-      <!-- 4: umbrella -->
+      <!-- 4: aurora arc over horizon -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="64" height="68" viewBox="0 0 68 72"><path d="M34 12 C18 12 6 24 4 36 C12 31 16 31 22 36 C28 30 32 30 34 36 C36 30 40 30 46 36 C52 31 56 31 64 36 C62 24 50 12 34 12 Z" fill="#2B5BF0"/><path d="M34 12 L34 56 a8 8 0 0 1 -16 0" fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round"/><circle cx="34" cy="9" r="3" fill="#0C1B2A"/></svg>
+          <svg width="76" height="64" viewBox="0 0 76 64" fill="none" stroke-linecap="round"><path d="M8 50 C20 24 56 24 68 50" stroke="#2E6FE0" stroke-width="4" opacity=".92"/><path d="M15 50 C25 30 51 30 61 50" stroke="#16C2C9" stroke-width="4" opacity=".82"/><path d="M22 50 C29 37 47 37 54 50" stroke="#2FD08C" stroke-width="4" opacity=".7"/><line x1="6" y1="54" x2="70" y2="54" stroke="#0C1B2A" stroke-width="3"/></svg>
         </div>
-        <b style="font-size:13px;">Umbrella</b><p class="fine">Literal "make it rain."</p>
+        <b style="font-size:13px;">Aurora arc</b><p class="fine">Northern lights over a fjord.</p>
       </div>
       <!-- 5: monogram R -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="72" height="72" viewBox="0 0 72 72"><rect x="2" y="2" width="68" height="68" rx="20" fill="none" stroke="#CFDBE8" stroke-width="2"/><text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-weight="800" font-size="46" fill="#0C1B2A" letter-spacing="-2">R</text><circle cx="48" cy="46" r="5" fill="#2B5BF0"/></svg>
+          <svg width="72" height="72" viewBox="0 0 72 72"><rect x="2" y="2" width="68" height="68" rx="20" fill="none" stroke="#CFDBE8" stroke-width="2"/><text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-weight="800" font-size="46" fill="#112230" letter-spacing="-2">R</text><path d="M48 40 l1.6 4.6 4.6 1.6 -4.6 1.6 -1.6 4.6 -1.6 -4.6 -4.6 -1.6 4.6 -1.6 Z" fill="#2E6FE0"/></svg>
         </div>
-        <b style="font-size:13px;">Monogram R</b><p class="fine">Drop counter on the bowl.</p>
+        <b style="font-size:13px;">Monogram R</b><p class="fine">Aurora spark on the bowl.</p>
       </div>
       <!-- 6: aurora puck (favicon) -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="fav" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28CE7C"/><stop offset=".5" stop-color="#14C3B2"/><stop offset="1" stop-color="#2B5BF0"/></linearGradient></defs><rect x="2" y="2" width="68" height="68" rx="20" fill="url(#fav)"/><path d="M36 16 C44 27 51 33 51 41 a15 15 0 1 1 -30 0 C21 33 28 27 36 16 Z" fill="#fff"/></svg>
+          <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="fav" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><rect x="2" y="2" width="68" height="68" rx="20" fill="url(#fav)"/><g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="5"><path d="M24 54 C28 38 30 30 28 20" opacity=".95"/><path d="M37 56 C41 38 41 28 38 16"/><path d="M50 54 C52 40 52 32 49 22" opacity=".7"/></g></svg>
         </div>
         <b style="font-size:13px;">Aurora puck</b><p class="fine">Favicon · notification badge.</p>
       </div>
       <!-- 7: reindeer face -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="rf2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28CE7C"/><stop offset=".5" stop-color="#14C3B2"/><stop offset="1" stop-color="#2B5BF0"/></linearGradient></defs><rect x="2" y="2" width="68" height="68" rx="20" fill="url(#rf2)"/><use href="#rainey-face" x="16" y="16" width="40" height="40"/></svg>
+          <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="rf2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><rect x="2" y="2" width="68" height="68" rx="20" fill="url(#rf2)"/><use href="#rainey-face" x="16" y="16" width="40" height="40"/></svg>
         </div>
         <b style="font-size:13px;">Rainey badge</b><p class="fine">Mascot lockup for the agent.</p>
       </div>
-      <!-- 8: stacked rain -->
+      <!-- 8: aurora star -->
       <div class="card" style="text-align:center;">
         <div style="height:120px; display:grid; place-items:center;">
-          <svg width="60" height="68" viewBox="0 0 64 72" fill="#2B5BF0"><path d="M32 30 C28 23 25 20 25 16 a7 7 0 0 1 14 0 C39 20 36 23 32 30 Z"/><path d="M18 52 C15 47 13 44 13 41 a5 5 0 0 1 10 0 C23 44 21 47 18 52 Z" opacity=".7"/><path d="M46 52 C43 47 41 44 41 41 a5 5 0 0 1 10 0 C51 44 49 47 46 52 Z" opacity=".7"/><path d="M32 66 C29 61 27 58 27 55 a5 5 0 0 1 10 0 C37 58 35 61 32 66 Z" opacity=".45"/></svg>
+          <svg width="64" height="64" viewBox="0 0 64 64"><defs><linearGradient id="m8" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><path fill="url(#m8)" d="M32 4 C34 20 44 30 60 32 C44 34 34 44 32 60 C30 44 20 34 4 32 C20 30 30 20 32 4 Z"/></svg>
         </div>
-        <b style="font-size:13px;">Downpour</b><p class="fine">Loading / "raining" motion seed.</p>
+        <b style="font-size:13px;">Aurora star</b><p class="fine">Loading &amp; success spark.</p>
       </div>
     </div>
 
@@ -817,16 +878,16 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
     <h3>App icon — per direction</h3>
     <div class="row" style="gap:28px; align-items:flex-end;">
       <div style="text-align:center;">
-        <svg width="92" height="92" viewBox="0 0 92 92"><defs><linearGradient id="ai-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3CD888"/><stop offset=".5" stop-color="#19C7B4"/><stop offset="1" stop-color="#2B5BF0"/></linearGradient></defs><rect x="4" y="4" width="84" height="84" rx="22" fill="url(#ai-a)"/><path d="M46 22 C55 35 63 42 63 51 a17 17 0 1 1 -34 0 C29 42 37 35 46 22 Z" fill="#fff"/></svg>
-        <div class="fine" style="margin-top:8px;">Aurora · gradient + drop</div>
+        <svg width="92" height="92" viewBox="0 0 92 92"><defs><linearGradient id="ai-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><rect x="4" y="4" width="84" height="84" rx="22" fill="url(#ai-a)"/><g fill="none" stroke="#fff" stroke-linecap="round"><path d="M32 70 C37 50 39 40 36 28" stroke-width="6" opacity=".9"/><path d="M46 72 C51 50 51 38 47 24" stroke-width="6.5"/><path d="M60 70 C62 52 62 42 58 30" stroke-width="6" opacity=".7"/></g></svg>
+        <div class="fine" style="margin-top:8px;">Aurora · gradient + light curtains</div>
       </div>
       <div style="text-align:center;">
-        <svg width="92" height="92" viewBox="0 0 92 92"><defs><linearGradient id="ai-f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16202E"/><stop offset="1" stop-color="#0A0E15"/></linearGradient></defs><rect x="4" y="4" width="84" height="84" rx="22" fill="url(#ai-f)"/><rect x="4.5" y="4.5" width="83" height="83" rx="21.5" fill="none" stroke="rgba(255,255,255,.14)"/><path d="M46 24 C54 36 61 42 61 50 a15 15 0 1 1 -30 0 C31 42 38 36 46 24 Z" fill="none" stroke="#5AA8FF" stroke-width="3"/><path d="M46 50 C44 43 46 37 45 32" stroke="#45E6CE" stroke-width="3" stroke-linecap="round" fill="none"/></svg>
-        <div class="fine" style="margin-top:8px;">Frost · glass + glow line</div>
+        <svg width="92" height="92" viewBox="0 0 92 92"><defs><linearGradient id="ai-f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16202E"/><stop offset="1" stop-color="#0A0E15"/></linearGradient></defs><rect x="4" y="4" width="84" height="84" rx="22" fill="url(#ai-f)"/><rect x="4.5" y="4.5" width="83" height="83" rx="21.5" fill="none" stroke="rgba(255,255,255,.14)"/><g fill="none" stroke-linecap="round"><path d="M34 68 C38 50 39 40 36 28" stroke="#45E6CE" stroke-width="4" opacity=".85"/><path d="M46 70 C50 50 50 38 47 24" stroke="#5AA8FF" stroke-width="4.5"/><path d="M58 68 C60 52 60 42 57 30" stroke="#A08CFF" stroke-width="4" opacity=".85"/></g></svg>
+        <div class="fine" style="margin-top:8px;">Frost · aurora glow on glass</div>
       </div>
       <div style="text-align:center;">
-        <svg width="92" height="92" viewBox="0 0 92 92"><rect x="4" y="4" width="84" height="84" rx="20" fill="#F2E9D6"/><rect x="4.5" y="4.5" width="83" height="83" rx="19.5" fill="none" stroke="#D8C7A4" stroke-width="1.5"/><path d="M46 26 C53 37 60 43 60 50 a14 14 0 1 1 -28 0 C32 43 39 37 46 26 Z" fill="#284A6E"/><g fill="none" stroke="#B14A2C" stroke-width="3" stroke-linecap="round"><path d="M46 40 C45 33 47 29 46 24"/><path d="M46 32 L40 27"/><path d="M46 32 L52 27"/></g></svg>
-        <div class="fine" style="margin-top:8px;">Almanac · woodcut on paper</div>
+        <svg width="92" height="92" viewBox="0 0 92 92"><rect x="4" y="4" width="84" height="84" rx="20" fill="#E7EDF3"/><rect x="4.5" y="4.5" width="83" height="83" rx="19.5" fill="none" stroke="#BAC8D6" stroke-width="1.5"/><g fill="none" stroke="#245C82" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M46 66 L46 40"/><path d="M46 40 C39 33 35 28 30 21"/><path d="M46 40 C53 33 57 28 62 21"/><path d="M37 30 L31 25"/><path d="M55 30 L61 25"/><path d="M46 35 L40 28"/><path d="M46 35 L52 28"/></g></svg>
+        <div class="fine" style="margin-top:8px;">Fjord · woodcut antler on stone</div>
       </div>
     </div>
 
@@ -836,23 +897,23 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
       <div class="card">
         <h4>Wordmark variants</h4>
         <div style="display:flex; flex-direction:column; gap:18px; margin-top:6px;">
-          <div style="font-size:34px; font-weight:800; letter-spacing:-.04em; color:#0A1722;">Rainy<span style="color:#2B5BF0;">.</span></div>
+          <div style="font-size:34px; font-weight:800; letter-spacing:-.04em; color:#0A1722;">Rainy<span style="color:#2E6FE0;">.</span></div>
           <div style="font-family:var(--font-serif); font-size:34px; font-weight:600; letter-spacing:-.01em; color:#0A1722;">Rainy</div>
           <div style="font-size:30px; font-weight:300; letter-spacing:.16em; text-transform:uppercase; color:#0A1722;">Rainy</div>
         </div>
-        <p class="fine" style="margin-top:16px;">Inter Extrabold (default UI) · Fraunces (editorial / Almanac) · light tracked-caps (lockup secondary).</p>
+        <p class="fine" style="margin-top:16px;">Inter Extrabold (default UI) · Fraunces (editorial / Fjord) · light tracked-caps (lockup secondary).</p>
       </div>
       <div class="card">
         <h4>Clear space &amp; min size</h4>
         <div style="display:flex; align-items:center; gap:18px; margin-top:6px;">
           <div style="position:relative; padding:22px; border:1px dashed #C9D6E5; border-radius:12px;">
-            <svg width="44" height="50" viewBox="0 0 64 72"><path d="M32 70 C20 52 14 45 14 35 a18 18 0 0 1 36 0 C50 45 44 52 32 70 Z" fill="#2B5BF0"/><g fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round"><path d="M32 24 C31 15 33 9 32 3"/><path d="M32 13 L23 6"/><path d="M32 9 L25 3"/><path d="M32 13 L41 6"/><path d="M32 9 L39 3"/></g></svg>
+            <svg width="44" height="50" viewBox="0 0 64 72"><defs><linearGradient id="cs" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#2E6FE0"/></linearGradient></defs><g fill="none" stroke="url(#cs)" stroke-linecap="round"><path d="M19 67 C23 51 25 41 23 29" stroke-width="5.5" opacity=".85"/><path d="M32 69 C36 49 36 37 32 23" stroke-width="6.5"/><path d="M45 67 C47 51 47 43 44 31" stroke-width="5.5" opacity=".85"/></g><g fill="none" stroke="#0C1B2A" stroke-width="3.4" stroke-linecap="round"><path d="M32 27 C31 17 33 10 32 3"/><path d="M32 15 L23 7"/><path d="M32 10 L25 4"/><path d="M32 15 L41 7"/><path d="M32 10 L39 4"/></g></svg>
           </div>
           <ul style="font-size:13px; color:#4A5D71; line-height:1.9; list-style:none;">
             <li>◦ Clear space = height of the antler crown on all sides.</li>
             <li>◦ Min digital size: <b>20&nbsp;px</b> glyph / <b>16&nbsp;px</b> favicon.</li>
             <li>◦ Never recolor the antlers to the aurora — they stay ink.</li>
-            <li>◦ Drop body may take any single brand color or the gradient.</li>
+            <li>◦ Aurora curtains take any cold brand color or the gradient; antlers stay ink.</li>
           </ul>
         </div>
       </div>
@@ -864,69 +925,49 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
   <div class="wrap">
     <span class="kicker">Identity · Mascot</span>
     <h2 class="serif">Meet Rainey.</h2>
-    <p class="lede">Rainey is the face of the agent — a reindeer co-pilot with an aurora nose that <b>glows when it's thinking</b>. It never blocks the work; it lives in the command bar, the cursor, and the menu bar. Warmth lives here so the chrome can stay coldly clean.</p>
+    <p class="lede">Rainey is the face of the agent — a reindeer co-pilot with an <b>aurora nose that glows when it's thinking</b>. Icy palette, slate antlers, northern-light nose. It never blocks the work; it lives in the command bar, the cursor, and the menu bar. Personality lives here so the chrome can stay cold and still.</p>
 
-    <div class="grid g2" style="align-items:stretch;">
+    <div class="grid g2" style="align-items:start;">
       <!-- HERO -->
       <div class="card" style="background:radial-gradient(120% 100% at 50% 0%, #EAF1FB, #F6F1FF 70%); display:grid; place-items:center; padding:30px; position:relative; overflow:hidden;">
-        <!-- falling aurora drops -->
+        <!-- ambient aurora stars -->
         <svg viewBox="0 0 240 260" width="300" style="max-width:100%;">
           <defs>
-            <linearGradient id="nose-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3CD888"/><stop offset=".5" stop-color="#19C7B4"/><stop offset="1" stop-color="#7A6CF5"/></linearGradient>
-            <radialGradient id="nose-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#19C7B4" stop-opacity=".55"/><stop offset="1" stop-color="#19C7B4" stop-opacity="0"/></radialGradient>
+            <linearGradient id="nose-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FD08C"/><stop offset=".5" stop-color="#16C2C9"/><stop offset="1" stop-color="#6A74F0"/></linearGradient>
+            <radialGradient id="nose-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#16C2C9" stop-opacity=".55"/><stop offset="1" stop-color="#16C2C9" stop-opacity="0"/></radialGradient>
           </defs>
-          <!-- ambient drops -->
-          <g opacity=".5"><path d="M40 40 C37 34 35 31 35 28 a5 5 0 0 1 10 0 C45 31 43 34 40 40 Z" fill="#7A6CF5"/><path d="M205 64 C202 58 200 55 200 52 a5 5 0 0 1 10 0 C210 55 208 58 205 64 Z" fill="#14C3B2"/><path d="M28 150 C26 146 24 143 24 141 a4 4 0 0 1 8 0 C32 143 30 146 28 150 Z" fill="#2B5BF0"/><path d="M214 158 C212 154 210 151 210 149 a4 4 0 0 1 8 0 C218 151 216 154 214 158 Z" fill="#28CE7C"/></g>
+          <!-- ambient aurora stars -->
+          <g opacity=".6"><path d="M40 36 C41 31 45 27 50 26 C45 25 41 21 40 16 C39 21 35 25 30 26 C35 27 39 31 40 36 Z" fill="#6A74F0"/><path d="M206 62 C207 58 210 55 214 54 C210 53 207 50 206 46 C205 50 202 53 198 54 C202 55 205 58 206 62 Z" fill="#16C2C9"/><path d="M28 150 C29 147 31 145 34 144 C31 143 29 141 28 138 C27 141 25 143 22 144 C25 145 27 147 28 150 Z" fill="#2E6FE0"/><path d="M214 158 C215 155 217 153 220 152 C217 151 215 149 214 146 C213 149 211 151 208 152 C211 153 213 155 214 158 Z" fill="#2FD08C"/></g>
           <!-- antlers -->
-          <g fill="none" stroke="#B98E5E" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+          <g fill="none" stroke="#8FA6BE" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M92 60 C82 42 76 30 80 14"/><path d="M84 36 L68 28"/><path d="M82 22 L92 12"/>
             <path d="M148 60 C158 42 164 30 160 14"/><path d="M156 36 L172 28"/><path d="M158 22 L148 12"/>
           </g>
           <!-- ears -->
-          <ellipse cx="72" cy="92" rx="17" ry="24" fill="#ECDCC2" transform="rotate(-26 72 92)"/>
-          <ellipse cx="72" cy="94" rx="8" ry="13" fill="#E7A6A0" transform="rotate(-26 72 94)"/>
-          <ellipse cx="168" cy="92" rx="17" ry="24" fill="#ECDCC2" transform="rotate(26 168 92)"/>
-          <ellipse cx="168" cy="94" rx="8" ry="13" fill="#E7A6A0" transform="rotate(26 168 94)"/>
+          <ellipse cx="72" cy="92" rx="17" ry="24" fill="#E3EAF2" transform="rotate(-26 72 92)"/>
+          <ellipse cx="72" cy="94" rx="8" ry="13" fill="#AEC8E0" transform="rotate(-26 72 94)"/>
+          <ellipse cx="168" cy="92" rx="17" ry="24" fill="#E3EAF2" transform="rotate(26 168 92)"/>
+          <ellipse cx="168" cy="94" rx="8" ry="13" fill="#AEC8E0" transform="rotate(26 168 94)"/>
           <!-- head -->
-          <path d="M120 52 C158 52 180 78 180 114 C180 150 156 172 120 172 C84 172 60 150 60 114 C60 78 82 52 120 52 Z" fill="#ECDCC2"/>
+          <path d="M120 52 C158 52 180 78 180 114 C180 150 156 172 120 172 C84 172 60 150 60 114 C60 78 82 52 120 52 Z" fill="#E3EAF2"/>
           <!-- muzzle patch -->
-          <ellipse cx="120" cy="138" rx="34" ry="27" fill="#F8F0E0"/>
+          <ellipse cx="120" cy="138" rx="34" ry="27" fill="#F0F4F9"/>
           <!-- cheeks -->
-          <circle cx="80" cy="132" r="11" fill="#F4B5A6" opacity=".65"/>
-          <circle cx="160" cy="132" r="11" fill="#F4B5A6" opacity=".65"/>
+          <circle cx="80" cy="132" r="11" fill="#B9D0E6" opacity=".6"/>
+          <circle cx="160" cy="132" r="11" fill="#B9D0E6" opacity=".6"/>
           <!-- eyes -->
-          <circle cx="98" cy="112" r="7" fill="#2A2118"/><circle cx="100.5" cy="109.5" r="2.2" fill="#fff"/>
-          <circle cx="142" cy="112" r="7" fill="#2A2118"/><circle cx="144.5" cy="109.5" r="2.2" fill="#fff"/>
+          <circle cx="98" cy="112" r="7" fill="#1A2A38"/><circle cx="100.5" cy="109.5" r="2.2" fill="#fff"/>
+          <circle cx="142" cy="112" r="7" fill="#1A2A38"/><circle cx="144.5" cy="109.5" r="2.2" fill="#fff"/>
           <!-- nose with glow -->
           <circle cx="120" cy="140" r="26" fill="url(#nose-glow)"/>
           <circle cx="120" cy="140" r="13" fill="url(#nose-grad)"/>
           <circle cx="115" cy="135" r="4" fill="#fff" opacity=".8"/>
         </svg>
-        <div style="position:absolute; bottom:16px; left:0; right:0; text-align:center;" class="fine"><b style="color:#5A4D6E;">Rainey</b> · idle</div>
+        <div style="position:absolute; bottom:16px; left:0; right:0; text-align:center;" class="fine"><b style="color:#3F4D63;">Rainey</b> · idle</div>
       </div>
 
       <!-- STATES + USAGE -->
       <div>
-        <div class="card" style="margin-bottom:18px;">
-          <h4>Expression states</h4>
-          <div class="row" style="gap:24px; justify-content:space-around; margin-top:6px;">
-            <!-- idle -->
-            <div style="text-align:center;">
-              <svg width="78" height="78" viewBox="0 0 80 80"><circle cx="40" cy="42" r="26" fill="#ECDCC2"/><g fill="none" stroke="#B98E5E" stroke-width="4" stroke-linecap="round"><path d="M30 20 C26 13 24 9 26 4"/><path d="M50 20 C54 13 56 9 54 4"/></g><circle cx="32" cy="40" r="3" fill="#2A2118"/><circle cx="48" cy="40" r="3" fill="#2A2118"/><circle cx="40" cy="52" r="6" fill="url(#nose-grad)"/></svg>
-              <div class="fine" style="margin-top:6px;">Idle</div>
-            </div>
-            <!-- thinking -->
-            <div style="text-align:center;">
-              <svg width="78" height="78" viewBox="0 0 80 80"><circle cx="40" cy="52" r="9" fill="url(#nose-glow)"/><circle cx="40" cy="42" r="26" fill="#ECDCC2"/><g fill="none" stroke="#B98E5E" stroke-width="4" stroke-linecap="round"><path d="M30 20 C26 13 24 9 26 4"/><path d="M50 20 C54 13 56 9 54 4"/></g><path d="M28 40 q4 -4 8 0" fill="none" stroke="#2A2118" stroke-width="3" stroke-linecap="round"/><path d="M44 40 q4 -4 8 0" fill="none" stroke="#2A2118" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="52" r="6.5" fill="url(#nose-grad)"/></svg>
-              <div class="fine" style="margin-top:6px;">Thinking <span class="dots-load"><span></span><span></span><span></span></span></div>
-            </div>
-            <!-- delight -->
-            <div style="text-align:center;">
-              <svg width="78" height="78" viewBox="0 0 80 80"><circle cx="40" cy="42" r="26" fill="#ECDCC2"/><g fill="none" stroke="#B98E5E" stroke-width="4" stroke-linecap="round"><path d="M30 20 C26 13 24 9 26 4"/><path d="M50 20 C54 13 56 9 54 4"/></g><path d="M27 42 q5 5 10 0" fill="none" stroke="#2A2118" stroke-width="3" stroke-linecap="round"/><path d="M43 42 q5 5 10 0" fill="none" stroke="#2A2118" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="52" r="6" fill="url(#nose-grad)"/><path d="M64 16 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z" fill="#FF9F2E"/></svg>
-              <div class="fine" style="margin-top:6px;">Delight</div>
-            </div>
-          </div>
-        </div>
         <div class="card">
           <h4>Rainey in product</h4>
           <p class="muted" style="font-size:13.5px; margin:0 0 14px;">In the actual UI, Rainey is the <b>aurora puck</b> (works on light &amp; dark) — small, calm, and only animated while it's actually doing something.</p>
@@ -946,6 +987,36 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div class="row" style="align-items:baseline; gap:12px; margin-bottom:2px;">
+        <h4 style="margin:0;">Expression states · the nose in motion</h4>
+        <span class="fine">pure CSS · one dot · respects reduced-motion</span>
+      </div>
+      <p class="muted" style="font-size:13.5px; margin:6px 0 2px;">Five loading states built from a single aurora dot — abstract, brand-true, drop-in. The nose <i>is</i> the loader: it pulses idle, orbits while thinking, pops on an idea, rings on success, and pulls input in while listening.</p>
+      <div class="ns-grid">
+        <div class="ns-cell ns-idle">
+          <div class="ns-stage"><div class="ns-nose"></div></div>
+          <div class="ns-lbl"><b>Idle</b>resting · gentle pulse</div>
+        </div>
+        <div class="ns-cell ns-think">
+          <div class="ns-stage"><div class="ns-nose"></div><div class="ns-orbit"><span></span><span></span></div></div>
+          <div class="ns-lbl"><b>Thinking</b>deep task · twin orbit</div>
+        </div>
+        <div class="ns-cell ns-idea">
+          <div class="ns-stage"><div class="ns-burst"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="ns-nose"></div></div>
+          <div class="ns-lbl"><b>Idea!</b>aha pop + spark</div>
+        </div>
+        <div class="ns-cell ns-done">
+          <div class="ns-stage"><div class="ns-ring"></div><div class="ns-nose"></div></div>
+          <div class="ns-lbl"><b>Done</b>success · glow ring</div>
+        </div>
+        <div class="ns-cell ns-listen">
+          <div class="ns-stage"><div class="ns-bit b1"></div><div class="ns-bit b2"></div><div class="ns-bit b3"></div><div class="ns-bit b4"></div><div class="ns-nose"></div></div>
+          <div class="ns-lbl"><b>Listening</b>absorbing input</div>
         </div>
       </div>
     </div>
@@ -980,19 +1051,19 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
         <div class="col">
           <h4>Palette</h4>
           <div class="dir-pal">
-            <div class="pc"><div class="b" style="background:#2B5BF0;"></div><div class="t">2B5BF0</div></div>
+            <div class="pc"><div class="b" style="background:#2E6FE0;"></div><div class="t">2E6FE0</div></div>
             <div class="pc"><div class="b" style="background:#0C1B2A;"></div><div class="t">0C1B2A</div></div>
-            <div class="pc"><div class="b" style="background:#14C3B2;"></div><div class="t">14C3B2</div></div>
-            <div class="pc"><div class="b" style="background:#7A6CF5;"></div><div class="t">7A6CF5</div></div>
-            <div class="pc"><div class="b" style="background:#28CE7C;"></div><div class="t">28CE7C</div></div>
-            <div class="pc"><div class="b" style="background:#FF9F2E;"></div><div class="t">FF9F2E</div></div>
+            <div class="pc"><div class="b" style="background:#16C2C9;"></div><div class="t">16C2C9</div></div>
+            <div class="pc"><div class="b" style="background:#6A74F0;"></div><div class="t">6A74F0</div></div>
+            <div class="pc"><div class="b" style="background:#2FD08C;"></div><div class="t">2FD08C</div></div>
+            <div class="pc"><div class="b" style="background:#1FC8A0;"></div><div class="t">1FC8A0</div></div>
             <div class="pc"><div class="b" style="background:#F4F7FB; border-color:#dde;"></div><div class="t">F4F7FB</div></div>
           </div>
         </div>
         <div class="col">
           <h4>Type — Inter</h4>
           <div class="type-spec">
-            <div class="big" style="font-weight:800;">Make it rain.</div>
+            <div class="big" style="font-weight:800;">Catch the light.</div>
             <div class="lab">Inter · 800 / -4% · UI 400–600</div>
             <div class="body">Workhorse grotesk. Tight display tracking, comfortable body. The Figma-grade default — invisible, fast, trustworthy.</div>
           </div>
@@ -1039,14 +1110,14 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
             <div class="pc"><div class="b" style="background:#45E6CE;"></div><div class="t">45E6CE</div></div>
             <div class="pc"><div class="b" style="background:#A08CFF;"></div><div class="t">A08CFF</div></div>
             <div class="pc"><div class="b" style="background:#4CE89E;"></div><div class="t">4CE89E</div></div>
-            <div class="pc"><div class="b" style="background:#FFC061;"></div><div class="t">FFC061</div></div>
+            <div class="pc"><div class="b" style="background:#46E0B0;"></div><div class="t">46E0B0</div></div>
             <div class="pc"><div class="b" style="background:rgba(255,255,255,.09); border-color:#444;"></div><div class="t">glass</div></div>
           </div>
         </div>
         <div class="col">
           <h4>Type — SF Pro</h4>
           <div class="type-spec">
-            <div class="big" style="font-weight:700;">Make it rain.</div>
+            <div class="big" style="font-weight:700;">Catch the light.</div>
             <div class="lab">SF Pro Display · 700 · system-native</div>
             <div class="body">Apple's system face. Zero font-load, perfect on Retina, feels like the OS. Pairs with the Liquid Glass chrome out of the box.</div>
           </div>
@@ -1071,16 +1142,16 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
       </div>
     </div>
 
-    <!-- DIRECTION C : ALMANAC -->
-    <div class="dir" data-theme="almanac">
+    <!-- DIRECTION C : FJORD -->
+    <div class="dir" data-theme="fjord">
       <div class="dir-head">
         <div class="aurora-bar"></div>
         <div>
           <span class="badge">Direction C · the memorable bet</span>
-          <h3>Almanac</h3>
-          <p>Warm paper, editorial field-guide. Fraunces serif display, woodcut antler marks, winterberry &amp; pine accents. A "naturalist's almanac for creators" — distinctive, ownable, anti-generic. The boldest brand, the most personality.</p>
+          <h3>Fjord</h3>
+          <p>Cold stone &amp; glacier light. Fraunces serif display, woodcut antler marks, slate-blue + sea-green on pale ice. A naturalist's field guide for creators — chilled. Distinctive, ownable, anti-generic; the most personality while staying Nordic-cold.</p>
           <div class="row" style="margin-top:14px;">
-            <span class="chip-t">✅ Unforgettable</span><span class="chip-t">✅ Story-rich</span><span class="chip-t">⚠︎ Risk: warmth vs data density</span>
+            <span class="chip-t">✅ Distinctive</span><span class="chip-t">✅ Calm &amp; cold</span><span class="chip-t">⚠︎ Risk: serif at data density</span>
           </div>
         </div>
       </div>
@@ -1088,26 +1159,26 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
         <div class="col">
           <h4>Palette</h4>
           <div class="dir-pal">
-            <div class="pc"><div class="b" style="background:#284A6E;"></div><div class="t">284A6E</div></div>
-            <div class="pc"><div class="b" style="background:#241C12;"></div><div class="t">241C12</div></div>
-            <div class="pc"><div class="b" style="background:#B14A2C;"></div><div class="t">B14A2C</div></div>
-            <div class="pc"><div class="b" style="background:#2F6B4B;"></div><div class="t">2F6B4B</div></div>
-            <div class="pc"><div class="b" style="background:#C98A2B;"></div><div class="t">C98A2B</div></div>
-            <div class="pc"><div class="b" style="background:#F6F1E6; border-color:#d8cdb5;"></div><div class="t">F6F1E6</div></div>
-            <div class="pc"><div class="b" style="background:#E0D5BD; border-color:#cdbd9c;"></div><div class="t">E0D5BD</div></div>
+            <div class="pc"><div class="b" style="background:#245C82;"></div><div class="t">245C82</div></div>
+            <div class="pc"><div class="b" style="background:#112230;"></div><div class="t">112230</div></div>
+            <div class="pc"><div class="b" style="background:#2A8C8C;"></div><div class="t">2A8C8C</div></div>
+            <div class="pc"><div class="b" style="background:#5566B0;"></div><div class="t">5566B0</div></div>
+            <div class="pc"><div class="b" style="background:#2E9E86;"></div><div class="t">2E9E86</div></div>
+            <div class="pc"><div class="b" style="background:#EFF4F8; border-color:#cfdbe6;"></div><div class="t">EFF4F8</div></div>
+            <div class="pc"><div class="b" style="background:#D5DFE9; border-color:#bcc9d6;"></div><div class="t">D5DFE9</div></div>
           </div>
         </div>
         <div class="col">
           <h4>Type — Fraunces + Inter</h4>
           <div class="type-spec">
-            <div class="big">Make it rain.</div>
+            <div class="big">Catch the light.</div>
             <div class="lab">Fraunces 600 · soft optical · Inter body</div>
             <div class="body">A high-contrast "old-style" serif with a soft wonk. Carries the field-guide voice; Inter keeps the data tables legible.</div>
           </div>
         </div>
         <div class="mini-ui">
           <div style="display:flex; align-items:center; gap:10px; padding:8px 14px; background:var(--surface); border:1px solid var(--line-2); border-radius:8px; margin-bottom:16px;">
-            <svg width="20" height="20" viewBox="0 0 80 80"><path d="M40 64 L40 40 M40 40 C32 32 28 26 22 18 M40 40 C48 32 52 26 58 18" fill="none" stroke="#284A6E" stroke-width="5" stroke-linecap="round"/></svg>
+            <svg width="20" height="20" viewBox="0 0 80 80"><path d="M40 64 L40 40 M40 40 C32 32 28 26 22 18 M40 40 C48 32 52 26 58 18" fill="none" stroke="#245C82" stroke-width="5" stroke-linecap="round"/></svg>
             <b style="font-size:14px; font-family:var(--font-serif); color:var(--ink);">MrBeast — Teardown</b><span style="flex:1;"></span>
             <button class="btn btn-pri" style="padding:7px 14px; border-radius:8px;">Share</button>
           </div>
@@ -1118,7 +1189,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
             </div>
             <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
               <div class="row"><button class="btn btn-pri" style="border-radius:8px;">Analyze</button><button class="btn btn-sec" style="border-radius:8px;">Compare</button></div>
-              <div class="row"><span class="chip-t">Hook 9.1</span><span class="badge-t" style="background:#F4E3CF; color:#9A5A1E;">OUTLIER</span></div>
+              <div class="row"><span class="chip-t">Hook 9.1</span><span class="badge-t" style="background:#DCEFE6; color:#1E7A56;">OUTLIER</span></div>
             </div>
           </div>
         </div>
@@ -1127,7 +1198,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
 
     <div class="callout">
       <div class="ci">🧪</div>
-      <div class="ct"><b>My recommendation to argue with:</b> ship <b>Aurora</b> as the default product skin (it's the lowest-risk, most legible at data density), but steal <b>Frost</b> for the canvas's "focus mode"/dark theme and borrow <b>Almanac's</b> Fraunces + woodcut marks for marketing, onboarding, and Rainey's storytelling. That's a real system: one calm tool, one cozy brand. Tell me if you'd rather commit fully to one.</div>
+      <div class="ct"><b>My recommendation to argue with:</b> ship <b>Aurora</b> as the default product skin (it's the lowest-risk, most legible at data density), but steal <b>Frost</b> for the canvas's "focus mode"/dark theme and borrow <b>Fjord's</b> Fraunces + woodcut marks for marketing, onboarding, and Rainey's storytelling. That's a real system: one calm tool, one cold-Nordic brand. Tell me if you'd rather commit fully to one.</div>
     </div>
   </div>
 </section>
@@ -1136,14 +1207,14 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
   <div class="wrap">
     <span class="kicker">Foundations · Typography</span>
     <h2>One scale, two voices.</h2>
-    <p class="lede"><b>Inter</b> does all the UI work (and the display in Aurora/Frost). <b>Fraunces</b> is the editorial voice for headlines, marketing, and Almanac. <b>JetBrains Mono</b> for data, IDs, timecodes, and tokens. The scale is a 1.25 ratio, snapped to round pixels.</p>
+    <p class="lede"><b>Inter</b> does all the UI work (and the display in Aurora/Frost). <b>Fraunces</b> is the editorial voice for headlines, marketing, and Fjord. <b>JetBrains Mono</b> for data, IDs, timecodes, and tokens. The scale is a 1.25 ratio, snapped to round pixels.</p>
 
     <div class="grid g2" style="align-items:start;">
       <div class="card">
         <h4>Type scale — Inter</h4>
         <div style="display:flex; flex-direction:column;">
           <div style="display:flex; align-items:baseline; gap:16px; padding:14px 0; border-bottom:1px solid var(--line);">
-            <div style="font-size:46px; font-weight:800; letter-spacing:-.04em; line-height:1; flex:1;">Make it rain</div>
+            <div style="font-size:46px; font-weight:800; letter-spacing:-.04em; line-height:1; flex:1;">Catch the light</div>
             <div class="fine" style="text-align:right; min-width:120px; font-family:var(--font-mono);">Display<br>46 / 800 / -4%</div>
           </div>
           <div style="display:flex; align-items:baseline; gap:16px; padding:14px 0; border-bottom:1px solid var(--line);">
@@ -1173,7 +1244,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
         <div class="card" style="margin-bottom:18px;">
           <h4>Display — Fraunces</h4>
           <div style="font-family:var(--font-serif); font-size:42px; font-weight:600; letter-spacing:-.015em; line-height:1.05; color:var(--ink);">Meet Santa's<br>analytics reindeer.</div>
-          <p class="fine" style="margin-top:14px;">Optical size set high for headlines, "Soft" axis for warmth. Marketing &amp; Almanac only — never in dense data UI.</p>
+          <p class="fine" style="margin-top:14px;">Optical size set high for headlines, "Soft" axis for a humane edge. Marketing &amp; Fjord only — never in dense data UI.</p>
         </div>
         <div class="card">
           <h4>Pairing rules</h4>
@@ -1210,7 +1281,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#F4F7FB;border:1px solid #e2e2e2;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">bg</b><span class="fine" style="font-family:var(--font-mono);">#F4F7FB</span></div>
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#14C3B2;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·teal</b><span class="fine" style="font-family:var(--font-mono);">#14C3B2</span></div>
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#7A6CF5;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·violet</b><span class="fine" style="font-family:var(--font-mono);">#7A6CF5</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#FF9F2E;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">warm·gold</b><span class="fine" style="font-family:var(--font-mono);">#FF9F2E</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#1FC8A0;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">peak·aurora</b><span class="fine" style="font-family:var(--font-mono);">#1FC8A0</span></div>
         </div>
         <div style="height:10px;border-radius:6px;background:var(--aurora-grad);margin-top:14px;"></div>
         <div class="fine" style="margin-top:6px;">aurora gradient · the one flourish</div>
@@ -1227,34 +1298,34 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#0A0E15;border:1px solid rgba(255,255,255,.15);"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">bg</b><span class="fine" style="font-family:var(--font-mono);">#0A0E15</span></div>
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#45E6CE;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·teal</b><span class="fine" style="font-family:var(--font-mono);">#45E6CE</span></div>
           <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#A08CFF;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·violet</b><span class="fine" style="font-family:var(--font-mono);">#A08CFF</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#FFC061;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">warm·gold</b><span class="fine" style="font-family:var(--font-mono);">#FFC061</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#46E0B0;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">peak·glow</b><span class="fine" style="font-family:var(--font-mono);">#46E0B0</span></div>
         </div>
         <div style="height:10px;border-radius:6px;background:var(--aurora-grad);margin-top:14px;"></div>
         <div class="fine" style="margin-top:6px;">glow gradient · neon on night</div>
       </div>
 
-      <!-- ALMANAC tokens -->
-      <div class="card" data-theme="almanac" style="background:var(--bg); border-color:var(--line-2);">
-        <h4 style="color:var(--ink);">Almanac</h4>
+      <!-- FJORD tokens -->
+      <div class="card" data-theme="fjord" style="background:var(--bg); border-color:var(--line-2);">
+        <h4 style="color:var(--ink);">Fjord</h4>
         <div style="display:flex;flex-direction:column;gap:9px;">
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#284A6E;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">primary</b><span class="fine" style="font-family:var(--font-mono);">#284A6E</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#241C12;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">ink</b><span class="fine" style="font-family:var(--font-mono);">#241C12</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#5C4E3A;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">ink-2</b><span class="fine" style="font-family:var(--font-mono);">#5C4E3A</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#FBF7EE;border:1px solid #d8cdb5;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">surface</b><span class="fine" style="font-family:var(--font-mono);">#FBF7EE</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#F1EADB;border:1px solid #d8cdb5;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">bg</b><span class="fine" style="font-family:var(--font-mono);">#F1EADB</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#B14A2C;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·berry</b><span class="fine" style="font-family:var(--font-mono);">#B14A2C</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#2F6B4B;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·pine</b><span class="fine" style="font-family:var(--font-mono);">#2F6B4B</span></div>
-          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#C98A2B;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">warm·amber</b><span class="fine" style="font-family:var(--font-mono);">#C98A2B</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#245C82;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">primary</b><span class="fine" style="font-family:var(--font-mono);">#245C82</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#112230;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">ink</b><span class="fine" style="font-family:var(--font-mono);">#112230</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#42566A;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">ink-2</b><span class="fine" style="font-family:var(--font-mono);">#42566A</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#F7FAFC;border:1px solid #cfdbe6;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">surface</b><span class="fine" style="font-family:var(--font-mono);">#F7FAFC</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#E7EDF3;border:1px solid #cfdbe6;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">bg</b><span class="fine" style="font-family:var(--font-mono);">#E7EDF3</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#2A8C8C;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·teal</b><span class="fine" style="font-family:var(--font-mono);">#2A8C8C</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#5566B0;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">accent·slate</b><span class="fine" style="font-family:var(--font-mono);">#5566B0</span></div>
+          <div class="row" style="gap:10px;"><span style="width:30px;height:30px;border-radius:8px;background:#2E9E86;"></span><b style="font-size:12.5px;flex:1;color:var(--ink);">peak·sea</b><span class="fine" style="font-family:var(--font-mono);">#2E9E86</span></div>
         </div>
         <div style="height:10px;border-radius:6px;background:var(--aurora-grad);margin-top:14px;"></div>
-        <div class="fine" style="margin-top:6px;">muted gradient · dusk over snow</div>
+        <div class="fine" style="margin-top:6px;">cold gradient · glacier dusk</div>
       </div>
     </div>
 
     <h3>Status &amp; data-viz ramp</h3>
     <div class="row" style="gap:10px;">
       <span class="pill" style="background:#E6F8EE;color:#1B8A55;">● Success / on-brand</span>
-      <span class="pill" style="background:#FFF1E0;color:#B26A12;">● Outlier / warm</span>
+      <span class="pill" style="background:#DCEFE6;color:#1E7A56;">● Outlier / aurora peak</span>
       <span class="pill" style="background:#FDE7E8;color:#C5363C;">● Underperforming</span>
       <span class="pill" style="background:#EAF0FF;color:#2B5BF0;">● Neutral / info</span>
       <span class="pill" style="background:#F0EDFE;color:#6457D6;">● Agent-generated</span>
@@ -1707,7 +1778,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
           <div class="ph"><h4>Creative opportunity — what your niche isn't doing</h4><div class="sp"></div><span class="badge-t" style="background:var(--primary-soft);color:var(--primary-soft-ink);">✦ RAINEY</span></div>
           <div class="row" style="gap:10px;">
             <span class="pill" style="background:var(--primary-soft);color:var(--primary-soft-ink);">Sub-3s number hooks · 0 competitors</span>
-            <span class="pill" style="background:#FFF1E0;color:#B26A12;">"reverse reveal" format · untapped</span>
+            <span class="pill" style="background:#DCEFE6;color:#1E7A56;">"reverse reveal" format · untapped</span>
             <span class="pill" style="background:#E6F8EE;color:#1B8A55;">behind-the-budget angle · 1 creator</span>
             <span class="pill" style="background:var(--surface-2);color:var(--ink-2);">+ 6 more →</span>
           </div>
@@ -1748,10 +1819,10 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
           <div style="border-top:1px solid var(--line); margin-top:8px; padding-top:8px; display:flex; gap:8px;"><button class="btn btn-sec" style="flex:1; justify-content:center; padding:7px;">Open canvas</button><button class="btn btn-pri" style="flex:1; justify-content:center; padding:7px;">Open Rainy</button></div>
         </div>
       </div>
-      <!-- almanac -->
-      <div class="menubar-shell" style="background:linear-gradient(160deg,#5a6a52,#3a4636);">
+      <!-- fjord -->
+      <div class="menubar-shell" style="background:linear-gradient(160deg,#2c3e52,#1a2836);">
         <div class="mb-strip"><span class="mi">🔋</span><span class="mi">🔍</span><span class="mi act">🌧️ Rainy</span><span class="mi">9:41</span></div>
-        <div class="mb-drop" data-theme="almanac">
+        <div class="mb-drop" data-theme="fjord">
           <div class="mb-head"><span class="mm" style="background:var(--aurora-grad);"><svg class="rainey" viewBox="0 0 40 40"><use href="#rainey-face"/></svg></span><div><div class="mt" style="font-family:var(--font-serif);">Rainey</div><div class="ms">2 jobs · all good</div></div></div>
           <div class="mb-cap"><span style="font-size:14px;">🔗</span> Paste a link to analyze…</div>
           <div class="mb-job"><div class="ji">⤓</div><div style="flex:1;"><div class="jt">Downloading · Airrack</div><div class="jsub">3 of 5 videos</div><div class="mb-prog"><i style="width:62%;"></i></div></div></div>
@@ -1868,7 +1939,7 @@ main { margin-left: var(--nav-w); margin-top: var(--topbar-h); }
       <div class="row" style="justify-content:space-between; align-items:flex-start;">
         <div style="max-width:560px;">
           <h3 style="color:#fff; margin-top:0; font-size:24px;">What I'd lock next.</h3>
-          <p style="color:#AFC0D2; font-size:14.5px; line-height:1.6;">Pick a primary <b>Direction</b> (my vote: Aurora as the product spine, Frost for dark/focus mode, Almanac's Fraunces + woodcut for brand &amp; onboarding). Then I'll spin a real tldraw shape-set + a SwiftUI Liquid-Glass shell against the canvas mock here, and a token file (CSS vars → Swift + Tailwind) so all three skins ship from one source.</p>
+          <p style="color:#AFC0D2; font-size:14.5px; line-height:1.6;">Pick a primary <b>Direction</b> (my vote: Aurora as the product spine, Frost for dark/focus mode, Fjord's Fraunces + woodcut for brand &amp; onboarding). Then I'll spin a real tldraw shape-set + a SwiftUI Liquid-Glass shell against the canvas mock here, and a token file (CSS vars → Swift + Tailwind) so all three skins ship from one source.</p>
         </div>
         <div style="text-align:right;">
           <div class="row" style="justify-content:flex-end;"><span class="pill" style="background:rgba(255,255,255,.12);color:#fff;">3 directions</span><span class="pill" style="background:rgba(255,255,255,.12);color:#fff;">4 canvas states</span></div>
