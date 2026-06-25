@@ -69,12 +69,13 @@ single avatar.
 - `{{avatar_clause}}` — **photo mode:** *"stylize the person in the attached reference photo as the
   clay character — keep their likeness (face, skin tone, hairstyle, glasses, clothing style), rendered
   in the soft clay look"* · **description mode:** *"a stylized clay character: {{avatar_description}}"*
+  · **default (nothing provided):** a man.
 - `{{companion}}` — e.g. *"a ginger cat curled up on the sofa"* or *"a vintage guitar leaning in the corner"*.
 - Empty list fields (`{{books}}`, etc.) → drop the clause.
 
 **Negative prompt** (models that take one): `text, letters, words, watermark, signature, UI, multiple
 rooms, extra people, crowd, blurry, photorealistic photo, harsh shadows, cluttered, distorted
-proportions, lowres`. **Format:** landscape **3:2**. **Consistency:** fix a **seed**, change only
+proportions, lowres`. **Format:** square **1:1**. **Consistency:** fix a **seed**, change only
 `{{room_design}}` to demo "same skeleton, many designs".
 
 ---
@@ -98,14 +99,14 @@ FIXED LAYOUT — include ALL of these:
   and a small brown reindeer figurine (the "Rainey" mascot).
 • CONTENT RECORDING SETUP (floor, center-front): a compact mirrorless camera on a small tripod, a
   ring light, and a clip-on mic, facing the seat; a laptop open to an editing timeline.
-• AVATAR (seated, editing on the laptop): a stylized clay character — a woman with tan skin and
-  shoulder-length wavy dark-brown hair, wearing a cream knit sweater, headphones around her neck.
+• AVATAR (seated, editing on the laptop): a stylized clay character — a man with tan skin, short wavy
+  dark-brown hair and light stubble, wearing a cream knit sweater, headphones around his neck.
 • AMBIENT LIGHTS: a paper-lantern floor lamp and a white pendant lamp matching the room — soft in
   daylight, built to glow warm at night.
 • COMPANION & DETAILS: a ginger cat curled up on a small sofa, plus a latte mug and a couple of plants.
 
 STYLE LOCK: isometric camera angle, one cohesive room, soft warm shadows, miniature diorama feel. NO
-text, watermark, UI, or extra people. Landscape 3:2.
+text, watermark, UI, or extra people. Square 1:1 aspect ratio.
 ```
 
 **Swap the gear line to test the other tiers (same room otherwise):**

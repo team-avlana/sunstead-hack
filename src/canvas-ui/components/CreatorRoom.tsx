@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { postNative } from '@/lib/bridge'
-import Onboarding from './Onboarding'
+import CreatorWizard from './CreatorWizard'
+import { requestRoomGeneration, type RoomGenerationPayload } from '@/lib/creatorRoomParams'
 import {
   apiBase,
   buildRoomDoc,
@@ -206,12 +207,13 @@ export default function CreatorRoom() {
 
   const onGenerate = () => void runGenerate(formToProfile(form))
 
-  // Onboarding finished → adopt the autofilled profile and generate immediately.
-  const onWizardComplete = (profile: CreatorProfile) => {
-    setForm(profileToForm(profile))
-    saveProfile(profile)
+  // Wizard finished → assemble the brief and (stub) trigger generation. The real
+  // POST to the image service is the cofounder's endpoint; today this only
+  // persists the payload and shows a friendly "ready" hint.
+  const onWizardComplete = (payload: RoomGenerationPayload) => {
     setWizard(false)
-    void runGenerate(profile)
+    void requestRoomGeneration(payload)
+    setStatus({ kind: 'hint', msg: 'Saved your room brief ✨ — image generation will hook up to the service soon.' })
   }
 
   const generating = status.kind === 'generating'
@@ -275,7 +277,7 @@ export default function CreatorRoom() {
         Edit details
       </button>
 
-      {wizard && <Onboarding onComplete={onWizardComplete} onCancel={() => setWizard(false)} />}
+      {wizard && <CreatorWizard onComplete={onWizardComplete} onCancel={() => setWizard(false)} />}
     </section>
   )
 }

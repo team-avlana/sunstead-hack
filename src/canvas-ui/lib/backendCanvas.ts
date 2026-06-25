@@ -17,8 +17,7 @@
  */
 
 import { createShapeId, type Editor, type TLShapeId } from 'tldraw'
-import { RAINY_TEXT } from '@/components/RainyTextShape'
-import { VIDEO_BLOCK, dims, type VideoData } from '@/components/VideoBlockShape'
+import { RAINY_TEXT, VIDEO_BLOCK, dims, type VideoData } from '@/lib/blockTypes'
 import {
   fetchProjectState,
   resolveAssetUrl,

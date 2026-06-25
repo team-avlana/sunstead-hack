@@ -19,6 +19,15 @@ import StarterKit from '@tiptap/starter-kit'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import {
+  RAINY_TEXT,
+  TEXT_FORMAT_OPTIONS,
+  type TextFormat,
+  inferFormat,
+  restructure,
+  setDefaultTextFormat,
+} from '@/lib/blockTypes'
+import { DeleteButton } from './ShapeChrome'
 
 /**
  * Rainy text block — a markdown-aware card.
@@ -30,8 +39,11 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
  *   - "Aa" toggled → a format menu (Plain text / Title + text / Title + subtitle +
  *     text). Picking a format restructures the block (non-destructively) and is
  *     remembered as the default for newly-created text blocks.
+ *
+ * The format taxonomy + (de)structuring logic lives in `lib/blockTypes` so the
+ * adaptive sidebar can drive the same transforms from outside the editor.
  */
-export const RAINY_TEXT = 'rainy-text' as const
+export { RAINY_TEXT } from '@/lib/blockTypes'
 
 /** DEBUG: tint the hover/active area so we can see what triggers the menu. Flip off when happy. */
 const DEBUG_HOVER = false
@@ -94,96 +106,18 @@ export class RainyTextShapeUtil extends ShapeUtil<RainyTextShape> {
 }
 
 // ---------------------------------------------------------------------------
-// Block format — plain / title+text / title+subtitle+text
+// Block format menu — the in-canvas "Aa" picker.
+// Taxonomy + transforms (plain / title / title-sub) live in lib/blockTypes.
 // ---------------------------------------------------------------------------
 
-export type TextFormat = 'plain' | 'title' | 'title-sub'
-
-/** Which structural slots each format carries above the body. */
-const FORMAT_SLOTS: Record<TextFormat, { title: boolean; subtitle: boolean }> = {
-  plain: { title: false, subtitle: false },
-  title: { title: true, subtitle: false },
-  'title-sub': { title: true, subtitle: true },
+/** Tiny structural preview per format, for the "Aa" menu rows. */
+const FORMAT_PREVIEW: Record<TextFormat, ReactNode> = {
+  plain: <><i className="b" /><i className="b2" /></>,
+  title: <><i className="t" /><i className="b" /><i className="b2" /></>,
+  'title-sub': <><i className="t" /><i className="s" /><i className="b2" /></>,
 }
 
-const FORMAT_KEY = 'rainy:textFormat'
-
-/** The last format the user picked — the default for newly-created text blocks. */
-export function getDefaultTextFormat(): TextFormat {
-  if (typeof window === 'undefined') return 'title'
-  const v = window.localStorage.getItem(FORMAT_KEY)
-  return v === 'plain' || v === 'title' || v === 'title-sub' ? v : 'title'
-}
-export function setDefaultTextFormat(f: TextFormat) {
-  if (typeof window !== 'undefined') window.localStorage.setItem(FORMAT_KEY, f)
-}
-
-/** Empty starting content for a format: headings first, then a body line. */
-export function templateHtml(f: TextFormat): string {
-  const slots = FORMAT_SLOTS[f]
-  return `${slots.title ? '<h1></h1>' : ''}${slots.subtitle ? '<h2></h2>' : ''}<p></p>`
-}
-
-/** Top-level element nodes of an HTML fragment (browser-only). */
-function topLevelNodes(html: string): HTMLElement[] {
-  if (typeof document === 'undefined') return []
-  const tpl = document.createElement('template')
-  tpl.innerHTML = html || ''
-  return Array.from(tpl.content.children) as HTMLElement[]
-}
-
-/** Does an inline HTML fragment carry any real text? */
-function hasText(inner: string): boolean {
-  return inner.replace(/<br\s*\/?>/gi, '').replace(/<[^>]*>/g, '').trim().length > 0
-}
-
-/** Infer a block's format from its leading headings (H1 = title, H1+H2 = +subtitle). */
-export function inferFormat(html: string): TextFormat {
-  const nodes = topLevelNodes(html)
-  const h1 = nodes[0]?.tagName === 'H1'
-  const h2 = nodes[1]?.tagName === 'H2'
-  if (h1 && h2) return 'title-sub'
-  if (h1) return 'title'
-  return 'plain'
-}
-
-/**
- * Restructure a block's HTML into the target format, preserving all text:
- * added slots come in empty (placeholder-ready); removed slots demote to body
- * paragraphs so nothing is lost.
- */
-export function restructure(html: string, next: TextFormat): string {
-  const cur = inferFormat(html)
-  if (cur === next) return html
-  const nodes = topLevelNodes(html)
-  const from = FORMAT_SLOTS[cur]
-  const to = FORMAT_SLOTS[next]
-
-  let i = 0
-  const titleInner = from.title ? nodes[i++]?.innerHTML ?? '' : ''
-  const subtitleInner = from.subtitle ? nodes[i++]?.innerHTML ?? '' : ''
-  const bodyEls = nodes.slice(i)
-
-  const head: string[] = []
-  if (to.title) head.push(`<h1>${titleInner}</h1>`)
-  if (to.subtitle) head.push(`<h2>${subtitleInner}</h2>`)
-
-  const body: string[] = []
-  // Demote dropped title/subtitle text into the body rather than discard it.
-  if (from.title && !to.title && hasText(titleInner)) body.push(`<p>${titleInner}</p>`)
-  if (from.subtitle && !to.subtitle && hasText(subtitleInner)) body.push(`<p>${subtitleInner}</p>`)
-  for (const el of bodyEls) body.push(el.outerHTML)
-  if (body.length === 0) body.push('<p></p>')
-
-  return head.join('') + body.join('')
-}
-
-/** The three formats offered in the "Aa" menu, with a tiny structural preview. */
-const FORMATS: { id: TextFormat; label: string; preview: ReactNode }[] = [
-  { id: 'plain', label: 'Plain text', preview: <><i className="b" /><i className="b2" /></> },
-  { id: 'title', label: 'Title + text', preview: <><i className="t" /><i className="b" /><i className="b2" /></> },
-  { id: 'title-sub', label: 'Title + subtitle + text', preview: <><i className="t" /><i className="s" /><i className="b2" /></> },
-]
+const FORMATS = TEXT_FORMAT_OPTIONS.map((o) => ({ ...o, preview: FORMAT_PREVIEW[o.id] }))
 
 // ---------------------------------------------------------------------------
 // Per-node placeholders (Title / Subtitle / Write something…) for empty blocks.
@@ -338,6 +272,8 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
         onMouseEnter={() => setZoneHover(true)}
         onMouseLeave={() => setZoneHover(false)}
       >
+        <DeleteButton editor={editor} id={shape.id} show={showMain} />
+
         <div className={`rainy-text-card${isSmall ? ' is-small' : ''}${isEditing ? ' is-editing' : ''}`}>
           <div
             className="rainy-text-content"

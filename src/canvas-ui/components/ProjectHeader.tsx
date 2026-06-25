@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { updateProjectTitle } from '@/lib/projects'
 import { useRainyStore } from '@/lib/store'
 
@@ -17,6 +17,14 @@ export default function ProjectHeader() {
   const [draft, setDraft] = useState(title)
   useEffect(() => setDraft(title), [title])
 
+  // Auto-size the title input to its content so the full title shows (clamped to
+  // max-width in CSS). An off-screen mirror measures the rendered text width.
+  const mirrorRef = useRef<HTMLSpanElement>(null)
+  const [width, setWidth] = useState<number | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (mirrorRef.current) setWidth(mirrorRef.current.offsetWidth + 2)
+  }, [draft])
+
   const commit = () => {
     const next = draft.trim() || 'Untitled project'
     setDraft(next)
@@ -29,8 +37,12 @@ export default function ProjectHeader() {
       <button className="rph-back" onClick={goHome} title="Back to home" aria-label="Back to home">
         <ChevronLeft />
       </button>
+      <span ref={mirrorRef} className="rph-title rph-title-mirror" aria-hidden>
+        {draft || 'Untitled project'}
+      </span>
       <input
         className="rph-title"
+        style={{ width }}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

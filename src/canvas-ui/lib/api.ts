@@ -7,7 +7,7 @@
  * local XML/localStorage projects and runs with no backend at all.
  */
 
-import type { VideoData } from '@/components/VideoBlockShape'
+import type { VideoData } from '@/lib/blockTypes'
 
 export interface BackendProject {
   project_id: string

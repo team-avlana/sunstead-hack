@@ -1,8 +1,7 @@
 'use client'
 
 import { createShapeId, useEditor, useValue, type Editor } from 'tldraw'
-import { RAINY_TEXT, getDefaultTextFormat, templateHtml } from './RainyTextShape'
-import { VIDEO_BLOCK } from './VideoBlockShape'
+import { RAINY_TEXT, VIDEO_BLOCK, getDefaultTextFormat, templateHtml } from '@/lib/blockTypes'
 import { useRainyStore } from '@/lib/store'
 
 /**
