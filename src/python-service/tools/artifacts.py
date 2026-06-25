@@ -21,11 +21,22 @@ def register(mcp: FastMCP) -> None:
         position: Optional[dict] = None,
     ) -> dict:
         """
-        Create a new artifact on the canvas for a project.
+        Create a frame (a "flow") on the canvas for a project. The canvas renders it
+        live. A frame is one artifact; the blocks it contains live inside its payload
+        as elements.
 
-        type: storyboard | shot_list | idea_board | script_doc | mood_board | diagram
-        payload: the typed content of the artifact (element ids live inside it).
-        position: {x, y, w, h} placement hint for the canvas.
+        type: 'frame'  (e.g. an Ideation flow, a Storyboarding flow)
+        payload: {
+          "label": str,               # frame title shown on the canvas
+          "role": str (optional),     # e.g. "ideation" | "storyboard"
+          "elements": [               # the blocks inside this frame
+            {"id": "el-1", "type": "text",  "content": "<p>…</p>", "x": 24, "y": 64, "w": 320, "h": 200},
+            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64}
+          ]
+        }
+        Each element needs a stable "id"; x/y are RELATIVE to the frame's top-left.
+        Address one block later with update_artifact(id, element_id=<el.id>, element_patch={...}).
+        position: {x, y, w, h} = the frame box on the canvas.
 
         Returns {artifact_id}.
         """

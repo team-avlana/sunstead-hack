@@ -29,22 +29,31 @@ import video_view
 _FRAMES_ROOT = Path(os.environ.get("FRAMES_DIR", "../analysis-worker/workdir")).resolve()
 
 
-def _enrich_artifact(artifact: dict) -> dict:
-    """Attach a live `video` view-model to video artifacts."""
-    if artifact.get("type") != "video":
-        return artifact
-    payload = artifact.get("payload") or {}
-    video_id = payload.get("video_id") if isinstance(payload, dict) else None
+def _video_view(src: dict) -> dict:
+    """Build the live video view-model for a dict that carries a video_id
+    (a video element, or a legacy standalone video artifact's payload)."""
+    video_id = src.get("video_id") if isinstance(src, dict) else None
     if not video_id:
-        # Placeholder block (empty / ready-for-input) — state lives in the payload.
-        state = (payload.get("state") if isinstance(payload, dict) else None) or "empty"
-        artifact["video"] = {"video_id": None, "status": state, "tags": [], "storyboard": []}
-        return artifact
+        # Placeholder block (empty / ready-for-input) — state lives alongside it.
+        state = (src.get("state") if isinstance(src, dict) else None) or "empty"
+        return {"video_id": None, "status": state, "tags": [], "storyboard": []}
     full = db.get_video_full(video_id)
     if full is None:
-        artifact["video"] = {"video_id": video_id, "status": "not_analysed", "tags": [], "storyboard": []}
-    else:
-        artifact["video"] = video_view.derive_video(full["video"], full["shots"])
+        return {"video_id": video_id, "status": "not_analysed", "tags": [], "storyboard": []}
+    return video_view.derive_video(full["video"], full["shots"])
+
+
+def _enrich_artifact(artifact: dict) -> dict:
+    """Attach live `video` view-models. For a frame, enrich each video element in
+    payload.elements; for a legacy standalone video artifact, enrich it directly."""
+    payload = artifact.get("payload") or {}
+    if artifact.get("type") == "frame" and isinstance(payload, dict):
+        for el in payload.get("elements") or []:
+            if isinstance(el, dict) and el.get("type") == "video":
+                el["video"] = _video_view(el)
+        return artifact
+    if artifact.get("type") == "video":
+        artifact["video"] = _video_view(payload if isinstance(payload, dict) else {})
     return artifact
 
 

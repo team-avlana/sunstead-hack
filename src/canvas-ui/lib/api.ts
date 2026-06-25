@@ -20,11 +20,12 @@ export interface EnrichedArtifact {
   project_id: string
   type: string
   title: string | null
+  /** For a 'frame': { label, role?, elements:[{id, type, x, y, w, h, ...}] }. */
   payload: Record<string, unknown> | null
   position: { x?: number; y?: number; w?: number; h?: number } | null
   z: number
   version: number
-  /** Present for type === 'video': the live view-model joined from the videos table. */
+  /** Legacy standalone 'video' artifact: the live view-model from the videos table. */
   video?: VideoData
 }
 
