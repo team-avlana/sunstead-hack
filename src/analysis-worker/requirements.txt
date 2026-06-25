@@ -1,0 +1,11 @@
+yt-dlp
+scenedetect[opencv]
+opencv-python
+ffmpeg-python
+numpy
+pillow
+scikit-learn
+mediapipe
+easyocr
+psycopg[binary]
+anthropic

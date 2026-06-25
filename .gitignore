@@ -250,3 +250,14 @@ scratchpad/
 # Un-ignore frontend source dirs that the broad Python rules above (lib/, build/) also match
 !src/canvas-ui/lib/
 !src/canvas-ui/lib/**
+
+# ───────────────────── Team backend (origin/main) ─────────────────────
+docs/tasks/**
+
+# runtime artifacts
+**/tmp/**
+**/workdir/**
+
+# python-service / comms-service (local config holds secrets)
+src/python-service/config.toml
+src/comms-service/config.toml
