@@ -36,3 +36,19 @@ implement more code yet").
 ## Still-valuable, unchanged
 `knowledge-base/` (all of it), `docs/FEASIBILITY.md` (near-real-time analysis, Apple-tools survey,
 pipeline cost/caveats), and the tldraw-v5 + WebView-shell reference docs remain accurate and useful.
+
+## Reconciliation status — 2026-06-25 (canvas ↔ canonical backend)
+Implemented on `feature/rainy-canvas-mcp-integration` (see `docs/RUNNING.md`):
+- **#2 Realtime → websocket.** `lib/realtime.ts` now opens `/ws` and treats messages as
+  *change-signals only*, re-pulling artifacts from the read API (+ a poll fallback). SSE scaffold retired.
+- **#4 Canvas reads.** Resolved as **option (a)**: `python-service` exposes a read HTTP API
+  (`/api/projects`, `/api/projects/{id}`, `/api/artifacts/{id}`, `/api/videos/{id}`, `/frames/...`),
+  so `canvas-ui` stays a static export. `lib/api.ts` + `lib/backendCanvas.ts` consume it.
+- **#1/#3/#5 Artifact rendering.** The canvas maps typed artifacts → tldraw shapes
+  (`type:'video'` → the new **Video Block**; others → text cards), id-namespaced so reconciliation
+  never clobbers user shapes. Editing is preserved for now (not yet forced read-only).
+- **Video blocks** are `artifacts(type='video')` with `payload.video_id`; the read API joins the
+  live analysis (`video_view.derive_video`). Cross-process change-signals use Postgres
+  `LISTEN/NOTIFY` (no DDL on the shared DB).
+
+Still open: forcing the canvas fully read-only (#1) and the `mac-app` static-export packaging.
