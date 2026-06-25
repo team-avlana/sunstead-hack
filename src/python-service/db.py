@@ -374,3 +374,59 @@ def delete_memory(memory_id: str) -> bool:
             (memory_id,),
         ).fetchone()
     return row is not None
+
+
+# ── Read helpers for the canvas HTTP API ───────────────────────────────────────
+
+def get_project(project_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, created_at, updated_at FROM projects "
+            "WHERE id = %s AND deleted_at IS NULL",
+            (project_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "project_id": str(row["id"]),
+        "name": row["name"],
+        "created_at": row["created_at"].isoformat(),
+        "updated_at": row["updated_at"].isoformat(),
+    }
+
+
+def get_video_full(video_id: str) -> dict | None:
+    """A videos row (with metrics) plus all its shots — for the Video Block view."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, source_url, title, duration_sec, metrics, "
+            "analyzed_at, analysis_error, created_at "
+            "FROM videos WHERE id = %s AND deleted_at IS NULL",
+            (video_id,),
+        ).fetchone()
+        if not row:
+            return None
+        shots = conn.execute(
+            "SELECT idx, start_sec, end_sec, frame_path, analysis FROM shots "
+            "WHERE video_id = %s AND deleted_at IS NULL ORDER BY idx",
+            (video_id,),
+        ).fetchall()
+    return {"video": dict(row), "shots": [dict(s) for s in shots]}
+
+
+def project_ids_for_video(video_id: str) -> list[str]:
+    """Projects whose live artifacts reference this video (payload.video_id)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT project_id FROM artifacts "
+            "WHERE deleted_at IS NULL AND payload->>'video_id' = %s",
+            (video_id,),
+        ).fetchall()
+    return [str(r["project_id"]) for r in rows]
+
+
+def pg_notify_change(payload: dict) -> None:
+    """Emit a Postgres NOTIFY on 'rainy_change'. The server's listener forwards it
+    to websocket subscribers. Used for cross-process signals (e.g. analyze_video)."""
+    with get_conn() as conn:
+        conn.execute("SELECT pg_notify('rainy_change', %s)", (json.dumps(payload),))

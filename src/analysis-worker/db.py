@@ -94,3 +94,17 @@ def set_analysis_error(conn, video_id: str, error: str) -> None:
             (error[:2000], video_id),
         )
     conn.commit()
+
+
+def notify_change(conn, video_id: str, action: str) -> None:
+    """Emit a Postgres NOTIFY the python-service forwards to the canvas over WS.
+    Best-effort: a failure here must never fail the analysis run."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT pg_notify('rainy_change', %s)",
+                (json.dumps({"type": "video", "action": action, "video_id": video_id}),),
+            )
+        conn.commit()
+    except Exception:
+        pass

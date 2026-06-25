@@ -11,6 +11,7 @@ We obtain the ASGI app from FastMCP and mount it inside our own Starlette
 app that also declares the /ws WebSocketRoute.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -21,6 +22,7 @@ from starlette.routing import Mount, WebSocketRoute
 
 import notify
 from config import settings
+from routes_api import routes as api_routes
 from tools import analysis, artifacts, creators, memory, projects
 
 # ── FastMCP instance ──────────────────────────────────────────────────────────
@@ -52,13 +54,24 @@ _mcp_asgi = mcp.http_app()
 @asynccontextmanager
 async def lifespan(app: Starlette):
     async with _mcp_asgi.router.lifespan_context(app):
-        yield
+        # Bridge cross-process changes (analysis-worker, analyze_video) to WS.
+        listener = asyncio.create_task(notify.pg_listen(settings.db.connection_string))
+        try:
+            yield
+        finally:
+            listener.cancel()
+            try:
+                await listener
+            except asyncio.CancelledError:
+                pass
 
 
 _app = Starlette(
     lifespan=lifespan,
     routes=[
+        # Order matters: specific routes before the catch-all MCP mount at "/".
         WebSocketRoute("/ws", notify.websocket_endpoint),
+        *api_routes,
         Mount("/", app=_mcp_asgi),
     ],
 )

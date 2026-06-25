@@ -30,6 +30,8 @@ def register(mcp: FastMCP) -> None:
 
         video_id = db.insert_video(creator_id, source_url)
         worker.spawn(video_id)
+        # Signal the canvas (a block referencing this video flips to "analysing").
+        db.pg_notify_change({"type": "video", "action": "created", "video_id": video_id})
         return {"video_id": video_id}
 
     @mcp.tool()
@@ -64,6 +66,7 @@ def register(mcp: FastMCP) -> None:
             vid_id = db.insert_video(creator_id, url)
             video_ids.append(vid_id)
             worker.spawn(vid_id)
+            db.pg_notify_change({"type": "video", "action": "created", "video_id": vid_id})
 
         return {"creator_id": creator_id, "video_ids": video_ids}
 

@@ -151,6 +151,7 @@ def run(video_id: str, dsn: str) -> None:
         db.write_video_metrics(conn, video_id, video_metrics)
         db.set_analyzed_at(conn, video_id)
         conn.commit()
+        db.notify_change(conn, video_id, "analysed")
 
         print(f"[{video_id}] Done.")
 
@@ -160,6 +161,7 @@ def run(video_id: str, dsn: str) -> None:
         traceback.print_exc(file=sys.stderr)
         try:
             db.set_analysis_error(conn, video_id, msg)
+            db.notify_change(conn, video_id, "error")
         except Exception:
             pass
         raise
