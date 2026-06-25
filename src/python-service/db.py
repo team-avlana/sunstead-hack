@@ -64,50 +64,70 @@ def list_projects() -> list[dict]:
 
 # ── Creators ──────────────────────────────────────────────────────────────────
 
-def get_creator_frames_for_room(creator_id: str, limit: int = 3) -> list[dict]:
-    """Return up to `limit` talking-head frame rows for a creator's analyzed videos.
+def get_creator_frames_for_room(creator_id: str, limit: int = 5) -> list[dict]:
+    """Return up to `limit` frame rows sourced from *different* videos.
 
-    Prefers frames where the shot analysis marks is_talking_head = true.
-    Falls back to any frame if no talking-head shots exist.
-    Returns [{data: bytes, mime_type: str, analysis: dict}].
+    Uses a window-function CTE to pick one random talking-head frame per video,
+    then randomly orders across those, so every analyzed video contributes at
+    most one frame — maximising the diversity of face/environment context passed
+    to the image model.
+
+    Falls back to one-random-frame-per-video (any shot) when talking-head
+    frames are unavailable, and to a plain random query when there are no
+    analyzed videos at all.
+
+    Returns [{data: bytes, mime_type: str, analysis: dict, video_id: str}].
     """
-    with get_conn() as conn:
-        rows = conn.execute(
-            """SELECT f.data, f.mime_type, s.analysis
-               FROM frames f
-               JOIN shots s ON f.shot_id = s.id
-               JOIN videos v ON s.video_id = v.id
-               WHERE v.creator_id = %s
-                 AND v.deleted_at IS NULL
-                 AND s.deleted_at IS NULL
-                 AND v.analyzed_at IS NOT NULL
-                 AND COALESCE(s.analysis->'llm'->>'is_talking_head',
-                              s.analysis->>'is_talking_head') = 'true'
-               ORDER BY RANDOM()
-               LIMIT %s""",
-            (creator_id, limit),
-        ).fetchall()
+    _TALKING_HEAD_CTE = """
+        WITH one_per_video AS (
+            SELECT f.data, f.mime_type, s.analysis, v.id AS video_id,
+                   ROW_NUMBER() OVER (PARTITION BY v.id ORDER BY RANDOM()) AS rn
+            FROM frames f
+            JOIN shots s ON f.shot_id = s.id
+            JOIN videos v ON s.video_id = v.id
+            WHERE v.creator_id = %s
+              AND v.deleted_at IS NULL
+              AND s.deleted_at IS NULL
+              AND v.analyzed_at IS NOT NULL
+              AND COALESCE(s.analysis->'llm'->>'is_talking_head',
+                           s.analysis->>'is_talking_head') = 'true'
+        )
+        SELECT data, mime_type, analysis, video_id
+        FROM one_per_video
+        WHERE rn = 1
+        ORDER BY RANDOM()
+        LIMIT %s
+    """
+    _ANY_FRAME_CTE = """
+        WITH one_per_video AS (
+            SELECT f.data, f.mime_type, s.analysis, v.id AS video_id,
+                   ROW_NUMBER() OVER (PARTITION BY v.id ORDER BY RANDOM()) AS rn
+            FROM frames f
+            JOIN shots s ON f.shot_id = s.id
+            JOIN videos v ON s.video_id = v.id
+            WHERE v.creator_id = %s
+              AND v.deleted_at IS NULL
+              AND s.deleted_at IS NULL
+              AND v.analyzed_at IS NOT NULL
+        )
+        SELECT data, mime_type, analysis, video_id
+        FROM one_per_video
+        WHERE rn = 1
+        ORDER BY RANDOM()
+        LIMIT %s
+    """
 
+    with get_conn() as conn:
+        rows = conn.execute(_TALKING_HEAD_CTE, (creator_id, limit)).fetchall()
         if not rows:
-            rows = conn.execute(
-                """SELECT f.data, f.mime_type, s.analysis
-                   FROM frames f
-                   JOIN shots s ON f.shot_id = s.id
-                   JOIN videos v ON s.video_id = v.id
-                   WHERE v.creator_id = %s
-                     AND v.deleted_at IS NULL
-                     AND s.deleted_at IS NULL
-                     AND v.analyzed_at IS NOT NULL
-                   ORDER BY RANDOM()
-                   LIMIT %s""",
-                (creator_id, limit),
-            ).fetchall()
+            rows = conn.execute(_ANY_FRAME_CTE, (creator_id, limit)).fetchall()
 
     return [
         {
             "data": bytes(r["data"]),
             "mime_type": r["mime_type"],
             "analysis": r["analysis"] or {},
+            "video_id": str(r["video_id"]),
         }
         for r in rows
     ]

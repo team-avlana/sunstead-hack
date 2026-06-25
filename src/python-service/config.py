@@ -51,9 +51,10 @@ class LlmConfig:
 
 @dataclass
 class ImageConfig:
-    azure_openai_url: str = ""  # e.g. https://<resource>.openai.azure.com
+    azure_openai_url: str = ""        # e.g. https://<resource>.openai.azure.com
     azure_openai_key: str = ""
-    azure_openai_deployment: str = "gpt-image-1"
+    azure_openai_deployment: str = "gpt-image-1.5"       # creator room
+    azure_openai_storyboard_deployment: str = "gpt-image-1-mini"  # storyboard frames
 
 
 @dataclass
@@ -120,6 +121,9 @@ def load() -> Settings:
     openai_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT") or img_raw.get(
         "azure_openai_deployment", ImageConfig.azure_openai_deployment
     )
+    openai_storyboard_deployment = os.environ.get("AZURE_OPENAI_STORYBOARD_DEPLOYMENT") or img_raw.get(
+        "azure_openai_storyboard_deployment", ImageConfig.azure_openai_storyboard_deployment
+    )
 
     return Settings(
         db=DbConfig(connection_string=conn_str),
@@ -150,6 +154,7 @@ def load() -> Settings:
             azure_openai_url=openai_url,
             azure_openai_key=openai_key,
             azure_openai_deployment=openai_deployment,
+            azure_openai_storyboard_deployment=openai_storyboard_deployment,
         ),
         terminal=TerminalConfig(
             enabled=str(
