@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { postNative } from '@/lib/bridge'
+import Onboarding from './Onboarding'
 import {
   apiBase,
   buildRoomDoc,
@@ -75,7 +76,13 @@ export default function CreatorRoom() {
   const [form, setForm] = useState<Form>(() => profileToForm(loadProfile()))
   const [mode, setMode] = useState<RoomMode>(() => loadMode())
   const [open, setOpen] = useState(false)
+  const [wizard, setWizard] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+
+  // First visit (nothing saved yet) → open the few-questions onboarding.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.localStorage.getItem('rainy:room:profile')) setWizard(true)
+  }, [])
 
   // image mode
   const [image, setImage] = useState<string | null>(() => loadGeneratedImage())
@@ -136,8 +143,7 @@ export default function CreatorRoom() {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  const onGenerate = async () => {
-    const p = formToProfile(form)
+  const runGenerate = async (p: CreatorProfile) => {
     saveProfile(p)
 
     if (!apiBase()) {
@@ -182,6 +188,17 @@ export default function CreatorRoom() {
     }
   }
 
+  const onGenerate = () => void runGenerate(formToProfile(form))
+
+  // Onboarding finished → adopt the autofilled profile and generate immediately.
+  const onWizardComplete = (profile: CreatorProfile) => {
+    setForm(profileToForm(profile))
+    saveProfile(profile)
+    setWizard(false)
+    setOpen(false)
+    void runGenerate(profile)
+  }
+
   const onReset = () => {
     abortRef.current?.abort()
     clearGeneratedImage()
@@ -209,8 +226,8 @@ export default function CreatorRoom() {
             {showSample && !generating && (
               <div className="room-cta">
                 <span className="room-cta-title">Paint your Creator Room</span>
-                <span className="room-cta-sub">Add a few details, then let Rainy render your cozy clay room — character and all.</span>
-                <button className="room-btn primary" onClick={onGenerate}>Generate with Rainy</button>
+                <span className="room-cta-sub">Answer three quick questions and Rainy renders your cozy clay room — character and all.</span>
+                <button className="room-btn primary" onClick={() => setWizard(true)}>✨ Design my room</button>
               </div>
             )}
           </>
@@ -243,7 +260,7 @@ export default function CreatorRoom() {
               <button className={mode === 'image' ? 'on' : ''} onClick={() => setMode('image')}>Image</button>
               <button className={mode === 'room3d' ? 'on' : ''} onClick={() => setMode('room3d')}>3D</button>
             </div>
-            <button className="room-btn ghost" onClick={() => setOpen((o) => !o)}>{open ? 'Done' : 'Customize'}</button>
+            <button className="room-btn ghost" onClick={() => setWizard(true)}>✨ Redesign</button>
             <button className="room-btn primary" onClick={onGenerate} disabled={generating}>
               {generating ? 'Generating…' : 'Generate with Rainy'}
             </button>
@@ -252,6 +269,12 @@ export default function CreatorRoom() {
 
         {status.msg && <div className={`room-status ${status.kind}`} role="status">{status.msg}</div>}
       </div>
+
+      <button className="room-edit-toggle" onClick={() => setOpen((o) => !o)}>
+        {open ? 'Hide details' : 'Edit details'}
+      </button>
+
+      {wizard && <Onboarding onComplete={onWizardComplete} onCancel={() => setWizard(false)} />}
 
       {open && (
         <div className="room-form">

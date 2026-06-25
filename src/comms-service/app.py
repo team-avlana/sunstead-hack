@@ -28,6 +28,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from creator_autofill import autofill_profile
 from creator_image import IMAGE_MODEL, ImageGenerationError, generate_room_image
 from creator_room import MODEL, GenerationError, generate_room_html
 
@@ -54,6 +55,11 @@ class GenerateBody(BaseModel):
     profile: dict[str, Any]
 
 
+class AutofillBody(BaseModel):
+    # The few onboarding answers: niche (required-ish), vibe, name, pet.
+    seed: dict[str, Any]
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     return {
@@ -63,6 +69,13 @@ def health() -> dict[str, Any]:
         "generation": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "image": bool(os.environ.get("OPENAI_API_KEY")),
     }
+
+
+@app.post("/api/creator-room/autofill")
+def autofill(body: AutofillBody) -> dict[str, Any]:
+    """Expand a few onboarding answers into a full CreatorProfile. Never 5xx —
+    always returns a usable profile (LLM-filled or deterministic fallback)."""
+    return {"profile": autofill_profile(body.seed)}
 
 
 @app.post("/api/creator-room/image")

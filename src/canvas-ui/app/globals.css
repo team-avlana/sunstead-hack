@@ -190,9 +190,90 @@ button, input { font-family: inherit; }
 }
 .room-form-foot { display: flex; justify-content: flex-end; gap: 8px; }
 
+.room-edit-toggle {
+  margin: 10px auto 0; display: block; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ink-dim);
+  padding: 4px 8px; border-radius: 8px; transition: color .14s ease, background .14s ease;
+}
+.room-edit-toggle:hover { color: var(--ink); background: rgba(18, 24, 48, 0.04); }
+
+/* ============================================================
+   Onboarding wizard — few-questions, one screen at a time
+   ============================================================ */
+.ob {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(18, 24, 48, 0.28);
+  -webkit-backdrop-filter: blur(8px) saturate(120%); backdrop-filter: blur(8px) saturate(120%);
+  animation: ob-fade 180ms ease;
+}
+@keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ob-card {
+  position: relative; width: 100%; max-width: 520px;
+  background: #fff; border-radius: 24px; padding: 30px 30px 22px;
+  box-shadow: 0 30px 80px rgba(18, 24, 48, 0.30), 0 4px 14px rgba(18, 24, 48, 0.12);
+  animation: ob-pop 240ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@keyframes ob-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ob, .ob-card, .ob-step { animation: none; } }
+
+.ob-close {
+  position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border-radius: 999px;
+  border: 0; background: rgba(18, 24, 48, 0.05); color: var(--ink-dim);
+  font-size: 19px; line-height: 1; cursor: pointer; transition: background .14s ease, color .14s ease;
+}
+.ob-close:hover { background: rgba(18, 24, 48, 0.10); color: var(--ink); }
+
+.ob-dots { display: flex; gap: 6px; margin-bottom: 22px; }
+.ob-dots span { width: 26px; height: 5px; border-radius: 999px; background: rgba(18, 24, 48, 0.10); transition: background .25s ease; }
+.ob-dots span.on { background: var(--primary); }
+
+.ob-step { animation: ob-slide 260ms ease; }
+@keyframes ob-slide { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+
+.ob-q { margin: 0 0 6px; font-size: 25px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.ob-sub { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+
+.ob-input {
+  width: 100%; height: 48px; padding: 0 16px; border-radius: 13px; margin-bottom: 14px;
+  border: 1.5px solid var(--border); background: #fff; color: var(--ink);
+  font-family: inherit; font-size: 16px; outline: none;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.ob-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12); }
+
+.ob-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-chip {
+  border: 1.5px solid var(--border); background: #fff; cursor: pointer; font-family: inherit;
+  height: 38px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink);
+  transition: all .14s ease; text-transform: capitalize;
+}
+.ob-chip:hover { border-color: rgba(var(--primary-rgb), 0.5); }
+.ob-chip.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: var(--primary-shadow); }
+
+.ob-pets { display: flex; gap: 10px; }
+.ob-pet {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  padding: 16px 8px; border-radius: 16px; border: 1.5px solid var(--border); background: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); transition: all .14s ease;
+}
+.ob-pet:hover { border-color: rgba(var(--primary-rgb), 0.5); }
+.ob-pet.on { border-color: var(--primary); background: rgba(var(--primary-rgb), 0.06); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10); }
+.ob-pet-emoji { font-size: 28px; }
+
+.ob-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 26px; }
+.ob-nav .room-btn { height: 42px; padding: 0 22px; font-size: 14px; }
+
+.ob-building {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; min-height: 220px; padding: 20px;
+}
+
 @media (max-width: 640px) {
   .room-stage { aspect-ratio: 4 / 3; }
   .room-overlay { flex-direction: column; }
+  .ob-card { padding: 24px 20px 18px; }
 }
 .home-head h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .home-head p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-dim); max-width: 56ch; }

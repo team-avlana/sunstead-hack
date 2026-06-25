@@ -174,6 +174,49 @@ export async function generateRoomDoc(profile: CreatorProfile, signal?: AbortSig
   return data.html
 }
 
+/** The few onboarding answers that seed a full profile. */
+export interface ProfileSeed {
+  niche: string
+  vibe: string[]
+  name: string
+  pet: Pet
+}
+
+/**
+ * Expand a few onboarding answers into a full CreatorProfile. Uses the Comms
+ * Service (LLM autofill) when available; otherwise falls back to a local
+ * DEFAULT + seed merge so onboarding always completes. Never throws.
+ */
+export async function autofillProfile(seed: ProfileSeed, signal?: AbortSignal): Promise<CreatorProfile> {
+  const base = apiBase()
+  if (base) {
+    try {
+      const res = await fetch(`${base}/creator-room/autofill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seed }),
+        signal,
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { profile?: CreatorProfile }
+        if (data.profile?.creator) return data.profile
+      }
+    } catch {
+      /* fall through to local merge */
+    }
+  }
+  // Local fallback — DEFAULT enriched with the seed answers.
+  return {
+    ...DEFAULT_PROFILE,
+    creator: {
+      name: seed.name.trim() || 'Creator',
+      niche: seed.niche.trim() || DEFAULT_PROFILE.creator.niche,
+      vibe: seed.vibe.length ? seed.vibe : DEFAULT_PROFILE.creator.vibe,
+    },
+    companions: { ...DEFAULT_PROFILE.companions, pet: seed.pet },
+  }
+}
+
 /**
  * Render a clay-diorama IMAGE of the room (the default mode) via the Comms
  * Service → gpt-image-1. Returns a data URL. Throws `GenerationUnavailable`
