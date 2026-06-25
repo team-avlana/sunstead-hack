@@ -29,7 +29,7 @@ import {
   setDefaultTextFormat,
 } from '@/lib/blockTypes'
 import { relayoutFrame } from '@/lib/frameLayout'
-import { DeleteButton } from './ShapeChrome'
+import { DeleteButton, DragHandle } from './ShapeChrome'
 
 /**
  * Rainy text block — a markdown-aware card.
@@ -328,6 +328,7 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
         onMouseLeave={() => setZoneHover(false)}
       >
         <DeleteButton editor={editor} id={shape.id} show={showMain} />
+        <DragHandle editor={editor} id={shape.id} show={showMain} />
 
         <div
           ref={cardRef}

@@ -10,7 +10,7 @@ import {
   type TLFrameShape,
 } from 'tldraw'
 import { getSquirclePath } from '@/lib/squircle'
-import { DeleteButton } from './ShapeChrome'
+import { DeleteButton, DragHandle } from './ShapeChrome'
 
 /** iOS-style corner radius (page units) for canvas frames. */
 const FRAME_RADIUS = 24
@@ -66,6 +66,14 @@ function FrameChrome({ shape }: { shape: TLFrameShape }) {
         show={isHovered || isSelected || trashHover}
         onHoverChange={setTrashHover}
         className="frame-trash"
+      />
+
+      <DragHandle
+        editor={editor}
+        id={shape.id}
+        show={isHovered || isSelected || trashHover}
+        onHoverChange={setTrashHover}
+        className="frame-grip"
       />
     </HTMLContainer>
   )

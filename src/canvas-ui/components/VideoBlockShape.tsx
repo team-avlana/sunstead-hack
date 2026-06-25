@@ -30,7 +30,7 @@ import {
 } from '@/lib/blockTypes'
 import { analyseVideoShape, isBackendShape, pollVideo } from '@/lib/videoAnalysis'
 import { relayoutFrame } from '@/lib/frameLayout'
-import { DeleteButton } from './ShapeChrome'
+import { DeleteButton, DragHandle } from './ShapeChrome'
 
 // The video taxonomy (status lifecycle, detail levels, sizing, parsing) lives in
 // lib/blockTypes so the adaptive sidebar can read + drive it from outside <Tldraw>.
@@ -174,6 +174,14 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
         show={isHovered || isSelected || trashHover}
         onHoverChange={setTrashHover}
         className="vb-trash"
+      />
+
+      <DragHandle
+        editor={editor}
+        id={shape.id}
+        show={isHovered || isSelected || trashHover}
+        onHoverChange={setTrashHover}
+        className="vb-grip"
       />
     </HTMLContainer>
   )
