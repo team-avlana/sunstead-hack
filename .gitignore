@@ -220,11 +220,44 @@ __marimo__/
 .claude
 .vscode
 
+# ───────────────────── Rainy / frontend / macOS additions ─────────────────────
+# macOS
+.DS_Store
+*.swp
+
+# Xcode / Swift (src/mac-app)
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+.swiftpm/
+
+# Node / Next.js (src/canvas-ui)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Secrets / local config
+.env.local
+*.local.json
+secrets/
+
+# Agent / scratch
+scratchpad/
+.archive/
+
+# Un-ignore frontend source dirs that the broad Python rules above (lib/, build/) also match
+!src/canvas-ui/lib/
+!src/canvas-ui/lib/**
+
+# ───────────────────── Team backend (origin/main) ─────────────────────
 docs/tasks/**
 
 # runtime artifacts
 **/tmp/**
 **/workdir/**
 
-# python-service
+# python-service / comms-service (local config holds secrets)
 src/python-service/config.toml
+src/comms-service/config.toml

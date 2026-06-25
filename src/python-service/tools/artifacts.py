@@ -4,6 +4,7 @@ import asyncio
 from typing import Any, Optional
 
 from fastmcp import FastMCP
+from starlette.concurrency import run_in_threadpool
 
 import db
 import notify
@@ -20,11 +21,22 @@ def register(mcp: FastMCP) -> None:
         position: Optional[dict] = None,
     ) -> dict:
         """
-        Create a new artifact on the canvas for a project.
+        Create a frame (a "flow") on the canvas for a project. The canvas renders it
+        live. A frame is one artifact; the blocks it contains live inside its payload
+        as elements.
 
-        type: storyboard | shot_list | idea_board | script_doc | mood_board | diagram
-        payload: the typed content of the artifact (element ids live inside it).
-        position: {x, y, w, h} placement hint for the canvas.
+        type: 'frame'  (e.g. an Ideation flow, a Storyboarding flow)
+        payload: {
+          "label": str,               # frame title shown on the canvas
+          "role": str (optional),     # e.g. "ideation" | "storyboard"
+          "elements": [               # the blocks inside this frame
+            {"id": "el-1", "type": "text",  "content": "<p>…</p>", "x": 24, "y": 64, "w": 320, "h": 200},
+            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64}
+          ]
+        }
+        Each element needs a stable "id"; x/y are RELATIVE to the frame's top-left.
+        Address one block later with update_artifact(id, element_id=<el.id>, element_patch={...}).
+        position: {x, y, w, h} = the frame box on the canvas.
 
         Returns {artifact_id}.
         """
@@ -33,12 +45,16 @@ def register(mcp: FastMCP) -> None:
         if not type:
             raise ValueError("type is required")
 
-        result = db.create_artifact(
-            project_id=project_id,
-            type_=type,
-            title=title,
-            payload=payload or {},
-            position=position,
+        # Run the blocking psycopg-pool call off the event loop so it never
+        # starves pg_listen / websocket delivery / the MCP transport.
+        result = await run_in_threadpool(
+            lambda: db.create_artifact(
+                project_id=project_id,
+                type_=type,
+                title=title,
+                payload=payload or {},
+                position=position,
+            )
         )
         await notify.broadcast(
             {
@@ -75,13 +91,15 @@ def register(mcp: FastMCP) -> None:
         if not artifact_id:
             raise ValueError("artifact_id is required")
 
-        result = db.update_artifact(
-            artifact_id=artifact_id,
-            payload=payload,
-            element_id=element_id,
-            element_patch=element_patch,
-            position=position,
-            title=title,
+        result = await run_in_threadpool(
+            lambda: db.update_artifact(
+                artifact_id=artifact_id,
+                payload=payload,
+                element_id=element_id,
+                element_patch=element_patch,
+                position=position,
+                title=title,
+            )
         )
         if result is None:
             raise ValueError(f"Artifact {artifact_id} not found")
@@ -121,7 +139,7 @@ def register(mcp: FastMCP) -> None:
         Soft-delete an artifact (sets deleted_at). Notifies the canvas.
         Returns {ok: true}.
         """
-        result = db.delete_artifact(artifact_id)
+        result = await run_in_threadpool(db.delete_artifact, artifact_id)
         if result is None:
             raise ValueError(f"Artifact {artifact_id} not found")
 

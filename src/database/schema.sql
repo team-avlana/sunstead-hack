@@ -147,18 +147,22 @@ CREATE TRIGGER trg_style_profiles_touch
     FOR EACH ROW EXECUTE FUNCTION touch_timestamps();
 
 -- ============================================================================
---  ARTIFACTS — everything the read-only canvas renders.
---  payload is typed per `type`, with element ids INSIDE it so the agent can
---  address a single element: update_artifact(id, element_id, ...).
+--  ARTIFACTS — every artifact is a FRAME (a flow); the blocks it contains live
+--  INSIDE payload.elements. The canvas is a pure projection of these rows: one
+--  frame → a tldraw frame, each element → a block (text | video | …) within it.
+--  Element ids live in the payload so the agent can address a single block:
+--  update_artifact(id, element_id, element_patch).
 -- ============================================================================
 CREATE TABLE artifacts (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id  uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    type        text NOT NULL,         -- storyboard | shot_list | idea_board |
-                                       -- script_doc | mood_board | diagram
+    type        text NOT NULL,         -- MVP: 'frame'. The block kind lives in
+                                       -- payload.elements[].type (text | video).
     title       text,
     payload     jsonb NOT NULL DEFAULT '{}'::jsonb,
-    position    jsonb,                 -- {x, y, w, h} on the infinite canvas
+                                       -- {label, role?, elements:[
+                                       --   {id, type, x, y, w, h, ...}]}
+    position    jsonb,                 -- {x, y, w, h} frame box on the canvas
     z           int NOT NULL DEFAULT 0,-- stacking order
     version     int NOT NULL DEFAULT 1,-- bump on update; cheap change detection
 

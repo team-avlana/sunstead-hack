@@ -1,11 +1,22 @@
 import os
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
+
+# Load credentials from a local .env (DB_CONNECTION_STRING, AZURE_ANTHROPIC_URL,
+# AZURE_ANTHROPIC_KEY) before settings are read. Resolved relative to this file so
+# it works regardless of the process CWD. python-dotenv is optional.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
 
 
 @dataclass

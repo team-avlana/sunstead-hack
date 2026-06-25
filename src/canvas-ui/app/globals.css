@@ -1,0 +1,755 @@
+/* Rainy Canvas UI — clean full-screen canvas (first pass).
+   Light, minimal. Full brand/design system lives in design/index.html. */
+
+:root {
+  --bg: #e9ecf3;
+  --canvas: #fcfdff;
+  --panel: rgba(255, 255, 255, 0.62);
+  --panel-blur: 14px;
+  --panel-hairline: rgba(255, 255, 255, 0.75);
+  --border: rgba(18, 24, 48, 0.08);
+  --ink: #191d28;
+  --ink-dim: #868d9e;
+  --accent: #3b6ef6;
+
+  /* Brand primary — reuse via var(--primary) everywhere in the app.
+     --primary-rgb is the same colour as r,g,b so we can mix our own alphas. */
+  --primary: #0C76FF;
+  --primary-rgb: 12, 118, 255;
+  /* Derived, reusable primary tints: a very gentle border + a soft tinted
+     drop shadow. Use these tokens anywhere a surface should read as "ours". */
+  --primary-border: rgba(var(--primary-rgb), 0.14);
+  --primary-shadow:
+    0 1px 2px rgba(var(--primary-rgb), 0.06),
+    0 12px 34px rgba(var(--primary-rgb), 0.14),
+    0 3px 12px rgba(var(--primary-rgb), 0.08);
+  /* Classic neutral card drop shadow (the "before" look). */
+  --card-shadow: 0 1px 2px rgba(20, 28, 60, 0.06), 0 12px 30px rgba(20, 28, 60, 0.10);
+
+  --shadow-sm: 0 1px 2px rgba(20, 28, 60, 0.06), 0 2px 6px rgba(20, 28, 60, 0.05);
+  --shadow-md: 0 8px 22px rgba(20, 28, 60, 0.10), 0 2px 6px rgba(20, 28, 60, 0.06);
+  --shadow-lg: 0 20px 54px rgba(20, 28, 60, 0.16), 0 4px 12px rgba(20, 28, 60, 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button, input { font-family: inherit; }
+
+/* ============================================================
+   Home screen — the project picker
+   ============================================================ */
+.home {
+  position: fixed; inset: 0; overflow: auto;
+  /* Full white so the 3D Creator Room reads cleanly against the page. */
+  background: #ffffff;
+}
+.home-inner { max-width: 1040px; margin: 0 auto; padding: 56px 28px 80px; }
+
+.home-head { margin-bottom: 30px; }
+.home-brand {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
+  margin-bottom: 18px;
+}
+
+/* ============================================================
+   Creator Room — the templated 3D diorama hero
+   ============================================================ */
+.room { margin: 0 0 44px; }
+
+.room-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 60vh;
+  border-radius: 24px;
+  overflow: hidden;
+  background: radial-gradient(120% 100% at 50% 0%, #ffffff 60%, #f4f6fb 100%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+.room-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+
+/* ---- image mode (default) ---- */
+.room-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Until a real image is generated, the reference sample sits blurred + dimmed
+   behind the CTA (the blur also hides the reference's annotation marks). */
+.room-img.sample { filter: blur(7px) saturate(1.05) brightness(0.94); transform: scale(1.06); }
+.room-cta {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  text-align: center; padding: 24px;
+  background: radial-gradient(120% 90% at 50% 45%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+}
+.room-cta-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); text-shadow: 0 1px 12px rgba(255, 255, 255, 0.9); }
+.room-cta-sub { font-size: 13.5px; font-weight: 500; color: var(--ink); max-width: 40ch; line-height: 1.5; text-shadow: 0 1px 10px rgba(255, 255, 255, 0.9); }
+.room-cta .room-btn { margin-top: 6px; height: 38px; padding: 0 18px; font-size: 14px; }
+
+/* ---- segmented Image / 3D toggle ---- */
+.room-seg {
+  pointer-events: auto; display: inline-flex; padding: 3px; gap: 2px;
+  background: rgba(255, 255, 255, 0.86); border: 1px solid var(--border); border-radius: 999px;
+  -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: var(--shadow-sm);
+}
+.room-seg button {
+  border: 0; background: none; cursor: pointer; font-family: inherit;
+  height: 28px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-dim);
+  transition: background .14s ease, color .14s ease;
+}
+.room-seg button:hover { color: var(--ink); }
+.room-seg button.on { background: var(--primary); color: #fff; }
+
+.room-loading {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  color: var(--ink-dim); font-size: 13px; font-weight: 500;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.room-spinner {
+  width: 26px; height: 26px; border-radius: 999px;
+  border: 2.5px solid rgba(var(--primary-rgb), 0.18);
+  border-top-color: var(--primary);
+  animation: room-spin 0.8s linear infinite;
+}
+@keyframes room-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .room-spinner { animation-duration: 2s; } }
+
+.room-overlay {
+  position: absolute; left: 18px; right: 18px; top: 16px; z-index: 3;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  pointer-events: none;
+}
+.room-meta { display: flex; flex-direction: column; gap: 2px; }
+.room-kicker {
+  font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.8);
+}
+.room-sub { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+
+.room-actions { display: inline-flex; gap: 8px; pointer-events: auto; }
+.room-top-actions { display: inline-flex; align-items: center; gap: 8px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; }
+.room-btn {
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  height: 34px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--border); transition: transform .14s ease, background .14s ease, box-shadow .14s ease;
+}
+.room-btn:active { transform: translateY(1px); }
+.room-btn:disabled { opacity: 0.6; cursor: default; }
+.room-btn.ghost {
+  background: rgba(255, 255, 255, 0.86); color: var(--ink);
+  -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: var(--shadow-sm);
+}
+.room-btn.ghost:hover { background: #fff; }
+.room-btn.primary {
+  background: var(--primary); color: #fff; border-color: transparent;
+  box-shadow: var(--primary-shadow);
+}
+.room-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
+
+.room-status {
+  position: absolute; left: 18px; right: 18px; bottom: 16px; z-index: 3;
+  padding: 9px 13px; border-radius: 12px; font-size: 12.5px; font-weight: 500;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm); color: var(--ink-dim);
+}
+.room-status.error { color: #b4413f; border-color: rgba(229, 72, 77, 0.28); }
+
+/* ---- intake form ---- */
+.room-form {
+  margin-top: 14px; padding: 18px;
+  border: 1px solid var(--border); border-radius: 18px;
+  background: rgba(250, 251, 253, 0.8); box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.room-fgroup { display: flex; flex-direction: column; gap: 9px; }
+.room-fgroup-title { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.room-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.room-field { display: flex; flex-direction: column; gap: 5px; }
+.room-field.wide { grid-column: 1 / -1; }
+.room-field > span { font-size: 11px; font-weight: 600; color: var(--ink-dim); }
+.room-field input, .room-field select {
+  height: 34px; padding: 0 10px; border-radius: 9px;
+  border: 1px solid var(--border); background: #fff; color: var(--ink);
+  font-family: inherit; font-size: 13px; outline: none;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.room-field input:focus, .room-field select:focus {
+  border-color: var(--primary-border);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10);
+}
+.room-form-foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+.room-edit-toggle {
+  margin: 10px auto 0; display: block; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ink-dim);
+  padding: 4px 8px; border-radius: 8px; transition: color .14s ease, background .14s ease;
+}
+.room-edit-toggle:hover { color: var(--ink); background: rgba(18, 24, 48, 0.04); }
+
+/* ============================================================
+   Onboarding wizard — few-questions, one screen at a time
+   ============================================================ */
+.ob {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(18, 24, 48, 0.28);
+  -webkit-backdrop-filter: blur(8px) saturate(120%); backdrop-filter: blur(8px) saturate(120%);
+  animation: ob-fade 180ms ease;
+}
+@keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ob-card {
+  position: relative; width: 100%; max-width: 520px;
+  background: #fff; border-radius: 24px; padding: 30px 30px 22px;
+  box-shadow: 0 30px 80px rgba(18, 24, 48, 0.30), 0 4px 14px rgba(18, 24, 48, 0.12);
+  animation: ob-pop 240ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@keyframes ob-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ob, .ob-card, .ob-step { animation: none; } }
+
+.ob-close {
+  position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border-radius: 999px;
+  border: 0; background: rgba(18, 24, 48, 0.05); color: var(--ink-dim);
+  font-size: 19px; line-height: 1; cursor: pointer; transition: background .14s ease, color .14s ease;
+}
+.ob-close:hover { background: rgba(18, 24, 48, 0.10); color: var(--ink); }
+
+.ob-dots { display: flex; gap: 6px; margin-bottom: 22px; }
+.ob-dots span { width: 26px; height: 5px; border-radius: 999px; background: rgba(18, 24, 48, 0.10); transition: background .25s ease; }
+.ob-dots span.on { background: var(--primary); }
+
+.ob-step { animation: ob-slide 260ms ease; }
+@keyframes ob-slide { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+
+.ob-q { margin: 0 0 6px; font-size: 25px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.ob-sub { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+
+.ob-input {
+  width: 100%; height: 48px; padding: 0 16px; border-radius: 13px; margin-bottom: 14px;
+  border: 1.5px solid var(--border); background: #fff; color: var(--ink);
+  font-family: inherit; font-size: 16px; outline: none;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.ob-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12); }
+
+.ob-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-chip {
+  border: 1.5px solid var(--border); background: #fff; cursor: pointer; font-family: inherit;
+  height: 38px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink);
+  transition: all .14s ease; text-transform: capitalize;
+}
+.ob-chip:hover { border-color: rgba(var(--primary-rgb), 0.5); }
+.ob-chip.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: var(--primary-shadow); }
+
+.ob-pets { display: flex; gap: 10px; }
+.ob-pet {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  padding: 16px 8px; border-radius: 16px; border: 1.5px solid var(--border); background: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); transition: all .14s ease;
+}
+.ob-pet:hover { border-color: rgba(var(--primary-rgb), 0.5); }
+.ob-pet.on { border-color: var(--primary); background: rgba(var(--primary-rgb), 0.06); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10); }
+.ob-pet-emoji { font-size: 28px; }
+
+.ob-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 26px; }
+.ob-nav .room-btn { height: 42px; padding: 0 22px; font-size: 14px; }
+
+.ob-building {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; min-height: 220px; padding: 20px;
+}
+
+@media (max-width: 640px) {
+  .room-stage { aspect-ratio: 4 / 3; }
+  .room-overlay { flex-direction: column; }
+  .ob-card { padding: 24px 20px 18px; }
+}
+.home-head h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.home-head p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-dim); max-width: 56ch; }
+
+.home-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.home-card {
+  position: relative; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 168px; padding: 18px;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+  backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+  border: 1px solid var(--primary-border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.home-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: rgba(var(--primary-rgb), 0.28); }
+.home-card:active { transform: translateY(-1px); }
+
+.home-card-thumb {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(var(--primary-rgb), 0.10); color: var(--primary);
+}
+.home-card-title { font-size: 15px; font-weight: 650; line-height: 1.3; color: var(--ink); }
+.home-card-meta { margin-top: auto; font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+.home-card-del {
+  position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 17px; line-height: 1; color: var(--ink-dim);
+  background: rgba(18, 24, 48, 0.04);
+  opacity: 0; transition: opacity .14s ease, background .14s ease, color .14s ease;
+}
+.home-card:hover .home-card-del { opacity: 1; }
+.home-card-del:hover { background: rgba(229, 72, 77, 0.14); color: #e5484d; }
+
+/* "New project" card — dashed, brand-tinted call to action */
+.home-new {
+  align-items: center; justify-content: center; gap: 8px; text-align: center;
+  background: rgba(var(--primary-rgb), 0.04);
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.35);
+  color: var(--primary); box-shadow: none;
+}
+.home-new:hover { background: rgba(var(--primary-rgb), 0.08); border-color: var(--primary); box-shadow: var(--shadow-md); }
+.home-new-plus { font-size: 30px; font-weight: 300; line-height: 1; }
+.home-new-label { font-size: 14px; font-weight: 600; }
+
+.home-empty { grid-column: 1 / -1; padding: 28px; color: var(--ink-dim); font-size: 14px; }
+
+/* ============================================================
+   Project header — floating chevron-back + editable title
+   ============================================================ */
+/* Progressive (gradient) backdrop blur band across the top, behind the header.
+   Layers + masks live in the TopBlur component; this just positions the band. */
+.rainy-top-blur {
+  position: absolute; top: 0; left: 252px; right: 0; height: 84px;
+  z-index: 5; pointer-events: none;
+  transition: left .26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rainy-project-header {
+  position: absolute; top: 14px; left: 258px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 12px;
+  pointer-events: none; /* let the canvas through the gaps; children re-enable */
+  transition: left .26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* With the sidebar hidden, slide the header/blur past the floating show button. */
+.rainy-root.sidebar-collapsed .rainy-top-blur { left: 0; }
+.rainy-root.sidebar-collapsed .rainy-project-header { left: 64px; }
+.rph-back {
+  pointer-events: auto;
+  flex: none; width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  color: var(--ink); cursor: pointer; box-shadow: var(--shadow-md);
+  transition: background .14s ease, transform .14s ease;
+}
+.rph-back:hover { background: #fff; transform: translateX(-1px); }
+.rph-back:active { transform: translateX(-2px) scale(0.96); }
+.rph-title {
+  pointer-events: auto;
+  min-width: 60px; max-width: 46vw;
+  border: 1px solid transparent; border-radius: 9px;
+  background: transparent; padding: 4px 8px;
+  font-family: inherit; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--ink); outline: none;
+  transition: background .14s ease, border-color .14s ease;
+}
+.rph-title:hover { background: rgba(255, 255, 255, 0.6); }
+.rph-title:focus { background: #fff; border-color: var(--primary-border); box-shadow: var(--shadow-sm); }
+
+/* ---------- Full-screen canvas ---------- */
+.rainy-root { position: fixed; inset: 0; background: var(--canvas); isolation: isolate; }
+
+/* Isolate the canvas onto its own compositing layer so the glass panels'
+   backdrop-filter samples one stable texture instead of re-blurring tldraw's
+   live per-frame repaint. This is the flicker fix — see the panel rules below. */
+.rainy-canvas {
+  position: absolute;
+  inset: 0; /* edge-to-edge, no rounding */
+  isolation: isolate;
+  contain: strict;
+  transform: translateZ(0);
+}
+
+/* Dot grid: GPU-composited, never intercept pointer/hit-testing (Figma-style). */
+.rainy-grid {
+  transform: translateZ(0);
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* Kill tldraw's blue focus outline (shows as a line along the top edge of the
+   full-screen canvas container when focused). */
+.tl-container,
+.tl-container:focus,
+.tl-container:focus-visible { outline: none !important; }
+
+/* Use Helvetica Neue for text shapes instead of tldraw's default handwritten
+   "draw" font (Shantell Sans). tldraw applies the font-family INLINE via JS, so
+   the CSS vars above don't take — force it on the rendered text elements with
+   !important (which beats inline non-important styles). */
+.tl-container {
+  --tl-font-draw: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --tl-font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --tl-font-serif: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --tl-font-mono: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+.tl-container .tl-text,
+.tl-container .tl-text-content,
+.tl-container .tl-text-label,
+.tl-container .tl-text-label__inner,
+.tl-container .tl-text-input,
+.tl-container .tl-rich-text,
+.tl-container .tl-rich-text *,
+.tl-container .tl-text-measure {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+}
+
+/* ---------- Sidebar (glassy floating card over the canvas) ---------- */
+.rainy-sidebar {
+  /* Floating card: inset from the edges with rounded corners, a drop shadow,
+     and a more see-through translucent gray vibrancy panel. */
+  position: absolute; top: 12px; left: 12px; bottom: 12px; width: 240px;
+  background: rgba(245, 245, 247, 0.34);
+  -webkit-backdrop-filter: blur(calc(var(--panel-blur) * 1.4)) saturate(180%);
+  backdrop-filter: blur(calc(var(--panel-blur) * 1.4)) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(18, 24, 48, 0.14), 0 1px 3px rgba(18, 24, 48, 0.08);
+  overflow: hidden;
+  z-index: 5;
+  /* Keep the panel on its own GPU layer (less flicker while the canvas repaints).
+     The collapse/expand slide is driven entirely by GSAP, which animates an
+     inline `transform` — so we deliberately do NOT set a CSS `transform` or
+     `transition` here; either would fight GSAP's per-frame inline writes. */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+/* Floating "show sidebar" button — only visible while the sidebar is collapsed.
+   Mirrors .rph-back (the "return to home" control): same 40px circular pill,
+   white blur fill, border, and shadow, so the two floating controls read as a
+   matched set. */
+.rainy-sidebar-show {
+  position: absolute; top: 14px; left: 14px; z-index: 6;
+  width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  color: var(--ink); cursor: pointer; box-shadow: var(--shadow-md);
+  opacity: 0; transform: translateX(-8px) scale(0.96); pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease, background .14s ease;
+}
+.rainy-sidebar-show.show { opacity: 1; transform: none; pointer-events: auto; }
+.rainy-sidebar-show:hover { background: #fff; }
+.rainy-sidebar-show:active { transform: scale(0.94); }
+
+/* ---------- Canvas insights (left panel contents) ---------- */
+.ci { display: flex; flex-direction: column; gap: 14px; padding: 16px 14px; height: 100%; }
+.ci-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ci-title { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.ci-collapse {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-dim); cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.ci-collapse:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+.ci-block {
+  display: flex; flex-direction: column; gap: 2px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 8px 10px;
+  box-shadow: var(--shadow-sm);
+}
+.ci-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; font-size: 12px; }
+.ci-k { color: var(--ink-dim); }
+.ci-v { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+.ci-zoom { display: flex; align-items: center; gap: 4px; }
+.ci-zoom button {
+  flex: 1; height: 30px; border: 1px solid var(--border); border-radius: 9px;
+  background: #fff; color: var(--ink); cursor: pointer; font-size: 14px;
+  box-shadow: var(--shadow-sm); transition: background .15s;
+}
+.ci-zoom button:hover { background: rgba(18, 24, 48, 0.04); }
+.ci-zoom .ci-zoom-pct { flex: 1.5; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ci-actions { display: flex; flex-direction: column; gap: 6px; }
+.ci-actions button {
+  height: 32px; border: 1px solid var(--border); border-radius: 10px;
+  background: #fff; color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 500;
+  box-shadow: var(--shadow-sm); transition: background .15s;
+}
+.ci-actions button:hover { background: rgba(18, 24, 48, 0.04); }
+.ci-hint { margin-top: auto; font-size: 11px; line-height: 1.4; color: var(--ink-dim); }
+
+/* ============================================================
+   Rainy text block (custom tldraw shape)
+   ============================================================ */
+/* isolate so the aurora bloom (::after, z-index -1) can sit behind the card */
+.rainy-text-host { position: relative; width: 100%; height: 100%; isolation: isolate; }
+
+/* When a block appears: a soft scale-pop, plus an aurora-like glow that blooms
+   out from behind the card. Rather than a hard ring, it's layered radial
+   gradients — brand blue drifting through cyan + violet (northern-lights palette)
+   — blurred and gently rotating so it feels alive and AI-native, then fades. */
+@keyframes rainy-blup {
+  0%   { transform: scale(0.82); opacity: 0; }
+  55%  { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes rainy-aurora {
+  0%   { opacity: 0;    transform: scale(0.9) rotate(-7deg); }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0;    transform: scale(1.18) rotate(5deg); }
+}
+.rainy-text-host::after {
+  content: '';
+  position: absolute; inset: -16px; border-radius: 28px; pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(58% 58% at 26% 22%, rgba(40, 210, 255, 0.32), transparent 70%),
+    radial-gradient(58% 58% at 78% 80%, rgba(132, 86, 255, 0.28), transparent 70%),
+    radial-gradient(82% 82% at 50% 50%, rgba(var(--primary-rgb), 0.26), transparent 72%);
+  filter: blur(11px);
+  /* invisible at rest — only the one-shot bloom makes it appear, then it fades
+     back to this 0 so the gradient never lingers behind the card. */
+  opacity: 0;
+  animation: rainy-aurora 820ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rainy-text-host::after { animation: none; opacity: 0; }
+}
+
+/* The active/hover area: a domed region extending above + around the card so the
+   menu reveals over the whole zone (card + the space where the toolbar sits). */
+.rt-zone {
+  --zt: 92px;  /* top extension (covers the toolbar dome) */
+  --zx: 30px;  /* side extension */
+  --zb: 16px;  /* bottom extension */
+  position: absolute;
+  top: calc(-1 * var(--zt));
+  left: calc(-1 * var(--zx));
+  right: calc(-1 * var(--zx));
+  bottom: calc(-1 * var(--zb));
+  pointer-events: auto;
+  /* arched/domed top to match the active-area mock */
+  border-radius: 46% 46% 18px 18px / 42% 42% 6% 6%;
+}
+/* DEBUG visualisation — remove by flipping DEBUG_HOVER off in RainyTextShape.tsx */
+.rt-zone.debug.on { background: rgba(59, 110, 246, 0.22); }
+.rt-zone.debug.on .rainy-text-card { background: #dde7ff; }
+
+.rainy-text-card {
+  position: absolute;
+  top: var(--zt); left: var(--zx); right: var(--zx); bottom: var(--zb);
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 16px;
+  /* classic neutral drop shadow (no border) */
+  border: none;
+  box-shadow: var(--card-shadow);
+  padding: 22px 24px;
+  overflow: hidden;
+  display: flex;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  /* opt the card into pointer events so the grab cursor shows; we never
+     stopPropagation while idle, so tldraw still receives the drag and moves it. */
+  pointer-events: auto;
+  /* easy drag affordance (tldraw still handles the actual move) */
+  cursor: grab;
+  /* appear animation; transform-origin center so it pops in place */
+  transform-origin: center;
+  animation: rainy-blup 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rainy-text-card { animation: none; }
+}
+.rainy-text-card:active { cursor: grabbing; }
+.rainy-text-card.is-editing { cursor: text; }
+.rainy-text-card.is-small { border-radius: 13px; padding: 14px 16px; }
+/* Always top-aligned, whether empty or not. The caret blinks in a fixed spot
+   from the moment the card is created and the text flows straight down from
+   there — no jump from centre to top when the first character lands. */
+.rainy-text-card { align-items: flex-start; justify-content: flex-start; }
+
+.rainy-text-content { position: relative; width: 100%; max-height: 100%; overflow: auto; }
+
+/* Native caret tint for the tiptap editable (behaviour stays default). */
+.rainy-text-prose { caret-color: #6C6C6C; }
+
+/* ---- rendered markdown (the "compiled aesthetic") ---- */
+.rainy-text-prose { outline: none; line-height: 1.45; font-size: 17px; }
+.rainy-text-card.is-small .rainy-text-prose { font-size: 15px; }
+.rainy-text-prose:focus { outline: none; }
+.rainy-text-prose > :first-child { margin-top: 0; }
+.rainy-text-prose > :last-child { margin-bottom: 0; }
+.rainy-text-prose h1 { font-size: 1.55em; font-weight: 700; margin: 0.4em 0 0.3em; letter-spacing: -0.01em; }
+.rainy-text-prose h2 { font-size: 1.3em; font-weight: 700; margin: 0.4em 0 0.3em; }
+.rainy-text-prose h3 { font-size: 1.12em; font-weight: 600; margin: 0.4em 0 0.3em; }
+.rainy-text-prose p { margin: 0.35em 0; }
+.rainy-text-prose ul, .rainy-text-prose ol { margin: 0.35em 0; padding-left: 1.3em; }
+.rainy-text-prose li { margin: 0.1em 0; }
+.rainy-text-prose blockquote { margin: 0.4em 0; padding-left: 0.8em; border-left: 3px solid var(--border); color: var(--ink-dim); }
+.rainy-text-prose code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; background: rgba(18, 24, 48, 0.06); padding: 0.1em 0.35em; border-radius: 5px; }
+.rainy-text-prose pre { background: rgba(18, 24, 48, 0.06); padding: 10px 12px; border-radius: 10px; overflow: auto; }
+.rainy-text-prose pre code { background: none; padding: 0; }
+.rainy-text-prose a { color: var(--accent); }
+
+/* ---- progressive-disclosure chrome (above the card) ---- */
+.rt-actions {
+  position: absolute;
+  /* centered over the card, sitting in the dome just above the card's top edge */
+  left: var(--zx);
+  right: var(--zx);
+  bottom: calc(100% - var(--zt) + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+.rt-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+.rt-format,
+.rt-main { display: inline-flex; align-items: center; gap: 2px; }
+
+/* the B/I/U/code bar sits above the Aa row and discloses on its own */
+.rt-format {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: var(--shadow-md);
+  padding: 3px;
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition: opacity 110ms ease, transform 110ms ease;
+  pointer-events: none;
+}
+.rt-format.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+.rt-format button {
+  border: 0; background: none; cursor: pointer;
+  width: 30px; height: 28px; border-radius: 8px;
+  color: var(--ink); font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.rt-format button:hover { background: rgba(18, 24, 48, 0.06); }
+.rt-format button.on { background: rgba(59, 110, 246, 0.12); color: var(--accent); }
+.rt-format .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+.rt-main {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  padding: 4px 6px;
+  gap: 4px;
+}
+.rt-pill {
+  border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 3px;
+  height: 26px; padding: 0 9px; border-radius: 999px;
+  font-size: 14px; color: var(--ink);
+}
+.rt-pill .caret { font-size: 11px; color: var(--ink-dim); }
+.rt-pill:hover { background: rgba(18, 24, 48, 0.06); }
+.rt-pill.on { background: rgba(18, 24, 48, 0.08); }
+.rt-icon {
+  border: 0; background: none; cursor: pointer;
+  width: 28px; height: 26px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-dim);
+}
+.rt-icon:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+
+/* ============================================================
+   Bottom dock — add Text / Video blocks
+   ============================================================ */
+.rainy-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--primary-border);
+  /* fully rounded pill to match the design system */
+  border-radius: 999px;
+  box-shadow: var(--primary-shadow);
+  pointer-events: auto;
+}
+.rainy-dock-sep { width: 1px; height: 22px; background: var(--primary-border); margin: 0 2px; flex: none; }
+
+/* Square icon tool button — compact, labelled via native tooltip. */
+.rainy-tool {
+  border: 0; background: none; cursor: pointer; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; border-radius: 999px;
+  color: var(--ink);
+  transition: background 120ms ease, color 120ms ease;
+}
+.rainy-tool svg { color: var(--ink-dim); display: block; }
+.rainy-tool:hover { background: rgba(var(--primary-rgb), 0.08); }
+.rainy-tool:hover svg { color: var(--primary); }
+.rainy-tool:active { background: rgba(var(--primary-rgb), 0.16); }
+/* active (current) tool — brand tint */
+.rainy-tool.on { background: rgba(var(--primary-rgb), 0.12); }
+.rainy-tool.on svg { color: var(--primary); }
+
+/* Shapes flyout (every built-in geo shape) */
+.rainy-dock-popwrap { position: relative; display: inline-flex; }
+.rainy-dock-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(5, 34px);
+  gap: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--primary-border);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.06), 0 16px 40px rgba(var(--primary-rgb), 0.18);
+  animation: rainy-pop 140ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes rainy-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rainy-dock-pop { animation: none; }
+}

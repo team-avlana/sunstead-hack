@@ -1,0 +1,41 @@
+import { create } from 'zustand'
+
+export type CommsStatus = 'idle' | 'connected' | 'reconnecting' | 'mock'
+
+/** Which screen the app is showing. Every canvas is tied to one project. */
+export type View = 'home' | 'canvas'
+
+interface RainyState {
+  view: View
+  currentProjectId: string | null
+  currentProjectTitle: string
+  commsStatus: CommsStatus
+  selectedIds: string[]
+  sidebarCollapsed: boolean
+  /** Open a project's canvas. Title is optional — the canvas load resolves it. */
+  openProject: (id: string, title?: string) => void
+  /** Back to the Home screen. */
+  goHome: () => void
+  setTitle: (title: string) => void
+  setCommsStatus: (s: CommsStatus) => void
+  setSelectedIds: (ids: string[]) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+  toggleSidebar: () => void
+}
+
+/** App/UI + navigation state only. Canvas truth lives in the tldraw store, not here. */
+export const useRainyStore = create<RainyState>((set) => ({
+  view: 'home',
+  currentProjectId: null,
+  currentProjectTitle: '',
+  commsStatus: 'idle',
+  selectedIds: [],
+  sidebarCollapsed: false,
+  openProject: (id, title) => set({ view: 'canvas', currentProjectId: id, currentProjectTitle: title ?? '' }),
+  goHome: () => set({ view: 'home', currentProjectId: null }),
+  setTitle: (currentProjectTitle) => set({ currentProjectTitle }),
+  setCommsStatus: (commsStatus) => set({ commsStatus }),
+  setSelectedIds: (selectedIds) => set({ selectedIds }),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+}))

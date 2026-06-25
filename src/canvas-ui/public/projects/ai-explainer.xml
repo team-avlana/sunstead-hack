@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project id="ai-explainer" title="What is an LLM? — 60s Explainer" updated="2026-06-18T09:15:00Z">
+  <shape id="concept" type="rainy-text" x="80" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">240</prop>
+    <prop name="html"><![CDATA[<h1>What is an LLM, really?</h1><p>A 60-second vertical explainer that demystifies large language models for total beginners. One idea, one metaphor, zero jargon.</p>]]></prop>
+  </shape>
+  <shape id="hook" type="rainy-text" x="600" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">240</prop>
+    <prop name="html"><![CDATA[<h2>Hook · 0–3s</h2><p>"You've used AI today and didn't notice."</p><p>Fast-cut montage: autocomplete, search, voice assistant.</p>]]></prop>
+  </shape>
+  <shape id="script" type="rainy-text" x="1120" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">280</prop>
+    <prop name="html"><![CDATA[<h2>Script beats</h2><ul><li>It's autocomplete on steroids</li><li>Trained on a huge slice of the internet</li><li>Predicts the next word, over and over</li><li>That's it — no magic, just patterns</li></ul>]]></prop>
+  </shape>
+  <shape id="visuals" type="rainy-text" x="340" y="420">
+    <prop name="w" type="number">460</prop>
+    <prop name="h" type="number">260</prop>
+    <prop name="html"><![CDATA[<h2>Visuals</h2><ol><li>Phone keyboard suggestion bar (screen recording)</li><li>Animated "word by word" build</li><li>Simple node diagram, brand blue</li></ol>]]></prop>
+  </shape>
+  <shape id="cta" type="rainy-text" x="880" y="420">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">200</prop>
+    <prop name="html"><![CDATA[<h2>CTA</h2><p>"Follow for the version that explains how it goes <em>wrong</em>."</p>]]></prop>
+  </shape>
+</project>

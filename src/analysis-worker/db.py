@@ -6,7 +6,9 @@ from psycopg.rows import dict_row
 
 def _dumps(obj) -> str:
     """json.dumps that coerces Decimal (psycopg numeric) to float."""
-    return json.dumps(obj, default=lambda o: float(o) if isinstance(o, Decimal) else str(o))
+    return json.dumps(
+        obj, default=lambda o: float(o) if isinstance(o, Decimal) else str(o)
+    )
 
 
 def get_connection(dsn: str):
@@ -102,8 +104,6 @@ def set_analysis_error(conn, video_id: str, error: str) -> None:
     conn.commit()
 
 
-# ─── style-profile helpers ───────────────────────────────────────────────────
-
 def load_creator(conn, creator_id: str) -> dict:
     with conn.cursor() as cur:
         cur.execute(
@@ -145,3 +145,21 @@ def insert_style_profile(conn, creator_id: str, summary: str, profile: dict) -> 
         row = cur.fetchone()
     conn.commit()
     return str(row["id"])
+
+
+def notify_change(conn, video_id: str, action: str) -> None:
+    """Emit a Postgres NOTIFY the python-service forwards to the canvas over WS.
+    Best-effort: a failure here must never fail the analysis run."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT pg_notify('rainy_change', %s)",
+                (
+                    json.dumps(
+                        {"type": "video", "action": action, "video_id": video_id}
+                    ),
+                ),
+            )
+        conn.commit()
+    except Exception:
+        pass

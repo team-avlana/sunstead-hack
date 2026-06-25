@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project id="channel-relaunch" title="Channel Relaunch Plan" updated="2026-06-10T12:00:00Z">
+  <shape id="goal" type="rainy-text" x="80" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">240</prop>
+    <prop name="html"><![CDATA[<h1>Channel Relaunch</h1><p>Reposition from "random tech videos" to a focused weekly show on <strong>creative tools</strong>.</p><p>Target: <strong>10k subs in 90 days</strong>.</p>]]></prop>
+  </shape>
+  <shape id="pillars" type="rainy-text" x="600" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">240</prop>
+    <prop name="html"><![CDATA[<h2>Content pillars</h2><ul><li>Tool deep-dives</li><li>Workflow teardowns</li><li>"Build with me" sessions</li></ul>]]></prop>
+  </shape>
+  <shape id="cadence" type="rainy-text" x="1120" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">220</prop>
+    <prop name="html"><![CDATA[<h2>Cadence</h2><p>One long-form video <strong>every Tuesday</strong>, plus two shorts midweek repurposed from it.</p>]]></prop>
+  </shape>
+  <shape id="firstmonth" type="rainy-text" x="340" y="420">
+    <prop name="w" type="number">460</prop>
+    <prop name="h" type="number">280</prop>
+    <prop name="html"><![CDATA[<h2>First month</h2><ol><li>My new editing setup</li><li>3 tools that replaced 10</li><li>Editing a video start to finish</li><li>Q&amp;A: going full-time</li></ol>]]></prop>
+  </shape>
+  <shape id="branding" type="rainy-text" x="880" y="420">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">220</prop>
+    <prop name="html"><![CDATA[<h2>Branding</h2><p>New intro (&lt;2s), a consistent thumbnail grid, and a brand-blue accent across every frame.</p>]]></prop>
+  </shape>
+</project>
