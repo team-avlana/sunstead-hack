@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project id="video-block-showcase" title="Video Block — States & Disclosure" updated="2026-06-25T03:00:00Z">
+<project id="video-block-showcase" title="Video Block — States &amp; Disclosure" updated="2026-06-25T03:00:00Z">
   <shape id="intro" type="rainy-text" x="80" y="40">
     <prop name="w" type="number">760</prop>
     <prop name="h" type="number">120</prop>
