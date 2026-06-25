@@ -62,7 +62,8 @@ def build_prompt(profile: dict) -> str:
     gear = _join(ct.get("gear"), 4, "a softbox light and a microphone")
     app = (ct.get("editingApp") or "a video editor").strip()
 
-    palette = _join(st.get("palette"), 4, "warm cream, terracotta, sage")
+    palette_list = [str(p).strip() for p in (st.get("palette") or []) if str(p).strip()]
+    palette_hexes = ", ".join(palette_list[:5]) if palette_list else "#EFE3CE cream, #C98A5E terracotta, #8FA98C sage"
     lighting = (st.get("lighting") or "warm").strip()
     materials = (st.get("materials") or "wood and linen").strip()
     pet = (cp.get("pet") or "cat").strip()
@@ -77,25 +78,24 @@ def build_prompt(profile: dict) -> str:
         "studio shadows, rounded soft shapes, Pixar-like soft 3D, ultra detailed. "
         "Single room floating centered on a plain cream/off-white background. "
         "NO text, NO labels, NO arrows, NO captions.\n\n"
-        f"This is the room of {name}, a content creator in {niche}; overall vibe: {vibe}. "
-        "In the room a friendly stylized clay CHARACTER (the creator) sits in a comfy "
-        "lounge chair wearing over-ear headphones, working on a laptop — a cute, warm, "
-        "approachable 3D avatar with simple rounded features.\n\n"
-        f"BACK WALL (library): floating wooden shelves with books ({reads}), framed "
-        f"posters of {shows}, small figurines ({roles}), trailing plants, and niche "
-        f"objects for {interests}.\n"
-        f"FLOOR (content setup): {shooter}, plus {gear}, and a round wooden table with a "
-        f"laptop whose screen shows {app} as a colorful editing timeline; recognizable, "
-        "realistic creator gear.\n"
-        "WINDOW WALL (lifestyle): a curtained window with a city view at dusk, a "
-        "record player / speaker, a labeled gear box, and a small bookshelf.\n\n"
-        f"STYLE: color palette {palette}; {lighting} lighting; {materials} materials; a "
-        f"patterned woven rug; {pet_clause}signature props ({props}). "
-        "RICH, VARIED COLORS — full-color illustration, NOT monochrome and NOT sepia: a "
-        "cream linen sofa, a terracotta patterned kilim rug, colorful book spines, green "
-        "leafy plants, warm honey wood floor, a white pendant lamp, and soft pastel "
-        "accents alongside the palette. "
-        "Centered composition, high detail, plain off-white background, no text."
+        f"FOREGROUND — a friendly stylized clay CHARACTER, {name}, a {vibe} {niche} creator: "
+        "sits in a comfy lounge chair wearing over-ear headphones, working on a laptop; a cute, "
+        "warm, approachable 3D avatar with simple rounded features and a gentle smile.\n"
+        f"BACK WALL (library): floating wooden shelves with books ({reads}), framed posters of "
+        f"{shows}, small figurines ({roles}), trailing plants, and niche objects for {interests}.\n"
+        f"FLOOR (content setup): {shooter}, plus {gear}, and a round wooden table with a laptop "
+        f"whose screen shows {app} as a colorful editing timeline; recognizable, realistic gear.\n"
+        "WINDOW WALL (lifestyle): a curtained window with a city view at dusk, a record player / "
+        "speaker, a labeled gear box, and a small bookshelf.\n"
+        f"STYLE: {lighting} lighting; {materials} materials; a patterned woven rug; {pet_clause}"
+        f"signature props ({props}).\n\n"
+        "DEPTH: a clean cutaway with strong foreground / midground / background separation — the "
+        "character + content rig up front, the table + rug in the middle, the two walls behind.\n"
+        "COLOR: rich, saturated, FULL-COLOR illustration. Dominant accents from this palette: "
+        f"{palette_hexes}. Plus a cream linen sofa, a terracotta patterned kilim rug, colorful book "
+        "spines, green leafy plants, warm honey wood floor, a white pendant lamp. Do NOT render it "
+        "monochrome, sepia, desaturated, muddy, or single-hue. Centered, high detail, plain "
+        "off-white background, no text."
     )
 
 
