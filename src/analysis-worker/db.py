@@ -1,6 +1,12 @@
 import json
 import psycopg
+from decimal import Decimal
 from psycopg.rows import dict_row
+
+
+def _dumps(obj) -> str:
+    """json.dumps that coerces Decimal (psycopg numeric) to float."""
+    return json.dumps(obj, default=lambda o: float(o) if isinstance(o, Decimal) else str(o))
 
 
 def get_connection(dsn: str):
@@ -69,7 +75,7 @@ def insert_shot(
                  end_sec   = EXCLUDED.end_sec,
                  frame_path = EXCLUDED.frame_path,
                  analysis  = EXCLUDED.analysis""",
-            (video_id, idx, start_sec, end_sec, frame_path, json.dumps(analysis)),
+            (video_id, idx, start_sec, end_sec, frame_path, _dumps(analysis)),
         )
 
 
@@ -77,7 +83,7 @@ def write_video_metrics(conn, video_id: str, metrics: dict) -> None:
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE videos SET metrics=%s WHERE id=%s",
-            (json.dumps(metrics), video_id),
+            (_dumps(metrics), video_id),
         )
 
 
@@ -94,3 +100,48 @@ def set_analysis_error(conn, video_id: str, error: str) -> None:
             (error[:2000], video_id),
         )
     conn.commit()
+
+
+# ─── style-profile helpers ───────────────────────────────────────────────────
+
+def load_creator(conn, creator_id: str) -> dict:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, platform, channel_url, kind FROM creators WHERE id = %s",
+            (creator_id,),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"No creator row found for id={creator_id}")
+    return dict(row)
+
+
+def load_completed_videos(conn, creator_id: str) -> list[dict]:
+    """Return all analyzed (not failed, not deleted) videos for this creator."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT id, title, duration_sec, source_url, published_at, metrics
+               FROM videos
+               WHERE creator_id = %s
+                 AND analyzed_at IS NOT NULL
+                 AND analysis_error IS NULL
+                 AND deleted_at IS NULL
+               ORDER BY published_at ASC NULLS LAST, created_at ASC""",
+            (creator_id,),
+        )
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def insert_style_profile(conn, creator_id: str, summary: str, profile: dict) -> str:
+    """Insert a new versioned style_profiles row. Returns the new row's id."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO style_profiles (creator_id, summary, profile)
+               VALUES (%s, %s, %s)
+               RETURNING id""",
+            (creator_id, summary, _dumps(profile)),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    return str(row["id"])

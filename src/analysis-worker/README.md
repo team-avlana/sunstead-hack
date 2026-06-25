@@ -31,17 +31,30 @@ pip install -r requirements.txt
 | `VIDEO_ID` | UUID of an existing `videos` row to analyze |
 | `DB_CONNECTION_STRING` | Postgres DSN, e.g. `postgresql://user:pass@localhost/db` |
 
-### LLM analysis (Azure AI Foundry → Anthropic)
+### LLM analysis (choose one)
+
+**Option A — Anthropic API (direct):**
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key from console.anthropic.com |
+
+**Option B — Azure AI Foundry:**
 
 | Variable | Description |
 |---|---|
 | `AZURE_ANTHROPIC_URL` | Azure AI Foundry endpoint URL for Anthropic models |
 | `AZURE_ANTHROPIC_KEY` | Azure AI Foundry API key |
-| `LLM_PER_SHOT_MODEL` | Model for per-shot vision analysis (default: `claude-haiku-4-5-20251001`) |
-| `LLM_VIDEO_LEVEL_MODEL` | Model for video-level synthesis (default: `claude-sonnet-4-6`) |
 
-If `AZURE_ANTHROPIC_URL` or `AZURE_ANTHROPIC_KEY` is absent, LLM metrics are
-skipped and the worker still completes with deterministic metrics only.
+**Model selection (both options):**
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_PER_SHOT_MODEL` | `claude-haiku-4-5-20251001` | Per-shot vision analysis (runs N times) |
+| `LLM_VIDEO_LEVEL_MODEL` | `claude-sonnet-4-6` | Video-level narrative synthesis (runs once) |
+
+If no credentials are set, LLM metrics are skipped and the worker completes
+with deterministic metrics only.
 
 ### CrispASR / transcription
 
@@ -64,8 +77,7 @@ skipped and the worker still completes with deterministic metrics only.
 ```bash
 VIDEO_ID=<uuid> \
 DB_CONNECTION_STRING="postgresql://user:pass@localhost/db" \
-AZURE_ANTHROPIC_URL="https://..." \
-AZURE_ANTHROPIC_KEY="..." \
+ANTHROPIC_API_KEY="sk-ant-..." \
 python main.py
 ```
 
@@ -76,6 +88,11 @@ On success the worker writes:
 - `videos.local_path`, `videos.title`, `videos.duration_sec`,
   `videos.published_at` — from yt-dlp metadata.
 - `videos.metrics` (JSONB) — `{deterministic: {...}, llm: {...}, transcript: {...}}`.
+  Key LLM narrative fields: `hook_text`, `hook_opening_words`, `hook_format`,
+  `hook_strength`, `hook_reasoning`, `tone_voice`, `tone_adjectives`,
+  `speaking_style`, `topic`, `subtopics`, `audience_pain_point`,
+  `value_proposition`, `narrative_arc`, `retention_tactics`,
+  `overall_style_summary`.
 - One `shots` row per detected shot with `frame_path` and `analysis` JSONB.
 - `videos.analyzed_at = now()` — set last as the completion marker.
 

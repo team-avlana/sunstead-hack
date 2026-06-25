@@ -29,7 +29,7 @@ def register(mcp: FastMCP) -> None:
             raise ValueError("creator_id is required")
 
         video_id = db.insert_video(creator_id, source_url)
-        worker.spawn(video_id)
+        worker.spawn_analysis_worker(video_id)
         return {"video_id": video_id}
 
     @mcp.tool()
@@ -63,7 +63,7 @@ def register(mcp: FastMCP) -> None:
         for url in urls:
             vid_id = db.insert_video(creator_id, url)
             video_ids.append(vid_id)
-            worker.spawn(vid_id)
+            worker.spawn_analysis_worker(vid_id)
 
         return {"creator_id": creator_id, "video_ids": video_ids}
 
@@ -102,10 +102,14 @@ def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:
     try:
         result = subprocess.run(
             [
-                sys.executable, "-m", "yt_dlp",
+                sys.executable,
+                "-m",
+                "yt_dlp",
                 "--flat-playlist",
-                "--print", "url",
-                "--playlist-end", str(max_videos),
+                "--print",
+                "url",
+                "--playlist-end",
+                str(max_videos),
                 channel_url,
             ],
             capture_output=True,

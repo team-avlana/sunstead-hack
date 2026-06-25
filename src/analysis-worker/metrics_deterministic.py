@@ -154,11 +154,16 @@ def compute_frame_metrics(frame_path: Optional[str]) -> dict:
             pass
 
     return {
+        "width": w,
+        "height": h,
+        "aspect_ratio": round(w / h, 4) if h else 0.0,
         "brightness": round(brightness, 2),
         "contrast": round(contrast, 2),
         "saturation": round(saturation, 2),
         "colorfulness": round(colorfulness, 2),
+        "sharpness": round(sharpness, 2),
         "dominant_colors": dominant_colors,
+        "color_temp": color_temp,
         "face_count": face_count,
         "largest_face_area_ratio": round(largest_face_area_ratio, 4),
         "has_onscreen_text": has_onscreen_text,
@@ -227,7 +232,8 @@ def compute_video_deterministic_metrics(
     avg_saturation = _safe_mean("saturation")
     avg_contrast = _safe_mean("contrast")
 
-
+    warm_count = sum(1 for m in frame_stats if m.get("color_temp") == "warm")
+    warm_cool_balance = round(warm_count / len(frame_stats), 4) if frame_stats else 0.5
 
     talking_head_shots = sum(
         1 for s in shots
@@ -270,6 +276,7 @@ def compute_video_deterministic_metrics(
         "avg_brightness": avg_brightness,
         "avg_saturation": avg_saturation,
         "avg_contrast": avg_contrast,
+        "warm_cool_balance": warm_cool_balance,
         "talking_head_ratio": talking_head_ratio,
         "onscreen_text_ratio": onscreen_text_ratio,
     }

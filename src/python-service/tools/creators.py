@@ -3,6 +3,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 import db
+import worker
 
 
 def register(mcp: FastMCP) -> None:
@@ -34,8 +35,20 @@ def register(mcp: FastMCP) -> None:
             )
         return result
 
-    # TODO: stub for future aggregation trigger
-    # @mcp.tool()
-    # def build_style_profile(creator_id: str) -> dict:
-    #     """Trigger style-profile aggregation for a creator (not yet implemented)."""
-    #     raise NotImplementedError("Style profile aggregation script is a separate task.")
+    @mcp.tool()
+    def build_style_profile(creator_id: str) -> dict:
+        """
+        Trigger style-profile aggregation for a creator.
+
+        Spawns build_profile.py as a background subprocess (fire-and-forget).
+        Returns immediately. Poll get_style_profile to check when the new
+        profile version appears — a newer created_at on the style_profiles row
+        means the build completed successfully.
+
+        Requires at least one completed video analysis for this creator.
+        """
+        creators = db.list_creators()
+        if not any(str(c["creator_id"]) == creator_id for c in creators):
+            raise ValueError(f"No creator found with id {creator_id}")
+        worker.spawn_profile_builder(creator_id)
+        return {"creator_id": creator_id, "status": "started"}

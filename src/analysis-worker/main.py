@@ -11,7 +11,6 @@ Optional:
   (without these two, LLM metrics are skipped)
 """
 
-import os
 import sys
 import traceback
 
@@ -95,9 +94,7 @@ def run(video_id: str, dsn: str) -> None:
             }
 
         # ── 7. LLM metrics ───────────────────────────────────────────────────
-        llm_enabled = bool(
-            os.environ.get("AZURE_ANTHROPIC_URL") and os.environ.get("AZURE_ANTHROPIC_KEY")
-        )
+        llm_enabled = config.llm_enabled()
 
         video_llm: dict = {}
         if llm_enabled:

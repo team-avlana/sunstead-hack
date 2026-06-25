@@ -87,6 +87,7 @@ CREATE TABLE videos (
     deleted_at      timestamptz
 );
 
+CREATE UNIQUE INDEX idx_videos_url ON videos (creator_id, source_url) WHERE deleted_at IS NULL;
 CREATE INDEX idx_videos_creator ON videos (creator_id) WHERE deleted_at IS NULL;
 
 CREATE TRIGGER trg_videos_touch
