@@ -503,6 +503,32 @@ button, input { font-family: inherit; }
 .ci-hint { margin-top: auto; font-size: 11px; line-height: 1.4; color: var(--ink-dim); }
 
 /* ============================================================
+   Canvas frames (tldraw frame shape, reskinned — see FrameShape.tsx)
+   ============================================================ */
+/* Hide tldraw's stock body rect; RainyFrameShapeUtil paints a squircle instead.
+   (`:not(.tl-frame__creating)` keeps the live drag-out outline while drawing.) */
+.tl-frame__body:not(.tl-frame__creating) { display: none; }
+
+/* The squircle body: clean off-white surface, brand-tinted hairline + soft drop
+   shadow. Stroke width and shadow are scaled by --tl-scale so they read the same
+   on screen at every zoom level (1px * scale ≈ 1 screen px). */
+.rainy-frame-svg {
+  filter:
+    drop-shadow(0 calc(1px * var(--tl-scale)) calc(2px * var(--tl-scale)) rgba(var(--primary-rgb), 0.06))
+    drop-shadow(0 calc(10px * var(--tl-scale)) calc(28px * var(--tl-scale)) rgba(var(--primary-rgb), 0.13))
+    drop-shadow(0 calc(3px * var(--tl-scale)) calc(10px * var(--tl-scale)) rgba(20, 28, 60, 0.07));
+}
+.rainy-frame-body {
+  fill: #fcfdff;
+  stroke: var(--primary-border);
+  stroke-width: calc(1px * var(--tl-scale));
+}
+
+/* Frame heading (title above the frame): quieter, app-matched type. */
+.tl-frame-heading { color: var(--ink-dim); font-weight: 600; letter-spacing: -0.01em; }
+.tl-frame-label { color: var(--ink-dim); }
+
+/* ============================================================
    Rainy text block (custom tldraw shape)
    ============================================================ */
 /* isolate so the aurora bloom (::after, z-index -1) can sit behind the card */
@@ -617,6 +643,17 @@ button, input { font-family: inherit; }
 .rainy-text-prose pre code { background: none; padding: 0; }
 .rainy-text-prose a { color: var(--accent); }
 
+/* empty-node placeholders (Title / Subtitle / Write something…) — the float/height:0
+   trick lets the hint sit in place without taking up layout or blocking the caret. */
+.rainy-text-prose .is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-dim);
+  opacity: 0.55;
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+
 /* ---- progressive-disclosure chrome (above the card) ---- */
 .rt-actions {
   position: absolute;
@@ -635,32 +672,50 @@ button, input { font-family: inherit; }
 }
 .rt-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-.rt-format,
 .rt-main { display: inline-flex; align-items: center; gap: 2px; }
 
-/* the B/I/U/code bar sits above the Aa row and discloses on its own */
-.rt-format {
+/* the format picker sits above the Aa row and discloses on its own */
+.rt-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
-  padding: 3px;
+  padding: 5px;
+  min-width: 196px;
   opacity: 0;
   transform: translateY(4px) scale(0.98);
+  transform-origin: bottom center;
   transition: opacity 110ms ease, transform 110ms ease;
   pointer-events: none;
 }
-.rt-format.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.rt-menu.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
 
-.rt-format button {
-  border: 0; background: none; cursor: pointer;
-  width: 30px; height: 28px; border-radius: 8px;
-  color: var(--ink); font-size: 14px; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center;
+.rt-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; border: 0; background: none; cursor: pointer;
+  padding: 7px 9px; border-radius: 8px; text-align: left;
+  font-family: inherit; font-size: 13.5px; color: var(--ink);
 }
-.rt-format button:hover { background: rgba(18, 24, 48, 0.06); }
-.rt-format button.on { background: rgba(59, 110, 246, 0.12); color: var(--accent); }
-.rt-format .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.rt-menu-item:hover { background: rgba(18, 24, 48, 0.05); }
+.rt-menu-item.on { background: rgba(59, 110, 246, 0.10); }
+.rt-menu-label { flex: 1; font-weight: 600; white-space: nowrap; }
+.rt-menu-check { display: inline-flex; color: var(--accent); }
+
+/* tiny stacked-line preview of each format */
+.rt-menu-preview {
+  flex: none; width: 28px; height: 28px;
+  border-radius: 7px; background: rgba(18, 24, 48, 0.05);
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 0 6px;
+}
+.rt-menu-preview i { display: block; height: 2px; border-radius: 2px; background: var(--ink-dim); }
+.rt-menu-preview i.t { height: 4px; width: 75%; background: var(--ink); }
+.rt-menu-preview i.s { height: 3px; width: 90%; background: rgba(18, 24, 48, 0.5); }
+.rt-menu-preview i.b { width: 100%; }
+.rt-menu-preview i.b2 { width: 70%; }
 
 .rt-main {
   background: #fff;
@@ -727,29 +782,62 @@ button, input { font-family: inherit; }
 .rainy-tool.on { background: rgba(var(--primary-rgb), 0.12); }
 .rainy-tool.on svg { color: var(--primary); }
 
-/* Shapes flyout (every built-in geo shape) */
-.rainy-dock-popwrap { position: relative; display: inline-flex; }
-.rainy-dock-pop {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(5, 34px);
-  gap: 4px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid var(--primary-border);
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.06), 0 16px 40px rgba(var(--primary-rgb), 0.18);
-  animation: rainy-pop 140ms cubic-bezier(0.34, 1.56, 0.64, 1);
+/* ============================================================
+   Dark mode — toggled by the dock's sun button (`.rainy-root.dark`).
+   We re-point the design tokens to a dark palette; everything built on
+   var(--canvas/--bg/--ink/--panel/...) follows automatically. A few surfaces
+   hardcode white (the dock glass, sidebar, video block), so they're overridden
+   explicitly below.
+   tldraw itself is switched to its own dark colorScheme in CanvasWorkspace.
+   ============================================================ */
+.rainy-root.dark {
+  --bg: #0b0e15;
+  --canvas: #0e1219;
+  --panel: rgba(28, 33, 46, 0.62);
+  --panel-hairline: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.10);
+  --ink: #e8ebf3;
+  --ink-dim: #8b93a7;
+  --primary-border: rgba(var(--primary-rgb), 0.30);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.40), 0 12px 30px rgba(0, 0, 0, 0.50);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 54px rgba(0, 0, 0, 0.60), 0 4px 12px rgba(0, 0, 0, 0.40);
 }
-@keyframes rainy-pop {
-  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.96); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+/* Glass surfaces that hardcode a light tint → dark glass. */
+.rainy-root.dark .rainy-dock { background: rgba(24, 28, 40, 0.82); }
+.rainy-root.dark .rainy-tool { color: var(--ink); }
+.rainy-root.dark .rainy-tool svg { color: var(--ink-dim); }
+
+/* --- Sidebar (floating glass card + its insights panel) --- */
+.rainy-root.dark .rainy-sidebar {
+  background: rgba(22, 26, 38, 0.46);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
 }
-@media (prefers-reduced-motion: reduce) {
-  .rainy-dock-pop { animation: none; }
-}
+.rainy-root.dark .rainy-sidebar-show { background: rgba(34, 40, 54, 0.92); }
+.rainy-root.dark .rainy-sidebar-show:hover { background: rgba(44, 51, 68, 0.96); }
+
+.rainy-root.dark .ci-collapse:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .ci-block { background: rgba(255, 255, 255, 0.04); }
+/* Zoom +/− , % , and the "Zoom to fit" / "Reset view" action pills. */
+.rainy-root.dark .ci-zoom button,
+.rainy-root.dark .ci-actions button { background: rgba(255, 255, 255, 0.06); }
+.rainy-root.dark .ci-zoom button:hover,
+.rainy-root.dark .ci-actions button:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* --- Project header (back button + editable title) --- */
+.rainy-root.dark .rph-back { background: rgba(34, 40, 54, 0.92); }
+.rainy-root.dark .rph-back:hover { background: rgba(44, 51, 68, 0.96); }
+.rainy-root.dark .rph-title:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rph-title:focus { background: rgba(255, 255, 255, 0.10); }
+
+/* --- Canvas blocks (text card + frame + their inline chrome) --- */
+.rainy-root.dark .rainy-text-card { background: #1a1f2c; }
+.rainy-root.dark .rainy-text-prose code,
+.rainy-root.dark .rainy-text-prose pre { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rainy-frame-body { fill: #161b26; }
+.rainy-root.dark .rt-menu { background: #1a1f2c; }
+.rainy-root.dark .rt-menu-item:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rt-menu-item.on { background: rgba(59, 110, 246, 0.18); }
+.rainy-root.dark .rt-menu-preview { background: rgba(255, 255, 255, 0.06); }

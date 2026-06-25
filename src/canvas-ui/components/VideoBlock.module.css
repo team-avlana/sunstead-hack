@@ -271,3 +271,61 @@
   padding: 9px 11px;
   line-height: 1.4;
 }
+
+/* ── dark mode ──────────────────────────────────────────────────────────
+   The canvas dark toggle adds `.dark` to the global `.rainy-root` (see
+   globals.css). This module is hashed, so we reach across with :global() to
+   the ancestor class while keeping the block's own classes scoped/local.
+   We darken the white surfaces and lift the hardcoded dark text to light. */
+:global(.rainy-root.dark) .card {
+  background: #1a1f2c;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+:global(.rainy-root.dark) .card.empty {
+  background: #141925;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+:global(.rainy-root.dark) .card.analysing {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px rgba(12, 118, 255, 0.22);
+}
+
+:global(.rainy-root.dark) .thumb,
+:global(.rainy-root.dark) .sceneThumb { background: #222a3c; }
+
+:global(.rainy-root.dark) .chev { background: rgba(255, 255, 255, 0.08); }
+:global(.rainy-root.dark) .chev:hover { background: rgba(255, 255, 255, 0.14); }
+
+:global(.rainy-root.dark) .divider { background: rgba(255, 255, 255, 0.08); }
+
+:global(.rainy-root.dark) .tag {
+  color: #c5ccda;
+  background: rgba(255, 255, 255, 0.06);
+}
+:global(.rainy-root.dark) .tagAccent { color: #7cb6ff; background: rgba(12, 118, 255, 0.16); }
+:global(.rainy-root.dark) .sceneTag { color: #9aa3b5; background: rgba(255, 255, 255, 0.06); }
+
+:global(.rainy-root.dark) .desc { color: #b8c0d0; }
+:global(.rainy-root.dark) .hookText { color: #ccd3e0; }
+:global(.rainy-root.dark) .transcript {
+  color: #aab2c2;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:global(.rainy-root.dark) .strengthBar i { background: rgba(255, 255, 255, 0.14); }
+
+:global(.rainy-root.dark) .urlInput {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+:global(.rainy-root.dark) .btnGhost {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Status pills + accent text read fine on dark, but nudge the brighter ones
+   so they don't glare against the deep card. */
+:global(.rainy-root.dark) .storyToggle,
+:global(.rainy-root.dark) .progressNote { color: #7cb6ff; }
+:global(.rainy-root.dark) .s_analysing { color: #7cb6ff; }
+:global(.rainy-root.dark) .s_analysed { color: #5fd09a; }
+:global(.rainy-root.dark) .s_not_analysed { color: #e2b964; }

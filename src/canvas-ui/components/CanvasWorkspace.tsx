@@ -20,10 +20,15 @@ import { connectRealtime } from '@/lib/realtime'
 import { attachOutboundSync } from '@/lib/remoteOps'
 import { useRainyStore } from '@/lib/store'
 import BottomDock from './BottomDock'
+import { RainyFrameShapeUtil } from './FrameShape'
 import { RAINY_TEXT, RainyTextShapeUtil } from './RainyTextShape'
 import { VideoBlockShapeUtil } from './VideoBlockShape'
 
-const shapeUtils: TLShapeUtilConstructor<any>[] = [RainyTextShapeUtil, VideoBlockShapeUtil]
+const shapeUtils: TLShapeUtilConstructor<any>[] = [
+  RainyFrameShapeUtil,
+  RainyTextShapeUtil,
+  VideoBlockShapeUtil,
+]
 
 /**
  * Dotted background grid that tracks the camera (pan + zoom).
@@ -33,6 +38,7 @@ const DotGrid: NonNullable<TLComponents['Grid']> = ({ size, x, y, z }) => {
   const editor = useEditor()
   const screenBounds = useValue('screenBounds', () => editor.getViewportScreenBounds(), [editor])
   const dpr = useValue('dpr', () => editor.getInstanceState().devicePixelRatio, [editor])
+  const dark = useRainyStore((s) => s.dark)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useLayoutEffect(() => {
@@ -60,7 +66,12 @@ const DotGrid: NonNullable<TLComponents['Grid']> = ({ size, x, y, z }) => {
     const endY = Math.floor(pb.maxY / gap) * gap
 
     const radius = Math.max(0.6, Math.min(1.4, 1.1 * z)) * dpr
-    ctx.fillStyle = `rgba(18, 24, 48, ${Math.min(0.16, 0.07 + z * 0.05)})`
+    // Light mode: dark ink dots on a light canvas. Dark mode: light dots on a
+    // dark canvas (slightly brighter so they stay legible against the deep bg).
+    const alpha = Math.min(0.16, 0.07 + z * 0.05)
+    ctx.fillStyle = dark
+      ? `rgba(150, 165, 210, ${Math.min(0.22, alpha + 0.05)})`
+      : `rgba(18, 24, 48, ${alpha})`
 
     for (let py = startY; py <= endY; py += gap) {
       for (let px = startX; px <= endX; px += gap) {
@@ -71,7 +82,7 @@ const DotGrid: NonNullable<TLComponents['Grid']> = ({ size, x, y, z }) => {
         ctx.fill()
       }
     }
-  }, [screenBounds, x, y, z, size, dpr, editor])
+  }, [screenBounds, x, y, z, size, dpr, editor, dark])
 
   return <canvas className="tl-grid rainy-grid" ref={canvasRef} />
 }
@@ -101,6 +112,7 @@ const components: TLComponents = {
 }
 
 export default function CanvasWorkspace({ projectId }: { projectId: string }) {
+  const dark = useRainyStore((s) => s.dark)
   const handleMount = useCallback((editor: Editor) => {
     ;(window as any).__rainyEditor = editor
 
@@ -183,7 +195,12 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="rainy-canvas">
-      <Tldraw colorScheme="light" components={components} shapeUtils={shapeUtils} onMount={handleMount} />
+      <Tldraw
+        colorScheme={dark ? 'dark' : 'light'}
+        components={components}
+        shapeUtils={shapeUtils}
+        onMount={handleMount}
+      />
     </div>
   )
 }

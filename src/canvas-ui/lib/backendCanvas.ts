@@ -113,6 +113,33 @@ function textHtmlFor(a: EnrichedArtifact): string {
   return `${head}<p><em>${escapeHtml(a.type)} artifact</em></p>`
 }
 
+/** Inner padding between the furthest child edge and the frame border. The top
+ * gets extra room for the frame's header/label. */
+const FRAME_PAD = 40
+const FRAME_PAD_TOP = 56
+/** A frame with no blocks still needs a usable footprint. */
+const FRAME_MIN_W = 360
+const FRAME_MIN_H = 280
+
+/** Frame box derived from its children so it always covers them (and auto-grows
+ * as blocks are added or manually edited). Child x/y are relative to the frame
+ * origin, so the box spans from (0,0) to the furthest child edge, plus padding.
+ * Computed in the frontend — the DB's position.w/h is intentionally ignored. */
+function frameSizeFor(children: ShapeDesc[]): { w: number; h: number } {
+  let maxRight = 0
+  let maxBottom = 0
+  for (const c of children) {
+    const cw = typeof c.props.w === 'number' ? (c.props.w as number) : 0
+    const ch = typeof c.props.h === 'number' ? (c.props.h as number) : 0
+    maxRight = Math.max(maxRight, c.x + cw)
+    maxBottom = Math.max(maxBottom, c.y + ch)
+  }
+  return {
+    w: Math.max(FRAME_MIN_W, maxRight + FRAME_PAD),
+    h: Math.max(FRAME_MIN_H, maxBottom + FRAME_PAD_TOP),
+  }
+}
+
 /** Expand one artifact into tldraw shapes. A 'frame' artifact yields the frame
  * plus a child shape per payload element; a legacy standalone video/text
  * artifact yields a single shape. */
@@ -126,12 +153,11 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
 
   if (a.type === FRAME) {
     const payload = (a.payload ?? {}) as Record<string, unknown>
-    const w = typeof pos.w === 'number' ? pos.w : 760
-    const h = typeof pos.h === 'number' ? pos.h : 560
     const name = (payload.label as string) || a.title || 'Flow'
     const frameId = artId(a.artifact_id)
-    const shapes: ShapeDesc[] = [{ id: frameId, type: FRAME, x, y, props: { name, w, h } }]
 
+    // Build the child shapes first; the frame is then sized to enclose them.
+    const children: ShapeDesc[] = []
     const els = Array.isArray(payload.elements) ? (payload.elements as Record<string, unknown>[]) : []
     els.forEach((el, i) => {
       // Stable per-element shape id; x/y are relative to the frame.
@@ -139,14 +165,16 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
       const ex = typeof el.x === 'number' ? el.x : 32 + (i % 2) * 360
       const ey = typeof el.y === 'number' ? el.y : 64 + Math.floor(i / 2) * 260
       if (el.type === 'video') {
-        shapes.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, props: videoShapeProps(el) })
+        children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, props: videoShapeProps(el) })
       } else {
         const ew = typeof el.w === 'number' ? el.w : 320
         const eh = typeof el.h === 'number' ? el.h : 200
-        shapes.push({ id, type: RAINY_TEXT, x: ex, y: ey, parentId: frameId, props: { w: ew, h: eh, html: elementTextHtml(el) } })
+        children.push({ id, type: RAINY_TEXT, x: ex, y: ey, parentId: frameId, props: { w: ew, h: eh, html: elementTextHtml(el) } })
       }
     })
-    return shapes
+
+    const { w, h } = frameSizeFor(children)
+    return [{ id: frameId, type: FRAME, x, y, props: { name, w, h } }, ...children]
   }
 
   // Legacy standalone artifacts (no enclosing frame).
@@ -236,10 +264,18 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
               props: { data: d.props.data, w: size.w, h: size.h },
             } as any)
           } else if (d.type === FRAME) {
+            // Grow to enclose the latest content; never shrink below what the
+            // user may have dragged the frame to (auto-grow, never clip).
+            const curW = typeof (cur as any).props?.w === 'number' ? ((cur as any).props.w as number) : 0
+            const curH = typeof (cur as any).props?.h === 'number' ? ((cur as any).props.h as number) : 0
             editor.updateShape({
               id: d.id,
               type: FRAME,
-              props: { name: d.props.name, w: d.props.w, h: d.props.h },
+              props: {
+                name: d.props.name,
+                w: Math.max(curW, d.props.w as number),
+                h: Math.max(curH, d.props.h as number),
+              },
             } as any)
           } else if (d.type === RAINY_TEXT) {
             editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)

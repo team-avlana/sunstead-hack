@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"/>
+<style>
+ html,body{margin:0;height:100%;background:#efe9df;overflow:hidden;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
+ #c{display:block;width:100vw;height:100vh}
+ .lbl{position:fixed;transform:transl(-50%,0);color:#7b7264;font-size:13px;font-weight:600;letter-spacing:.02em;pointer-events:none;text-transform:capitalize}
+ #title{position:fixed;left:24px;top:18px;color:#5a5346;font-size:15px;font-weight:700}
+ #sub{position:fixed;left:24px;top:40px;color:#9a9181;font-size:12px}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+</head><body><canvas id="c"></canvas>
+<div id="title">Rainey — CC0 asset showroom</div>
+<div id="sub">Quaternius · CC0 · rendered in the clay lighting stack</div>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+const IDS = ["chair","desk","table-round","bookcase","cabinet-shelves","floor-lamp","table-lamp","plant","sofa","couch"];
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setClearColor(0xefe9df,1);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.AgXToneMapping;renderer.toneMappingExposure=1.12;
+const scene=new THREE.Scene();
+const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;scene.environmentIntensity=1.05;
+const COLS=5, S=4.4, ROWGAP=5.6;
+const rows=Math.ceil(IDS.length/COLS);
+const F=5.3;const cam=new THREE.OrthographicCamera(-F,F,F,-F,0.1,200);
+cam.position.set(0,11,17);cam.lookAt(0,0.5,0);
+scene.add(new THREE.HemisphereLight(0xfff1dd,0x8a7656,0.4));
+const key=new THREE.DirectionalLight(0xffe7c2,1.5);key.position.set(8,16,12);key.castShadow=true;
+key.shadow.mapSize.set(2048,2048);key.shadow.radius=6;key.shadow.bias=-0.0004;
+const sc=key.shadow.camera;sc.left=-16;sc.right=16;sc.top=12;sc.bottom=-12;sc.near=1;sc.far=60;sc.updateProjectionMatrix();scene.add(key);
+const fill=new THREE.DirectionalLight(0xffffff,0.35);fill.position.set(-10,8,6);scene.add(fill);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0xefe9df,roughness:0.95}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+function cell(i){const col=i%COLS,row=Math.floor(i/COLS);return [ (col-(COLS-1)/2)*S, (row-(rows-1)/2)*ROWGAP ];}
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,cam));
+const gtao=new GTAOPass(scene,cam,innerWidth,innerHeight);gtao.output=GTAOPass.OUTPUT.Default;
+gtao.updateGtaoMaterial({radius:0.5,distanceExponent:1,thickness:1,scale:1,samples:16,screenSpaceRadius:false});composer.addPass(gtao);
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.14,0.6,0.92));
+composer.addPass(new SMAAPass(innerWidth,innerHeight));composer.addPass(new OutputPass());
+function resize(){const w=innerWidth,h=innerHeight,a=w/h;cam.left=-F*a;cam.right=F*a;cam.top=F;cam.bottom=-F;cam.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(w,h,false);composer.setSize(w,h);}
+addEventListener('resize',resize);resize();
+const loader=new GLTFLoader();
+const placed=[];
+Promise.all(IDS.map((id,i)=>new Promise((res)=>{
+  loader.load('/vendor/assets/'+id+'.glb',(g)=>{
+    const o=g.scene;o.traverse(m=>{if(m.isMesh){m.castShadow=true;m.receiveShadow=true;}});
+    const b=new THREE.Box3().setFromObject(o);const sz=new THREE.Vector3();b.getSize(sz);
+    const s=Math.min(1.6/Math.max(sz.y,0.2), 2.7/Math.max(sz.x,sz.z,0.2));o.scale.setScalar(s);
+    const b2=new THREE.Box3().setFromObject(o);const c=new THREE.Vector3();b2.getCenter(c);
+    const [x,z]=cell(i);o.position.set(x-c.x, -b2.min.y, z-c.z);
+    scene.add(o);
+    const ped=new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,0.12,40),new THREE.MeshStandardMaterial({color:0xe6dccb,roughness:0.95}));
+    ped.position.set(x,-0.06,z);ped.receiveShadow=true;scene.add(ped);
+    placed.push({id,x,z});res(true);
+  },undefined,()=>{placed.push({id,x:cell(i)[0],z:cell(i)[1],err:true});res(false);});
+})))
+.then(()=>{
+  composer.render();
+  for(const p of placed){
+    const v=new THREE.Vector3(p.x,0,p.z+2.0);v.project(cam);
+    const sx=(v.x*0.5+0.5)*innerWidth, sy=(-v.y*0.5+0.5)*innerHeight;
+    const d=document.createElement('div');d.className='lbl';d.style.left=sx+'px';d.style.top=(sy)+'px';
+    d.textContent=(p.err?'⚠ ':'')+p.id.replace(/-/g,' ');document.body.appendChild(d);
+  }
+  window.__ready=true;
+});
+renderer.setAnimationLoop(()=>composer.render());
+</script></body></html>

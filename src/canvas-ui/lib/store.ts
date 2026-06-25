@@ -12,6 +12,8 @@ interface RainyState {
   commsStatus: CommsStatus
   selectedIds: string[]
   sidebarCollapsed: boolean
+  /** Canvas dark mode — toggled from the bottom dock's sun button. */
+  dark: boolean
   /** Open a project's canvas. Title is optional — the canvas load resolves it. */
   openProject: (id: string, title?: string) => void
   /** Back to the Home screen. */
@@ -21,6 +23,16 @@ interface RainyState {
   setSelectedIds: (ids: string[]) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
+  setDark: (dark: boolean) => void
+  toggleDark: () => void
+}
+
+const DARK_KEY = 'rainy:dark'
+
+/** Read the persisted dark-mode preference (SSR-safe). */
+function initialDark(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(DARK_KEY) === '1'
 }
 
 /** App/UI + navigation state only. Canvas truth lives in the tldraw store, not here. */
@@ -31,6 +43,7 @@ export const useRainyStore = create<RainyState>((set) => ({
   commsStatus: 'idle',
   selectedIds: [],
   sidebarCollapsed: false,
+  dark: initialDark(),
   openProject: (id, title) => set({ view: 'canvas', currentProjectId: id, currentProjectTitle: title ?? '' }),
   goHome: () => set({ view: 'home', currentProjectId: null }),
   setTitle: (currentProjectTitle) => set({ currentProjectTitle }),
@@ -38,4 +51,14 @@ export const useRainyStore = create<RainyState>((set) => ({
   setSelectedIds: (selectedIds) => set({ selectedIds }),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setDark: (dark) => {
+    if (typeof window !== 'undefined') window.localStorage.setItem(DARK_KEY, dark ? '1' : '0')
+    set({ dark })
+  },
+  toggleDark: () =>
+    set((s) => {
+      const dark = !s.dark
+      if (typeof window !== 'undefined') window.localStorage.setItem(DARK_KEY, dark ? '1' : '0')
+      return { dark }
+    }),
 }))

@@ -24,6 +24,7 @@ export default function CanvasClient() {
   const view = useRainyStore((s) => s.view)
   const projectId = useRainyStore((s) => s.currentProjectId)
   const sidebarCollapsed = useRainyStore((s) => s.sidebarCollapsed)
+  const dark = useRainyStore((s) => s.dark)
 
   // Keep the URL hash and the navigation state in sync, both directions:
   // hash → state (deep links, refresh, back/forward) and state → hash.
@@ -55,7 +56,7 @@ export default function CanvasClient() {
   if (view !== 'canvas' || !projectId) return <Home />
 
   return (
-    <div className={`rainy-root${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+    <div className={`rainy-root${sidebarCollapsed ? ' sidebar-collapsed' : ''}${dark ? ' dark' : ''}`}>
       {/* key by project so switching projects fully remounts the canvas */}
       <CanvasWorkspace key={projectId} projectId={projectId} />
       <Sidebar />
