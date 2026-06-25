@@ -84,6 +84,7 @@ function OverlayCard({ data, corner }: { data: OverlayCardData; corner: 'tl' | '
   return (
     <div className={`room-overlay ${corner} ${open ? 'open' : 'closed'}`}>
       <button
+        type="button"
         className="room-overlay-head"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -108,6 +109,7 @@ function OverlaySectionRow({ section }: { section: OverlaySection }) {
   return (
     <div className={`room-overlay-section ${open ? 'open' : 'closed'}`}>
       <button
+        type="button"
         className="room-overlay-sec-head"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}

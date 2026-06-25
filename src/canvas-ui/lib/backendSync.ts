@@ -27,7 +27,7 @@
  */
 
 import type { Editor, TLShapeId } from 'tldraw'
-import { RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat } from '@/lib/blockTypes'
+import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat } from '@/lib/blockTypes'
 import {
   createArtifact,
   deleteArtifact,
@@ -142,7 +142,9 @@ function buildPatch(shape: any, cats: Set<Cat>, ref: ArtRef): ArtifactPatch | nu
     if (cats.has('geom')) {
       ep.x = num(shape.x)
       ep.y = num(shape.y)
-      if (shape.type === RAINY_TEXT) {
+      // Text + image carry a meaningful box; a video's size is derived from its
+      // view, so we don't persist w/h for it.
+      if (shape.type === RAINY_TEXT || shape.type === IMAGE_BLOCK) {
         ep.w = num(p.w)
         ep.h = num(p.h)
       }

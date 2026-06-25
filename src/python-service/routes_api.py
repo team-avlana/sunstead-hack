@@ -28,9 +28,19 @@ from starlette.routing import Route
 
 import active_project
 import db
-import image_gen
 import notify
 import video_view
+
+# Image generation is an optional feature (needs `openai` + Azure config). A
+# missing dependency here must never take down the whole API at import time, so
+# load it defensively — the room-image route degrades to 503 if it's unavailable.
+try:
+    import image_gen
+except Exception as exc:  # pragma: no cover - depends on optional deps/config
+    image_gen = None
+    _IMAGE_GEN_IMPORT_ERROR = repr(exc)
+else:
+    _IMAGE_GEN_IMPORT_ERROR = None
 import worker
 
 
@@ -339,6 +349,12 @@ async def get_creator_room_image(request: Request):
 async def post_creator_room_image(request: Request) -> JSONResponse:
     """Trigger room image generation for a creator, save to DB, return the URL."""
     cid = request.path_params["creator_id"]
+
+    if image_gen is None:
+        return JSONResponse(
+            {"error": f"image generation unavailable: {_IMAGE_GEN_IMPORT_ERROR}"},
+            status_code=503,
+        )
 
     # Optional form profile from the canvas (used to enrich the prompt).
     profile: dict | None = None

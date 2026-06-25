@@ -23,11 +23,13 @@ import BottomDock from './BottomDock'
 import { RainyFrameShapeUtil } from './FrameShape'
 import { RainyTextShapeUtil } from './RainyTextShape'
 import { VideoBlockShapeUtil } from './VideoBlockShape'
+import { ImageBlockShapeUtil } from './ImageBlockShape'
 
 const shapeUtils: TLShapeUtilConstructor<any>[] = [
   RainyFrameShapeUtil,
   RainyTextShapeUtil,
   VideoBlockShapeUtil,
+  ImageBlockShapeUtil,
 ]
 
 /**

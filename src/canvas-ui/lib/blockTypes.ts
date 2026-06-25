@@ -10,6 +10,7 @@
  *
  *   Text block  → format:  plain | title | title-sub
  *   Video block → detail:  compact | expanded | full   (+ analysis status)
+ *   Image block → a frame/panel: a src (frame, AI storyboard, or data URL) + caption
  */
 
 // ===========================================================================
@@ -92,10 +93,17 @@ export function restructure(html: string, next: TextFormat): string {
   const from = FORMAT_SLOTS[cur]
   const to = FORMAT_SLOTS[next]
 
+  // Peel the current heading slots off the front; the rest is the body.
   let i = 0
-  const titleInner = from.title ? nodes[i++]?.innerHTML ?? '' : ''
-  const subtitleInner = from.subtitle ? nodes[i++]?.innerHTML ?? '' : ''
+  let titleInner = from.title ? nodes[i++]?.innerHTML ?? '' : ''
+  let subtitleInner = from.subtitle ? nodes[i++]?.innerHTML ?? '' : ''
   const bodyEls = nodes.slice(i)
+
+  // Promote: when the target adds a heading slot the source lacked, lift the first
+  // body line into it — so a plain "Hook\n…" makes "Hook" the title, instead of
+  // inserting an empty heading the user then has to retype.
+  if (to.title && !from.title && bodyEls.length) titleInner = bodyEls.shift()!.innerHTML
+  if (to.subtitle && !from.subtitle && bodyEls.length) subtitleInner = bodyEls.shift()!.innerHTML
 
   const head: string[] = []
   if (to.title) head.push(`<h1>${titleInner}</h1>`)
@@ -275,3 +283,29 @@ export const fmtTime = (sec?: number | null): string => {
   const s = Math.round(sec % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
 }
+
+// ===========================================================================
+// Image blocks
+// ===========================================================================
+
+export const IMAGE_BLOCK = 'image-block' as const
+
+/**
+ * An image panel — the visual unit of a storyboard or shot list. The `src` is a
+ * resolved, loadable URL: a representative video frame (`/frames/{id}`), an
+ * AI-generated storyboard panel (`/api/storyboard/{id}`), a data: URL, or any
+ * absolute http(s) image. `caption` is the scene label/description and
+ * `shotType` an optional cinematography tag (e.g. "wide shot") shown as a badge.
+ *
+ * The renderer (ImageBlockShape) and the artifact→shape mapping (backendCanvas)
+ * share this taxonomy; the backend emits these as payload elements of
+ * type:"image" (see generate_storyboard_frame / the create_artifact taxonomy).
+ */
+export interface ImageData {
+  src?: string | null
+  caption?: string | null
+  shotType?: string | null
+}
+
+/** Image blocks default to a 16:9 storyboard-panel footprint. */
+export const IMAGE_DEFAULT_DIMS = { w: 360, h: 224 } as const

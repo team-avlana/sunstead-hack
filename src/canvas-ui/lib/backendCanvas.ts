@@ -17,7 +17,7 @@
  */
 
 import { createShapeId, type Editor, type TLShapeId } from 'tldraw'
-import { RAINY_TEXT, VIDEO_BLOCK, composeTextHtml, dims, type TextFormat, type VideoData } from '@/lib/blockTypes'
+import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, composeTextHtml, dims, type TextFormat, type VideoData } from '@/lib/blockTypes'
 import {
   fetchProjectState,
   resolveAssetUrl,
@@ -87,6 +87,21 @@ function videoShapeProps(src: Record<string, unknown>): { view: View; data: stri
   const view = ((src.view as View) || (data.status === 'analysed' ? 'expanded' : 'compact')) as View
   const size = dims(view, data)
   return { view, data: JSON.stringify(data), w: size.w, h: size.h }
+}
+
+/** Image Block props from an `image` element. The element's src is a backend
+ * path (`/frames/{id}`, `/api/storyboard/{id}`), a data: URL, or an absolute
+ * URL — resolveAssetUrl makes relative paths absolute and passes the rest
+ * through. The caption falls back through concept/label; shot_type is an
+ * optional badge. Storyboard panels declare their own w/h (16:9 vs square). */
+function imageShapeProps(el: Record<string, unknown>): { w: number; h: number; src: string; caption: string; shotType: string } {
+  const str = (k: string): string | undefined => (typeof el[k] === 'string' ? (el[k] as string) : undefined)
+  const w = typeof el.w === 'number' ? el.w : 360
+  const h = typeof el.h === 'number' ? el.h : 224
+  const src = resolveAssetUrl(str('src') ?? str('url')) ?? ''
+  const caption = str('caption') ?? str('concept') ?? str('label') ?? ''
+  const shotType = str('shot_type') ?? str('shotType') ?? ''
+  return { w, h, src, caption, shotType }
 }
 
 /** A text element's body. Prefer the self-describing structured form
@@ -180,6 +195,8 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
       const meta = { pinned: el.pinned === true }
       if (el.type === 'video') {
         children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: videoShapeProps(el) })
+      } else if (el.type === 'image') {
+        children.push({ id, type: IMAGE_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: imageShapeProps(el) })
       } else {
         const ew = typeof el.w === 'number' ? el.w : 320
         const eh = typeof el.h === 'number' ? el.h : 200
@@ -296,6 +313,15 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
             if (!isContentDirty(editor, d.id)) {
               editor.updateShape({ id: d.id, type: FRAME, props: { name: d.props.name } } as any)
             }
+          } else if (d.type === IMAGE_BLOCK) {
+            // Refresh the image source + caption (the underlying frame/panel can
+            // change), but keep the user's chosen size (w/h aren't patched, so a
+            // manual resize survives the re-pull).
+            editor.updateShape({
+              id: d.id,
+              type: IMAGE_BLOCK,
+              props: { src: d.props.src, caption: d.props.caption, shotType: d.props.shotType },
+            } as any)
           } else if (d.type === RAINY_TEXT) {
             // Don't overwrite text the user is editing / just edited before it
             // round-trips to the DB.

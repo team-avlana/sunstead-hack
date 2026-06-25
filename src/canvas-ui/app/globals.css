@@ -1068,8 +1068,9 @@ button, input { font-family: inherit; }
 
 /* Text — inside the hover dome, straddling the card's top-left corner. */
 .rt-zone .shape-trash { top: calc(var(--zt) - 16px); left: calc(var(--zx) - 16px); }
-/* Video — straddling the card's top-left corner. */
-.vb-trash { top: -15px; left: -15px; }
+/* Video + image — straddling the card's top-left corner. */
+.vb-trash,
+.ib-trash { top: -15px; left: -15px; }
 /* Frame — the name heading lives above the top edge, so tuck the button just
    inside the top-left, straddling the left edge below the heading band. */
 .frame-chrome { pointer-events: none; }
@@ -1110,8 +1111,9 @@ button, input { font-family: inherit; }
 .shape-grip:active,
 .shape-grip.dragging { cursor: grabbing; }
 
-/* Left edge, vertically centred — for video + frame (relative to the shape). */
+/* Left edge, vertically centred — for video + image + frame (relative to the shape). */
 .vb-grip,
+.ib-grip,
 .frame-grip { top: 50%; left: -30px; transform: translateY(-50%); }
 /* Text — inside the hover dome, centred on the card's left edge (the dome is
    taller above the card, so centre on the card box, not the dome). */
