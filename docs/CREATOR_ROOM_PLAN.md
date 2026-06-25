@@ -1,4 +1,34 @@
-I now have the full ground truth. The verdicts are accurate: ACES tone mapping is at line 280, no postprocessing exists, three.js loads via jsDelivr CDN importmap, the iframe sandbox lacks `allow-same-origin`, the five-zone contract is real, hotspots are wired, and the Comms-Service has only `/image` and `/generate` endpoints (no `/autofill`, no `/depth`, no caching). I have everything needed to write a decisive, file-grounded plan.
+# Creator Room — Build Plan & Handoff
+
+> **STATUS (2026-06-25, agent: Opus 4.8).** This plan came from a 13-agent research
+> workflow. Backend = `src/comms-service/` (Creator Room HTTP API, runs on :8787;
+> NOT `src/python-service/`, which is the team's MCP service on :9000). Frontend =
+> `src/canvas-ui/` (`lib/creatorRoom.ts`, `components/{CreatorRoom,Onboarding}.tsx`).
+>
+> **DONE this session (committed):**
+> - **Phase 1 — clay aesthetic preset** (`creatorRoom.ts` `ROOM_DOC`): AgX tone
+>   mapping + EffectComposer (GTAO ambient occlusion → soft bloom → SMAA) +
+>   clay materials. The 3D room reads as soft clay, not greybox.
+> - **Phase 2 — image prompt upgrade** (`creator_image.py`): per-hex palette,
+>   foreground/mid/background depth, color negatives, stable character clause.
+> - **Phase 3 — onboarding** (`Onboarding.tsx` + `/api/creator-room/autofill` +
+>   `creator_autofill.py`): 3 questions (niche→vibe→name+pet) → LLM autofill →
+>   generate. Auto-opens on first visit. Verified end-to-end.
+>
+> **NOT done — prioritized backlog for overnight agents (details in §5/§7 below):**
+> - **P0 self-host three.js** (`public/vendor/three/…`) + repoint the importmap off
+>   jsDelivr — the iframe sandbox has no `allow-same-origin`, so the CDN importmap
+>   **breaks offline in the WKWebView**. The post-stack added several addon imports
+>   (EffectComposer + passes), so vendor those too.
+> - **P0 profile-hash cache** in comms-service (shared by image/autofill/layout).
+> - **P3 kit-bashed GLB room** (Phase 4): CC0 prop curation + `/api/creator-room/layout`
+>   (schema-constrained Claude chooser) + GLB composition in `ROOM_DOC`. The
+>   interactivity headline — closes the aesthetic gap with the image.
+> - **P4 optional** depth-displaced 2.5D "live photo" on IMAGE mode.
+> - **Note:** autofill uses OpenAI `gpt-4o-mini` today (only an OpenAI key is
+>   configured); it auto-prefers Claude when `ANTHROPIC_API_KEY` is set.
+
+---
 
 # Rainy Creator Room — Architecture Decision & Build Plan
 
