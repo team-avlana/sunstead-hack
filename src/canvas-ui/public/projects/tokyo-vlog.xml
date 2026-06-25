@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project id="tokyo-vlog" title="Tokyo in the Rain — Travel Vlog" updated="2026-06-22T16:40:00Z">
+  <shape id="concept" type="rainy-text" x="80" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">260</prop>
+    <prop name="html"><![CDATA[<h1>Tokyo in the Rain</h1><p>A moody 8-minute travel vlog: Tokyo at night, neon reflections, quiet ramen counters. Calm voiceover, no hard cuts.</p><p><strong>Vibe:</strong> cinematic, intimate, unhurried.</p>]]></prop>
+  </shape>
+  <shape id="hook" type="rainy-text" x="600" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">260</prop>
+    <prop name="html"><![CDATA[<h2>Hook · 0–8s</h2><p>Open on rain hitting a Shibuya window, city lights bokeh behind it.</p><blockquote>"Everyone films Tokyo in daylight. I came for the rain."</blockquote>]]></prop>
+  </shape>
+  <shape id="beats" type="rainy-text" x="1120" y="80">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">300</prop>
+    <prop name="html"><![CDATA[<h2>Story beats</h2><ul><li>Arrival — last train, empty platform</li><li>Shibuya crossing in the downpour</li><li>Ramen counter, steam on the lens</li><li>Golden Gai alleys</li><li>Rooftop, rain clearing at dawn</li></ul>]]></prop>
+  </shape>
+  <shape id="shotlist" type="rainy-text" x="340" y="440">
+    <prop name="w" type="number">460</prop>
+    <prop name="h" type="number">300</prop>
+    <prop name="html"><![CDATA[<h2>Shot list</h2><ol><li>Window rain macro — 50mm, f/1.8</li><li>Crossing wide — tripod, ND filter</li><li>Ramen hands — gimbal, slow push-in</li><li>Neon signs — rack focus</li><li>Dawn rooftop — timelapse</li></ol>]]></prop>
+  </shape>
+  <shape id="outro" type="rainy-text" x="880" y="440">
+    <prop name="w" type="number">440</prop>
+    <prop name="h" type="number">240</prop>
+    <prop name="html"><![CDATA[<h2>Outro &amp; CTA</h2><p>Soft piano + city ambience. Ask viewers where to film next.</p><p><strong>Music:</strong> lofi, 70–80 BPM, licensed.</p>]]></prop>
+  </shape>
+</project>

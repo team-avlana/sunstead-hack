@@ -138,3 +138,23 @@ Comms Service on **HTTP+Postgres**; `schema.sql`/`DATA_MODEL.md` move from SQLit
   *through* FM for app-level uniformity vs. direct Anthropic SDK / MCP-Claude-Code when we need
   Anthropic-specific features (prompt caching, batches, extended thinking, server tools). Leaning:
   **both** — FM-provider for in-app quick tasks, MCP/Claude Code for the agentic heavy lifting.
+
+## 2026-06-25 — Creator Room (3D diorama hero)
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| D27 | Creator Room concept | An isometric clay-render **diorama** of the creator's world, on the **Home screen** (full-white background). **Fixed skeleton + variable payload**: geometry/zones/camera/lighting constant; only per-zone objects change. Zones = library / content / referral / style / companions. | Per the build brief; one component → infinite personalized rooms. |
+| D28 | Render path | A **self-contained three.js HTML document** run in a **sandboxed `<iframe srcdoc>`**. NOT React Three Fiber baked into the bundle. | R3F can't be transpiled/mounted at runtime in a **static export**; a self-contained doc *is* runnable generated code and stays isolated from our origin. Keeps three.js out of the Next bundle (loaded via jsDelivr importmap). |
+| D29 | Two render sources, one iframe | **Procedural** renderer (`lib/creatorRoom.ts → buildRoomDoc`) is the instant, offline, deterministic default **and** the fallback; **live Claude generation** swaps in a bespoke doc when available. | Brief's `code_only` (deterministic, editable) for the product + `image_then_code`-style hero. Canvas always works with no backend. |
+| D30 | Generation lives in the Comms Service | `POST /api/creator-room/generate` on `src/python-service` (FastAPI) calls **Claude Opus 4.8** (adaptive thinking, streamed) to write the room doc. UI reaches it via `NEXT_PUBLIC_COMMS_API_URL`; 503 → procedural fallback. | Consistent with the static-export decision (D22/D24, webview-shell doc): the client never calls Anthropic/Postgres directly. First concrete Comms Service endpoint. |
+| D31 | Scope | **Home screen only** for now (intake form + hero). Per-project rooms deferred. | Chosen with the user; keeps v1 focused. |
+
+## 2026-06-25 — Creator Room: IMAGE mode is the default
+
+Pivot after seeing the procedural 3D ship as a greybox vs. the reference clay render.
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| D32 | Default mode | **Image** (a clay-render diorama PNG), with the 3D procedural/generated room as a secondary **toggle**. | A rendered image matches the reference style 1:1 (character/avatar, soft clay, full scene); hand-coded primitives can't. |
+| D33 | Image pipeline | Profile → **deterministic image prompt** (faithful to the brief's Prompt A; optional Claude refine when ANTHROPIC_API_KEY is set) → **OpenAI `gpt-image-1`** → data-URL PNG shown as the hero. `POST /api/creator-room/image`. | Anthropic can't output images; gpt-image-1 is best at this cozy clay-iso style + character fidelity. Verified end-to-end (adapts per profile: shooter→rig, pet, palette, lighting). |
+| D34 | Default visual | A bundled **own-generated** sample (`public/creator-room/sample.png`, made with gpt-image-1) shown **blurred behind a "Generate" CTA** until a real image is rendered. | Clean (no third-party/annotated art), conveys the style instantly, sets the generate expectation. Needs only `OPENAI_API_KEY` (image mode is independent of Anthropic). |

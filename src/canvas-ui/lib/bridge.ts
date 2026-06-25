@@ -1,5 +1,5 @@
 import type { Editor } from 'tldraw'
-import { applyRemoteOps, type CanvasOp } from './remoteOps'
+import type { CanvasOp } from './remoteOps'
 
 /** JS -> Swift (fire-and-forget). No-op in a plain browser. */
 export function postNative(msg: unknown): void {
@@ -16,8 +16,13 @@ export function installBridge(editor: Editor): () => void {
   if (typeof window === 'undefined') return () => {}
   const w = window as any
 
-  // Swift -> JS: push a batch of agent ops onto the canvas.
-  w.__rainyApplyOps = (ops: CanvasOp[]) => applyRemoteOps(editor, ops)
+  // Swift -> JS: push a batch of agent ops onto the canvas. Lazy-load the op
+  // applier so the eager landing bundle (Home → CreatorRoom only needs
+  // `postNative`) never pulls remoteOps → all of tldraw. installBridge only
+  // runs once the canvas is mounted, where tldraw is already loading.
+  w.__rainyApplyOps = (ops: CanvasOp[]) => {
+    void import('./remoteOps').then(({ applyRemoteOps }) => applyRemoteOps(editor, ops))
+  }
 
   // Swift -> JS: generic event receiver -> dispatches `native:<event>`.
   w.__rainyNative = {
