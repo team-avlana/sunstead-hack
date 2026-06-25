@@ -12,6 +12,8 @@ import {
   type TLShapeUtilConstructor,
 } from 'tldraw'
 import 'tldraw/tldraw.css'
+import { hasBackend, isBackendId } from '@/lib/api'
+import { loadBackendProject } from '@/lib/backendCanvas'
 import { installBridge } from '@/lib/bridge'
 import { attachProjectAutosave, loadProjectIntoEditor } from '@/lib/projectCanvas'
 import { connectRealtime } from '@/lib/realtime'
@@ -149,21 +151,32 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
     }
     editor.on('event', onCanvasEvent)
 
+    const isBackend = hasBackend() && isBackendId(projectId)
+
     const disposers: Array<() => void> = [
       suppressNativeText,
       () => editor.off('event', onCanvasEvent),
       installBridge(editor),
-      connectRealtime(editor),
+      connectRealtime(editor, projectId),
       attachOutboundSync(editor),
-      attachProjectAutosave(editor, projectId),
+      // Local autosave only for XML/localStorage projects — backend projects are
+      // sourced from Postgres and reconciled by realtime, never saved locally.
+      ...(isBackend ? [] : [attachProjectAutosave(editor, projectId)]),
       editor.store.listen(
         () => useRainyStore.getState().setSelectedIds(editor.getSelectedShapeIds().map(String)),
         { scope: 'session' }
       ),
     ]
 
-    // Render this project's blocks onto the freshly-mounted canvas.
-    loadProjectIntoEditor(editor, projectId)
+    // Render this project's blocks. Backend projects pull from Postgres; if that
+    // fails (or it's a local id) fall back to the XML/localStorage project.
+    if (isBackend) {
+      void loadBackendProject(editor, projectId).then((ok) => {
+        if (!ok && !editor.isDisposed) void loadProjectIntoEditor(editor, projectId)
+      })
+    } else {
+      void loadProjectIntoEditor(editor, projectId)
+    }
 
     return () => disposers.forEach((dispose) => dispose())
   }, [projectId])

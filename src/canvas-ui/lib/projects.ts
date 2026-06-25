@@ -11,6 +11,8 @@
  * layer is the local stand-in so the canvas works end-to-end with no backend.
  */
 
+import { fetchProjects, hasBackend } from './api'
+
 /** One block on the canvas. `props` is shape-type specific (rainy-text: w/h/html). */
 export interface RainyShape {
   id: string
@@ -35,7 +37,7 @@ export interface ProjectMeta {
   title: string
   updated: string
   blocks: number
-  origin: 'seed' | 'local'
+  origin: 'seed' | 'local' | 'backend'
 }
 
 const SEED_MANIFEST = '/projects/index.json'
@@ -167,13 +169,26 @@ async function fetchSeeds(): Promise<ProjectMeta[]> {
 
 /** All projects for the Home grid: shipped seeds ∪ local edits (local wins), newest first. */
 export async function listProjects(): Promise<ProjectMeta[]> {
-  const seeds = await fetchSeeds()
-  const index = readIndex()
   const hidden = new Set(readHidden())
+  const [seeds, backend] = await Promise.all([
+    fetchSeeds(),
+    hasBackend() ? fetchProjects() : Promise.resolve([]),
+  ])
+  const index = readIndex()
 
   const byId = new Map<string, ProjectMeta>()
   for (const s of seeds) if (!hidden.has(s.id)) byId.set(s.id, s)
   for (const m of Object.values(index)) if (!hidden.has(m.id)) byId.set(m.id, m) // local overrides seed
+  for (const b of backend) {
+    if (hidden.has(b.project_id)) continue
+    byId.set(b.project_id, {
+      id: b.project_id,
+      title: b.name,
+      updated: b.created_at,
+      blocks: 0,
+      origin: 'backend',
+    })
+  }
 
   return [...byId.values()].sort((a, b) => (b.updated || '').localeCompare(a.updated || ''))
 }

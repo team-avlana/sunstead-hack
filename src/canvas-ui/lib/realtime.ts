@@ -1,30 +1,80 @@
 import type { Editor } from 'tldraw'
-import { applyRemoteOps, type CanvasOp } from './remoteOps'
+import { hasBackend, isBackendId, wsBase } from './api'
+import { syncBackendProject } from './backendCanvas'
 import { useRainyStore } from './store'
 
 /**
- * SSE client for the Comms Service op stream (scaffold).
+ * Realtime for a backend project: a websocket carrying a *change-signal only*
+ * (never data) — on any signal the canvas re-pulls the project's artifacts from
+ * Postgres and reconciles (docs/architecture.md, INTEGRATION_NOTES.md #2). A
+ * gentle visibility-aware poll covers any missed signal.
  *
- * NOTE: the canonical design (docs/architecture.md) uses a WEBSOCKET "change-signal" + the canvas
- * re-pulling from Postgres — not SSE carrying ops. This is a divergence to reconcile
- * (docs/INTEGRATION_NOTES.md #2). No-op until NEXT_PUBLIC_COMMS_SSE_URL is set.
+ * No-op for local (XML/localStorage) projects or when no backend is configured.
  */
-export function connectRealtime(editor: Editor): () => void {
+export function connectRealtime(editor: Editor, projectId: string): () => void {
   if (typeof window === 'undefined') return () => {}
-  const url = process.env.NEXT_PUBLIC_COMMS_SSE_URL
-  if (!url) return () => {}
+  if (!hasBackend() || !isBackendId(projectId)) {
+    useRainyStore.getState().setCommsStatus('mock')
+    return () => {}
+  }
 
-  const es = new EventSource(url, { withCredentials: true })
-  const onOps = (e: MessageEvent) => {
+  let closed = false
+  let ws: WebSocket | null = null
+  let retry: number | undefined
+  let debounce: number | undefined
+
+  const resync = () => {
+    window.clearTimeout(debounce)
+    debounce = window.setTimeout(() => void syncBackendProject(editor, projectId), 200)
+  }
+
+  const scheduleRetry = () => {
+    if (!closed) retry = window.setTimeout(open, 1800)
+  }
+
+  function open() {
+    const base = wsBase()
+    if (!base || closed) return
     try {
-      applyRemoteOps(editor, JSON.parse(e.data) as CanvasOp[])
-    } catch (err) {
-      console.warn('[rainy] bad ops payload', err)
+      ws = new WebSocket(`${base}/ws?project_id=${encodeURIComponent(projectId)}`)
+    } catch {
+      scheduleRetry()
+      return
+    }
+    ws.onopen = () => useRainyStore.getState().setCommsStatus('connected')
+    ws.onmessage = () => resync()
+    ws.onerror = () => {
+      try {
+        ws?.close()
+      } catch {
+        /* ignore */
+      }
+    }
+    ws.onclose = () => {
+      ws = null
+      if (!closed) {
+        useRainyStore.getState().setCommsStatus('reconnecting')
+        scheduleRetry()
+      }
     }
   }
-  es.addEventListener('ops', onOps as EventListener)
-  es.addEventListener('open', () => useRainyStore.getState().setCommsStatus('connected'))
-  es.addEventListener('error', () => useRainyStore.getState().setCommsStatus('reconnecting'))
 
-  return () => es.close()
+  open()
+
+  // Safety-net poll — cheap for a handful of artifacts; pauses when hidden.
+  const poll = window.setInterval(() => {
+    if (!document.hidden) void syncBackendProject(editor, projectId)
+  }, 6000)
+
+  return () => {
+    closed = true
+    window.clearTimeout(retry)
+    window.clearTimeout(debounce)
+    window.clearInterval(poll)
+    try {
+      ws?.close()
+    } catch {
+      /* ignore */
+    }
+  }
 }

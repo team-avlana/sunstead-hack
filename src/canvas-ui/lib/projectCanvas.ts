@@ -1,5 +1,6 @@
 import { createShapeId, type Editor } from 'tldraw'
 import { RAINY_TEXT } from '@/components/RainyTextShape'
+import { VIDEO_BLOCK } from '@/components/VideoBlockShape'
 import { loadProject, saveProject, type Project, type RainyShape } from './projects'
 import { useRainyStore } from './store'
 
@@ -53,16 +54,14 @@ export async function loadProjectIntoEditor(editor: Editor, id: string): Promise
 function snapshotShapes(editor: Editor): RainyShape[] {
   return editor
     .getCurrentPageShapes()
-    .filter((s) => s.type === RAINY_TEXT)
+    .filter((s) => s.type === RAINY_TEXT || s.type === VIDEO_BLOCK)
     .map((s) => {
-      const props = (s as any).props
-      return {
-        id: stem(s.id),
-        type: s.type,
-        x: Math.round(s.x),
-        y: Math.round(s.y),
-        props: { w: props.w, h: props.h, html: props.html ?? '' },
-      }
+      const p = (s as any).props
+      const props: Record<string, string | number | boolean> =
+        s.type === VIDEO_BLOCK
+          ? { w: p.w, h: p.h, view: p.view ?? 'compact', data: p.data ?? '' }
+          : { w: p.w, h: p.h, html: p.html ?? '' }
+      return { id: stem(s.id), type: s.type, x: Math.round(s.x), y: Math.round(s.y), props }
     })
 }
 

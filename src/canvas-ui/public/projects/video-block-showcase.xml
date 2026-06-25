@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project id="video-block-showcase" title="Video Block — States & Disclosure" updated="2026-06-25T03:00:00Z">
+  <shape id="intro" type="rainy-text" x="80" y="40">
+    <prop name="w" type="number">760</prop>
+    <prop name="h" type="number">120</prop>
+    <prop name="html"><![CDATA[<h1>The Video Block</h1><p>The fundamental interface for a video + its analysed data. The same block progressively discloses more as analysis completes, across three compactness levels. Click the chevron to expand, then “Show” the storyboard.</p>]]></prop>
+  </shape>
+
+  <shape id="compact" type="video-block" x="80" y="200">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">92</prop>
+    <prop name="view">compact</prop>
+    <prop name="data"><![CDATA[{"status":"analysed","title":"Power laws and the trap of productivity","duration_sec":109,"shot_count":39,"palette":["#201c17","#4c4437","#7c7561","#a29a7f","#7d5c2e"],"tags":["Power laws","Bold-claim hook","CTA: follow","scripted","Thoughtful"]}]]></prop>
+  </shape>
+
+  <shape id="expanded" type="video-block" x="500" y="200">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">332</prop>
+    <prop name="view">expanded</prop>
+    <prop name="data"><![CDATA[{"status":"analysed","title":"Power laws and the trap of productivity","duration_sec":109,"shot_count":39,"palette":["#201c17","#4c4437","#7c7561","#a29a7f","#7d5c2e"],"tags":["Power laws","Bold-claim hook","CTA: follow","scripted","Thoughtful"],"description":"A tightly scripted, idea-driven talking-head Short in the edu-tainment mold. Heavily A-roll (~84%) with sparse B-roll punctuating transitions; a brisk 39-cut rhythm across 109s.","hook":{"text":"The rich want you to think that working harder will make you more successful.","format":"bold_claim","strength":8}}]]></prop>
+  </shape>
+
+  <shape id="full" type="video-block" x="920" y="200">
+    <prop name="w" type="number">384</prop>
+    <prop name="h" type="number">652</prop>
+    <prop name="view">full</prop>
+    <prop name="data"><![CDATA[{"status":"analysed","title":"Power laws and the trap of productivity","duration_sec":109,"shot_count":39,"palette":["#201c17","#4c4437","#7c7561","#a29a7f","#7d5c2e"],"tags":["Power laws","Bold-claim hook","CTA: follow","scripted","Thoughtful"],"description":"A tightly scripted, idea-driven talking-head Short. Heavily A-roll with sparse B-roll punctuating transitions.","transcript":"The rich want you to think that working harder will make you more successful. And the underlying math seems logical. Twice the work means twice the result. But that is what I call the trap of productivity.","hook":{"text":"The rich want you to think that working harder will make you more successful.","format":"bold_claim","strength":8},"storyboard":[{"label":"Hook / Productivity Trap Intro","start_sec":0,"end_sec":9.4,"tags":["medium","a roll","centered"]},{"label":"Venture Capital Story — Andy Bechtelsheim and Google","start_sec":9.4,"end_sec":35.2,"tags":["medium","a roll","rule of thirds"]},{"label":"Power Law Concept Explanation","start_sec":35.2,"end_sec":54.5,"tags":["close up","a roll"]},{"label":"Real-World Power Law Examples","start_sec":54.5,"end_sec":71.6,"tags":["medium","b roll"]},{"label":"Reframe — Expected Payoff","start_sec":71.6,"end_sec":86.5,"tags":["medium","a roll"]}]}]]></prop>
+  </shape>
+
+  <shape id="analysing" type="video-block" x="80" y="380">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">168</prop>
+    <prop name="view">expanded</prop>
+    <prop name="data"><![CDATA[{"status":"analysing","title":"How I create 90 posts from just 2 hours of work","duration_sec":34,"palette":["#1d2b3a","#2f4a63","#6f8fad"]}]]></prop>
+  </shape>
+
+  <shape id="not_analysed" type="video-block" x="80" y="588">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">156</prop>
+    <prop name="view">expanded</prop>
+    <prop name="data"><![CDATA[{"status":"not_analysed","title":"day in the life of a startup founder","duration_sec":37,"palette":["#3a2f22","#6b5436","#a98a5a"]}]]></prop>
+  </shape>
+
+  <shape id="empty" type="video-block" x="500" y="588">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">178</prop>
+    <prop name="view">expanded</prop>
+    <prop name="data"><![CDATA[{"status":"empty","title":""}]]></prop>
+  </shape>
+
+  <shape id="error" type="video-block" x="500" y="396">
+    <prop name="w" type="number">360</prop>
+    <prop name="h" type="number">188</prop>
+    <prop name="view">expanded</prop>
+    <prop name="data"><![CDATA[{"status":"error","title":"Obviously not even close to everything","analysis_error":"yt-dlp: video unavailable (HTTP 403). The source may be private or region-locked."}]]></prop>
+  </shape>
+</project>
