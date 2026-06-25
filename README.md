@@ -1,6 +1,6 @@
 # Rainy
 
-**Rainy is an AI creator companion for video preproduction.** Paste a YouTube, TikTok, or Instagram URL — Rainy downloads and analyses the video (shot detection, transcription, visual style profiling), then your own Claude client drives an infinite canvas where you research, ideate, script, storyboard, and plan shot lists. The canvas and the AI are co-equal writers: Claude creates and populates artifacts, you edit them directly.
+**Rainy is an AI creator companion for video preproduction.** Paste your YouTube or Tiktok channel — Rainy downloads and analyses your past videos (shot detection, transcription, visual style profiling), understands your editing style and then your own Claude client drives an infinite canvas where you research, ideate, script, storyboard, and plan shot lists. The canvas and the AI are co-equal writers: Claude creates and populates artifacts, you edit them directly.
 
 > Landing page: [rainey.lovable.app](https://rainey.lovable.app/)
 
