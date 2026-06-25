@@ -21,27 +21,49 @@ def register(mcp: FastMCP) -> None:
         position: Optional[dict] = None,
     ) -> dict:
         """
-        Create a frame (a "flow") on the canvas for a project. The canvas renders it
-        live. A frame is one artifact; the blocks it contains live inside its payload
-        as elements.
+        Create a frame on the canvas. The canvas renders it live. Call this
+        throughout the preproduction workflow to visualise each phase.
 
-        type: 'frame'  (e.g. an Ideation flow, a Storyboarding flow)
+        Be as visual as possible — create artifacts early and keep iterating with
+        update_artifact rather than creating duplicates.
+
+        type: 'frame'
+
         payload: {
-          "label": str,               # frame title shown on the canvas
-          "role": str (optional),     # e.g. "ideation" | "storyboard"
-          "elements": [               # the blocks inside this frame
-            {"id": "el-1", "type": "text",  "content": "<p>…</p>", "x": 24, "y": 64, "w": 320, "h": 200},
-            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64},
-            {"id": "el-3", "type": "image", "src": "/frames/{frame_id}", "frame_id": "…",
-             "caption": str (optional), "x": 0, "y": 0, "w": 320, "h": 180}
+          "label": str,         # title shown on the canvas frame header
+          "role": str,          # phase hint: "research" | "ideation" | "script" |
+                                #             "storyboard" | "shot_list" | "reference"
+          "elements": [
+            {
+              "id": "el-1",          # stable id — required for update_artifact targeting
+              "type": "text",
+              "content": "<p>…</p>", # HTML supported: <p> <strong> <em> <ul> <li>
+              "x": 24, "y": 64, "w": 320, "h": 200
+            },
+            {
+              "id": "el-2",
+              "type": "video",
+              "video_id": "…",
+              "view": "compact",     # "compact" | "full"
+              "x": 360, "y": 64
+            },
+            {
+              "id": "el-3",
+              "type": "image",
+              "src": "/frames/{frame_id}",   # real frame from a video shot
+              "frame_id": "…",               # UUID from get_video_shots
+              "caption": "Scene 1",          # optional
+              "x": 0, "y": 0, "w": 320, "h": 180
+            }
           ]
         }
-        For storyboards: use get_video_analysis to get shots_summary (each shot has a
-        frame_id), then create one image element per scene using src="/frames/{frame_id}".
-        Pair each image element with a text element for the scene label/description.
-        Each element needs a stable "id"; x/y are RELATIVE to the frame's top-left.
-        Address one block later with update_artifact(id, element_id=<el.id>, element_patch={...}).
-        position: {x, y, w, h} = the frame box on the canvas.
+
+        Storyboard pattern: call get_video_shots(video_id) → for each scene create
+        an image element (src='/frames/{frame_id}') and a paired text element for the
+        scene label. x/y coordinates are RELATIVE to the frame's top-left corner.
+
+        position: {x, y, w, h} — where to place the frame on the infinite canvas.
+        Avoid overlapping: offset x by (prev_w + 80) per new frame.
 
         Returns {artifact_id}.
         """
@@ -83,14 +105,18 @@ def register(mcp: FastMCP) -> None:
         title: Optional[str] = None,
     ) -> dict:
         """
-        Update an existing artifact. Bumps version so the canvas can detect changes.
+        Update an existing artifact. Bumps version so the canvas detects the change.
+
+        Prefer this over create_artifact when iterating — never create a duplicate
+        artifact when you can update the existing one.
 
         Two update modes:
-        - Whole-payload replace: pass payload={...}.
-        - Addressed element update: pass element_id + element_patch to merge into
-          a single element within payload.elements that has the matching id.
+        - Whole-payload replace: pass payload={...} to replace all elements at once.
+        - Addressed element update: pass element_id (the "id" field of one element)
+          + element_patch to merge only into that element, leaving others untouched.
+          Use this to revise a single scene in a storyboard or fix one line of a script.
 
-        Also supports updating position and/or title independently.
+        Also supports updating position and/or title independently (pass without payload).
         Returns {artifact_id, version}.
         """
         if not artifact_id:
@@ -124,7 +150,8 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_artifact(artifact_id: str) -> dict:
         """
-        Read back a single artifact by id (for the agent; the canvas reads from DB directly).
+        Read back a single artifact by id. Use this to inspect current element ids
+        before doing an addressed element update via update_artifact.
         """
         result = db.get_artifact(artifact_id)
         if result is None:
@@ -134,7 +161,11 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def list_artifacts(project_id: str) -> list:
         """
-        List all active artifacts for a project (for the agent; canvas reads DB directly).
+        List all active (non-deleted) artifacts for a project.
+
+        Use this to see what is already on the canvas before creating new artifacts,
+        so you can update existing ones rather than duplicating them.
+        Returns [{artifact_id, type, title, payload, position, version, created_at}].
         """
         return db.list_artifacts(project_id)
 

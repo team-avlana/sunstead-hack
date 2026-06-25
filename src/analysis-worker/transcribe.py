@@ -47,14 +47,17 @@ def transcribe(video_path: str, workdir: Path) -> dict:
         response = requests.post(
             "https://api.elevenlabs.io/v1/speech-to-text",
             headers={"xi-api-key": api_key},
-            files={"audio": ("audio.wav", f, "audio/wav")},
-            data={
-                "model_id": "scribe_v1",
-                "timestamps_granularity": "word",
+            files={
+                "file": ("audio.wav", f, "audio/wav"),
+                "model_id": (None, "scribe_v1"),
+                "timestamps_granularity": (None, "word"),
             },
             timeout=300,
         )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(
+            f"ElevenLabs STT {response.status_code}: {response.text[:500]}"
+        )
     return _normalise_transcript(response.json())
 
 

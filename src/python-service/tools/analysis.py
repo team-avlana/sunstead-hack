@@ -46,14 +46,17 @@ def register(mcp: FastMCP) -> None:
         """
         Enumerate recent videos from a channel and start analysis for each.
 
-        kind must be 'self' (your own channel) or 'reference' (a competitor
-        or inspiration channel). Creates/finds a creators row, enumerates up
-        to max_videos recent videos via yt-dlp, inserts a videos row per URL,
-        and spawns one worker per video. Returns immediately.
+        kind='self'      — the user's own channel (use for onboarding the user).
+        kind='reference' — a competitor, role model, or inspiration channel.
+                           Add freely; reference creators enrich ideation and comparison.
 
-        max_videos defaults to the server's configured default (5) and is
-        capped at 20. Videos that are already tracked are skipped (no duplicate
-        worker is spawned).
+        Recommended max_videos: 5-10. That is usually enough for a solid style profile
+        and avoids long waits. Each video takes 1-3 min; a full run takes 3-10 min.
+        Hard cap is 20. Videos already tracked are skipped (no duplicate worker).
+
+        After this call: poll get_channel_analysis(creator_id) until done==total,
+        then call build_style_profile(creator_id) to generate the aggregated profile.
+        The profile does NOT build automatically — you must trigger it.
 
         Returns {creator_id, video_ids}.
         """
@@ -114,6 +117,10 @@ def register(mcp: FastMCP) -> None:
         """
         Return analysis progress for all videos belonging to a creator/channel.
 
+        Poll this after analyze_channel to track progress. When done==total, all
+        video analysis is complete and you should call build_style_profile(creator_id)
+        to generate the aggregated style profile.
+
         Returns {videos: [{video_id, status}], done: int, total: int}.
         """
         videos = db.get_channel_videos(creator_id)
@@ -125,15 +132,19 @@ def register(mcp: FastMCP) -> None:
         """
         Return the full shot and frame list for a video, including per-shot analysis.
 
-        Each shot includes idx, start_sec, end_sec, frame_id, and the complete
-        analysis data:
+        Use this for deep-dive research or to build storyboard artifacts. Each shot
+        has a representative frame (use get_frame(frame_id) to fetch the JPEG) and
+        per-shot LLM analysis describing what the creator actually did visually.
+
+        Each shot includes idx, start_sec, end_sec, frame_id, and:
           - analysis.deterministic: duration_sec, frame metrics, speech metrics
           - analysis.llm: shot_type, composition, subjects, palette, camera_movement,
-            roll, subject — the vision model output per shot
+            roll — vision-model output describing the shot
 
-        frame_id is a UUID; fetch the JPEG thumbnail with get_frame or at
-        /frames/{frame_id}. Use get_video_analysis to check status first — shots
-        are empty while analysis is still running.
+        frame_id is a UUID; fetch the JPEG with get_frame(frame_id) or reference it
+        in image elements as src='/frames/{frame_id}'.
+
+        Check get_video_analysis status first — shots array is empty while running.
         """
         full = db.get_video_full(video_id)
         if full is None:
