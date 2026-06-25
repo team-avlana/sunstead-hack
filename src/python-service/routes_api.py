@@ -6,7 +6,7 @@ directly). Mounted alongside the MCP server in server.py.
     GET /api/projects/{project_id}     -> {project, artifacts:[enriched]}
     GET /api/artifacts/{artifact_id}   -> enriched artifact (re-pull on WS signal)
     GET /api/videos/{video_id}         -> {video, shots_summary}
-    GET /frames/{video_id}/{name}      -> a shot frame image if present (else 404)
+    GET /frames/{frame_id}             -> JPEG image served from the frames table
 
 "Enriched" = a `type:'video'` artifact gets a live `video` view-model attached,
 joined from the videos table via payload.video_id (see video_view.derive_video).
@@ -14,19 +14,13 @@ joined from the videos table via payload.video_id (see video_view.derive_video).
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 import db
 import video_view
-
-# Where the analysis-worker writes frames (best-effort serving; missing -> 404).
-_FRAMES_ROOT = Path(os.environ.get("FRAMES_DIR", "../analysis-worker/workdir")).resolve()
 
 
 def _video_view(src: dict) -> dict:
@@ -106,13 +100,11 @@ async def get_video(request: Request) -> JSONResponse:
 
 
 async def get_frame(request: Request):
-    vid = request.path_params["video_id"]
-    name = os.path.basename(request.path_params["name"])  # prevent traversal
-    candidate = (_FRAMES_ROOT / vid / "frames" / name).resolve()
-    # Stay within the frames root.
-    if _FRAMES_ROOT in candidate.parents and candidate.is_file():
-        return FileResponse(str(candidate))
-    return JSONResponse({"error": "frame not found"}, status_code=404)
+    frame_id = request.path_params["frame_id"]
+    frame = await run_in_threadpool(db.get_frame, frame_id)
+    if frame is None:
+        return JSONResponse({"error": "frame not found"}, status_code=404)
+    return Response(content=frame["data"], media_type=frame["mime_type"])
 
 
 routes = [
@@ -121,5 +113,5 @@ routes = [
     Route("/api/projects/{project_id}", get_project),
     Route("/api/artifacts/{artifact_id}", get_artifact),
     Route("/api/videos/{video_id}", get_video),
-    Route("/frames/{video_id}/{name}", get_frame),
+    Route("/frames/{frame_id}", get_frame),
 ]

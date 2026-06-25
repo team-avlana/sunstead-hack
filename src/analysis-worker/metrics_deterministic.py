@@ -1,5 +1,4 @@
 import statistics
-from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -44,11 +43,12 @@ def _get_haar() -> cv2.CascadeClassifier:
 #  Per-shot frame metrics
 # ─────────────────────────────────────────────
 
-def compute_frame_metrics(frame_path: Optional[str]) -> dict:
-    if not frame_path or not Path(frame_path).exists():
+def compute_frame_metrics(frame_bytes: Optional[bytes]) -> dict:
+    if not frame_bytes:
         return {"error": "frame_not_found"}
 
-    img_bgr = cv2.imread(frame_path)
+    arr = np.frombuffer(frame_bytes, dtype=np.uint8)
+    img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img_bgr is None:
         return {"error": "unreadable"}
 
@@ -139,7 +139,7 @@ def compute_frame_metrics(frame_path: Optional[str]) -> dict:
     ocr_text = ""
     if _HAS_EASYOCR and _ocr_reader is not None:
         try:
-            ocr_results = _ocr_reader.readtext(frame_path)
+            ocr_results = _ocr_reader.readtext(img_rgb)
             if ocr_results:
                 has_onscreen_text = True
                 ocr_text = " ".join(r[1] for r in ocr_results)

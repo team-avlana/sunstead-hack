@@ -113,16 +113,10 @@ def _shot_for_segment(shots: list[dict], start: float, end: float) -> dict | Non
     return best
 
 
-def _frame_url(video_id: str, frame_path: str | None) -> str | None:
-    """Frames live on the worker host (often Windows paths). Expose a stable URL
-    the canvas *can* request; the python-service serves it when the file exists,
-    otherwise the canvas falls back to a palette gradient."""
-    if not frame_path:
+def _frame_url(frame_id: str | None) -> str | None:
+    if not frame_id:
         return None
-    base = frame_path.replace("\\", "/").rsplit("/", 1)[-1]
-    if not base:
-        return None
-    return f"/frames/{video_id}/{base}"
+    return f"/frames/{frame_id}"
 
 
 def _scene_tags(shot: dict | None) -> list[str]:
@@ -137,7 +131,7 @@ def _scene_tags(shot: dict | None) -> list[str]:
     return out
 
 
-def _storyboard(video_id: str, llm: dict, shots: list[dict]) -> list[dict]:
+def _storyboard(llm: dict, shots: list[dict]) -> list[dict]:
     segments = llm.get("segments") or []
     scenes = []
     for i, seg in enumerate(segments):
@@ -153,7 +147,7 @@ def _storyboard(video_id: str, llm: dict, shots: list[dict]) -> list[dict]:
                 "label": seg.get("label") or f"Scene {i + 1}",
                 "start_sec": start,
                 "end_sec": end,
-                "thumbnail": _frame_url(video_id, (shot or {}).get("frame_path")),
+                "thumbnail": _frame_url((shot or {}).get("frame_id")),
                 "tags": _scene_tags(shot),
                 "description": subject or "",
             }
@@ -182,7 +176,7 @@ def derive_video(video: dict, shots: list[dict] | None = None) -> dict:
         "source_url": video.get("source_url"),
         "title": video.get("title"),
         "duration_sec": float(duration) if duration is not None else None,
-        "thumbnail": _frame_url(str(video.get("id") or ""), (rep_shot or {}).get("frame_path")),
+        "thumbnail": _frame_url((rep_shot or {}).get("frame_id")),
         "palette": _palette(metrics),
         "shot_count": len(shots),
         "analysis_error": video.get("analysis_error"),
@@ -203,6 +197,6 @@ def derive_video(video: dict, shots: list[dict] | None = None) -> dict:
             else None
         ),
         # *** storyboard
-        "storyboard": _storyboard(str(video.get("id") or ""), llm, shots) if analysed else [],
+        "storyboard": _storyboard(llm, shots) if analysed else [],
     }
     return view

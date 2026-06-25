@@ -1,7 +1,6 @@
 import base64
 import json
 import os
-from pathlib import Path
 
 import config
 
@@ -159,25 +158,21 @@ def _client():
     )
 
 
-def _encode_image(frame_path: str) -> str:
-    return base64.standard_b64encode(Path(frame_path).read_bytes()).decode("utf-8")
-
-
 # ─── per-shot analysis ───────────────────────────────────────────────────────
 
-def analyze_shot(frame_path: str | None, transcript_slice: dict, idx: int) -> dict:
+def analyze_shot(frame_bytes: bytes | None, transcript_slice: dict, idx: int) -> dict:
     """Vision + text analysis for one shot. Returns raw LLM JSON."""
     client = _client()
     transcript_text = transcript_slice.get("text", "").strip()
 
     content: list = []
-    if frame_path and Path(frame_path).exists():
+    if frame_bytes:
         content.append({
             "type": "image",
             "source": {
                 "type": "base64",
                 "media_type": "image/jpeg",
-                "data": _encode_image(frame_path),
+                "data": base64.standard_b64encode(frame_bytes).decode("utf-8"),
             },
         })
 

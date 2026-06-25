@@ -146,8 +146,11 @@ def get_video_analysis(video_id: str) -> dict | None:
             return None
 
         shots = conn.execute(
-            "SELECT idx, start_sec, end_sec FROM shots "
-            "WHERE video_id = %s AND deleted_at IS NULL ORDER BY idx",
+            """SELECT s.idx, s.start_sec, s.end_sec, f.id AS frame_id
+               FROM shots s
+               LEFT JOIN frames f ON f.shot_id = s.id
+               WHERE s.video_id = %s AND s.deleted_at IS NULL
+               ORDER BY s.idx""",
             (video_id,),
         ).fetchall()
 
@@ -159,7 +162,12 @@ def get_video_analysis(video_id: str) -> dict | None:
         status = "running"
 
     shots_summary = [
-        {"idx": s["idx"], "start_sec": float(s["start_sec"]), "end_sec": float(s["end_sec"])}
+        {
+            "idx": s["idx"],
+            "start_sec": float(s["start_sec"]),
+            "end_sec": float(s["end_sec"]),
+            "frame_id": str(s["frame_id"]) if s["frame_id"] else None,
+        }
         for s in shots
     ]
 
@@ -416,11 +424,27 @@ def get_video_full(video_id: str) -> dict | None:
         if not row:
             return None
         shots = conn.execute(
-            "SELECT idx, start_sec, end_sec, frame_path, analysis FROM shots "
-            "WHERE video_id = %s AND deleted_at IS NULL ORDER BY idx",
+            """SELECT s.idx, s.start_sec, s.end_sec, s.analysis,
+                      f.id AS frame_id
+               FROM shots s
+               LEFT JOIN frames f ON f.shot_id = s.id
+               WHERE s.video_id = %s AND s.deleted_at IS NULL
+               ORDER BY s.idx""",
             (video_id,),
         ).fetchall()
     return {"video": dict(row), "shots": [dict(s) for s in shots]}
+
+
+def get_frame(frame_id: str) -> dict | None:
+    """Return the raw bytes and mime_type for a frame row."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT data, mime_type FROM frames WHERE id = %s",
+            (frame_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"data": bytes(row["data"]), "mime_type": row["mime_type"]}
 
 
 def project_ids_for_video(video_id: str) -> list[str]:

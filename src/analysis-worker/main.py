@@ -81,10 +81,12 @@ def run(video_id: str, dsn: str) -> None:
         # ── 6. Deterministic metrics ─────────────────────────────────────────
         print(f"[{video_id}] Computing deterministic metrics...")
         for shot in shot_list:
-            frame_m = det.compute_frame_metrics(shot.get("frame_path"))
+            frame_m = det.compute_frame_metrics(shot.get("frame_bytes"))
             speech_m = det.compute_shot_speech_metrics(
                 shot["transcript_slice"], shot["end_sec"] - shot["start_sec"]
             )
+            shot["frame_width"] = frame_m.get("width")
+            shot["frame_height"] = frame_m.get("height")
             shot["analysis"] = {
                 "deterministic": {
                     "duration_sec": round(shot["end_sec"] - shot["start_sec"], 3),
@@ -102,7 +104,7 @@ def run(video_id: str, dsn: str) -> None:
             for shot in shot_list:
                 try:
                     shot["analysis"]["llm"] = analyze_llm.analyze_shot(
-                        shot.get("frame_path"),
+                        shot.get("frame_bytes"),
                         shot["transcript_slice"],
                         shot["idx"],
                     )
@@ -121,17 +123,26 @@ def run(video_id: str, dsn: str) -> None:
 
         # ── 8. Persist ───────────────────────────────────────────────────────
         print(f"[{video_id}] Persisting {len(shot_list)} shot(s)...")
-        db.delete_existing_shots(conn, video_id)
+        db.delete_existing_shots(conn, video_id)  # cascades to frames
         for shot in shot_list:
-            db.insert_shot(
+            shot_id = db.insert_shot(
                 conn,
                 video_id=video_id,
                 idx=shot["idx"],
                 start_sec=shot["start_sec"],
                 end_sec=shot["end_sec"],
-                frame_path=shot.get("frame_path"),
                 analysis=shot["analysis"],
             )
+            if shot.get("frame_bytes"):
+                db.insert_frame(
+                    conn,
+                    shot_id=shot_id,
+                    video_id=video_id,
+                    timestamp_sec=shot["frame_ts"],
+                    data=shot["frame_bytes"],
+                    width=shot.get("frame_width"),
+                    height=shot.get("frame_height"),
+                )
         conn.commit()
 
         video_metrics = {

@@ -65,20 +65,43 @@ def insert_shot(
     idx: int,
     start_sec: float,
     end_sec: float,
-    frame_path: str | None,
     analysis: dict,
-) -> None:
+) -> str:
+    """Insert (or upsert) a shot row. Returns the shot UUID."""
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO shots (video_id, idx, start_sec, end_sec, frame_path, analysis)
-               VALUES (%s, %s, %s, %s, %s, %s)
+            """INSERT INTO shots (video_id, idx, start_sec, end_sec, analysis)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT (video_id, idx) DO UPDATE SET
                  start_sec = EXCLUDED.start_sec,
                  end_sec   = EXCLUDED.end_sec,
-                 frame_path = EXCLUDED.frame_path,
-                 analysis  = EXCLUDED.analysis""",
-            (video_id, idx, start_sec, end_sec, frame_path, _dumps(analysis)),
+                 analysis  = EXCLUDED.analysis
+               RETURNING id""",
+            (video_id, idx, start_sec, end_sec, _dumps(analysis)),
         )
+        row = cur.fetchone()
+    return str(row["id"])
+
+
+def insert_frame(
+    conn,
+    shot_id: str,
+    video_id: str,
+    timestamp_sec: float,
+    data: bytes,
+    width: int | None = None,
+    height: int | None = None,
+) -> str:
+    """Insert a frame row. Returns the frame UUID."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO frames (shot_id, video_id, timestamp_sec, data, width, height)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (shot_id, video_id, timestamp_sec, data, width, height),
+        )
+        row = cur.fetchone()
+    return str(row["id"])
 
 
 def write_video_metrics(conn, video_id: str, metrics: dict) -> None:

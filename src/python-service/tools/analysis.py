@@ -81,7 +81,9 @@ def register(mcp: FastMCP) -> None:
 
         status is one of: 'running', 'done', 'failed'.
         When done, video.metrics contains the derived style data.
-        shots_summary lists shot boundaries (no frame images).
+        shots_summary lists every shot with idx, start_sec, end_sec, and frame_id.
+        frame_id is a UUID; the representative frame image is served at /frames/{frame_id}.
+        Use frame_id when building storyboard artifacts that reference shot thumbnails.
         """
         result = db.get_video_analysis(video_id)
         if result is None:
