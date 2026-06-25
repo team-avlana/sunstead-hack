@@ -372,14 +372,16 @@ def generate_storyboard_frame(
         if palette := style_hints.get("palette"):
             colors = ", ".join(str(c) for c in palette[:3])
             style_parts.append(f"colour palette {colors}")
-    style_str = ", ".join(style_parts) if style_parts else "cinematic, warm"
+    scene_context = ", ".join(style_parts) if style_parts else ""
 
     prompt = (
-        f"Storyboard panel: {concept}. "
-        f"Framing: {shot_type}. "
-        f"Style: {style_str}. "
-        "Clean cinematic illustration, flat graphic style with subtle depth, "
-        "muted tones, no text or UI overlays, single scene."
+        f"Storyboard panel, {shot_type}: {concept}"
+        + (f". Context: {scene_context}" if scene_context else "")
+        + ". "
+        "Hand-drawn pencil sketch on warm construction paper — rough hatching and "
+        "cross-hatching for shadows, light paper texture showing through, loose "
+        "expressive lines, no colour fills (monochrome graphite only), soft erased "
+        "highlights. Uniform storyboard illustration style. No text, no UI overlays."
     )
 
     logger.info(

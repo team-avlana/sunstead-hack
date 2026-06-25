@@ -181,6 +181,14 @@ async def get_frame(request: Request):
     return Response(content=frame["data"], media_type=frame["mime_type"])
 
 
+async def get_storyboard_frame(request: Request):
+    frame_id = request.path_params["frame_id"]
+    frame = await run_in_threadpool(db.get_storyboard_frame, frame_id)
+    if frame is None:
+        return JSONResponse({"error": "storyboard frame not found"}, status_code=404)
+    return Response(content=frame["data"], media_type=frame["mime_type"])
+
+
 async def list_creators(request: Request) -> JSONResponse:
     kind = request.query_params.get("kind")
     if kind and kind not in ("self", "reference"):
@@ -232,6 +240,7 @@ routes = [
     Route("/api/artifacts/{artifact_id}", delete_artifact, methods=["DELETE"]),
     Route("/api/videos/{video_id}/status", get_video_status),
     Route("/api/videos/{video_id}", get_video),
+    Route("/api/storyboard/{frame_id}", get_storyboard_frame),
     Route("/api/creators", list_creators),
     Route("/api/creators/{creator_id}/videos", list_creator_videos),
     Route("/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]),

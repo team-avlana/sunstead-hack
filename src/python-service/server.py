@@ -32,7 +32,7 @@ import notify
 import pty_bridge
 from config import settings
 from routes_api import routes as api_routes
-from tools import analysis, artifacts, creators, memory, projects
+from tools import analysis, artifacts, creators, memory, projects, storyboard
 
 # ── FastMCP instance ──────────────────────────────────────────────────────────
 
@@ -79,8 +79,24 @@ mcp = FastMCP(
         "3. Scripting — develop the audio layer (voiceover/narration/dialogue). Must closely "
         "match the creator's tone of voice as revealed by their style profile.\n"
         "4. Storyboarding — sketch the approximate visual structure scene by scene. "
-        "Use real shot frames from analyzed videos to show composition references.\n"
+        "For PAST videos use real shot frames from get_video_shots(). "
+        "For FUTURE videos use generate_storyboard_frame() to create AI-generated panels.\n"
         "5. Shot list — create a concrete, actionable checklist of shots to film.\n\n"
+
+        "## AI storyboard images for future videos\n"
+        "generate_storyboard_frame(project_id, concept, shot_type, creator_id?) generates "
+        "a visual panel for a planned scene using gpt-image-1.5 and places it on the canvas "
+        "automatically. Use it during ideation and storyboarding phases.\n"
+        "- Call once per key scene (4-8 panels for a full storyboard).\n"
+        "- Pass creator_id to inherit the creator's colour palette, lighting, and mood.\n"
+        "- shot_type options: 'close-up', 'medium shot', 'wide shot', "
+        "'over-the-shoulder', 'POV', 'aerial', 'insert'.\n"
+        "- aspect_ratio: '1:1' (default) or '16:9' for widescreen panels.\n"
+        "- Position panels in a row: each call pass position={x: prev_x + w + 20, y: 0, w, h}.\n"
+        "- list_storyboard_frames(project_id) shows all previously generated panels.\n"
+        "When a user says 'storyboard this idea', 'visualise my concept', or 'show me "
+        "what this could look like', you MUST call generate_storyboard_frame() — "
+        "do not just describe the scenes in text.\n\n"
 
         "## Canvas artifacts — be visual, always\n"
         "The canvas is the primary output surface. Treat it as a living document.\n"
@@ -88,10 +104,11 @@ mcp = FastMCP(
         "update an existing one with update_artifact().\n"
         "- type='frame' is the standard block. Use payload.role to signal the phase "
         "(e.g. 'research', 'ideation', 'script', 'storyboard', 'shot_list').\n"
-        "- Element types: 'text' (HTML content), 'image' (src='/frames/{frame_id}'), "
+        "- Element types: 'text' (HTML content), 'image' (src='/frames/{frame_id}' for "
+        "extracted video frames, or src='/api/storyboard/{id}' for AI-generated panels), "
         "'video' (video_id + view='compact'|'full').\n"
-        "- Storyboards: call get_video_shots(video_id) to get frame_ids, then place image "
-        "elements with src='/frames/{frame_id}' alongside text elements for scene labels.\n"
+        "- Past-video storyboards: call get_video_shots(video_id) to get frame_ids, then "
+        "place image elements with src='/frames/{frame_id}' alongside scene labels.\n"
         "- Lay out frames so they don't overlap: increment x by (w + gap) per frame.\n\n"
 
         "## Raw video data\n"
@@ -112,6 +129,7 @@ analysis.register(mcp)
 artifacts.register(mcp)
 memory.register(mcp)
 creators.register(mcp)
+storyboard.register(mcp)
 
 # ── Combined ASGI app ─────────────────────────────────────────────────────────
 
