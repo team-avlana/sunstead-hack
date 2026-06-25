@@ -64,6 +64,78 @@ def list_projects() -> list[dict]:
 
 # ── Creators ──────────────────────────────────────────────────────────────────
 
+def get_creator_frames_for_room(creator_id: str, limit: int = 3) -> list[dict]:
+    """Return up to `limit` talking-head frame rows for a creator's analyzed videos.
+
+    Prefers frames where the shot analysis marks is_talking_head = true.
+    Falls back to any frame if no talking-head shots exist.
+    Returns [{data: bytes, mime_type: str, analysis: dict}].
+    """
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT f.data, f.mime_type, s.analysis
+               FROM frames f
+               JOIN shots s ON f.shot_id = s.id
+               JOIN videos v ON s.video_id = v.id
+               WHERE v.creator_id = %s
+                 AND v.deleted_at IS NULL
+                 AND s.deleted_at IS NULL
+                 AND v.analyzed_at IS NOT NULL
+                 AND COALESCE(s.analysis->'llm'->>'is_talking_head',
+                              s.analysis->>'is_talking_head') = 'true'
+               ORDER BY RANDOM()
+               LIMIT %s""",
+            (creator_id, limit),
+        ).fetchall()
+
+        if not rows:
+            rows = conn.execute(
+                """SELECT f.data, f.mime_type, s.analysis
+                   FROM frames f
+                   JOIN shots s ON f.shot_id = s.id
+                   JOIN videos v ON s.video_id = v.id
+                   WHERE v.creator_id = %s
+                     AND v.deleted_at IS NULL
+                     AND s.deleted_at IS NULL
+                     AND v.analyzed_at IS NOT NULL
+                   ORDER BY RANDOM()
+                   LIMIT %s""",
+                (creator_id, limit),
+            ).fetchall()
+
+    return [
+        {
+            "data": bytes(r["data"]),
+            "mime_type": r["mime_type"],
+            "analysis": r["analysis"] or {},
+        }
+        for r in rows
+    ]
+
+
+def save_creator_room_image(creator_id: str, data: bytes, mime_type: str = "image/png") -> None:
+    """Persist a generated room image onto the creators row."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE creators SET room_image = %s, room_image_mime = %s "
+            "WHERE id = %s AND deleted_at IS NULL",
+            (data, mime_type, creator_id),
+        )
+
+
+def get_creator_room_image(creator_id: str) -> dict | None:
+    """Return {data: bytes, mime_type: str} or None if no image has been generated."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT room_image, room_image_mime FROM creators "
+            "WHERE id = %s AND deleted_at IS NULL",
+            (creator_id,),
+        ).fetchone()
+    if not row or row["room_image"] is None:
+        return None
+    return {"data": bytes(row["room_image"]), "mime_type": row["room_image_mime"]}
+
+
 def find_or_create_creator(kind: str, name: str, channel_url: str | None = None) -> dict:
     with get_conn() as conn:
         if channel_url:
@@ -125,20 +197,29 @@ def get_style_profile(creator_id: str) -> dict | None:
 
 # ── Videos ───────────────────────────────────────────────────────────────────
 
-def insert_video(creator_id: str, source_url: str) -> str:
+def find_or_create_video(creator_id: str, source_url: str) -> tuple[str, bool]:
+    """Returns (video_id, created). created=False means the row already existed."""
     with get_conn() as conn:
         row = conn.execute(
-            "INSERT INTO videos (creator_id, source_url) VALUES (%s, %s) RETURNING id",
+            "INSERT INTO videos (creator_id, source_url) VALUES (%s, %s) "
+            "ON CONFLICT (creator_id, source_url) WHERE deleted_at IS NULL "
+            "DO NOTHING RETURNING id",
             (creator_id, source_url),
         ).fetchone()
-        return str(row["id"])
+        if row:
+            return str(row["id"]), True
+        row = conn.execute(
+            "SELECT id FROM videos WHERE creator_id = %s AND source_url = %s AND deleted_at IS NULL",
+            (creator_id, source_url),
+        ).fetchone()
+        return str(row["id"]), False
 
 
 def get_video_analysis(video_id: str) -> dict | None:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT id, source_url, title, duration_sec, metrics, "
-            "analyzed_at, analysis_error, created_at "
+            "analyzed_at, analysis_error, analysis_stage, created_at "
             "FROM videos WHERE id = %s AND deleted_at IS NULL",
             (video_id,),
         ).fetchone()
@@ -173,6 +254,7 @@ def get_video_analysis(video_id: str) -> dict | None:
 
     return {
         "status": status,
+        "analysis_stage": row["analysis_stage"],
         "video": {
             "video_id": str(row["id"]),
             "source_url": row["source_url"],
@@ -451,7 +533,7 @@ def get_video_status(video_id: str) -> dict | None:
     """Lightweight status check — no shot join, suitable for polling."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, title, duration_sec, analyzed_at, analysis_error "
+            "SELECT id, title, duration_sec, analyzed_at, analysis_error, analysis_stage "
             "FROM videos WHERE id = %s AND deleted_at IS NULL",
             (video_id,),
         ).fetchone()
@@ -466,6 +548,7 @@ def get_video_status(video_id: str) -> dict | None:
     return {
         "video_id": str(row["id"]),
         "status": status,
+        "analysis_stage": row["analysis_stage"],
         "title": row["title"],
         "duration_sec": float(row["duration_sec"]) if row["duration_sec"] else None,
         "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None,

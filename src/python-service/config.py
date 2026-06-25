@@ -30,6 +30,9 @@ class ServerConfig:
     port: int = 9000
 
 
+MAX_CHANNEL_VIDEOS = 20
+
+
 @dataclass
 class WorkerConfig:
     python: str = "python"
@@ -46,11 +49,19 @@ class LlmConfig:
 
 
 @dataclass
+class ImageConfig:
+    azure_openai_url: str = ""        # e.g. https://<resource>.openai.azure.com
+    azure_openai_key: str = ""
+    azure_openai_deployment: str = "gpt-image-1"
+
+
+@dataclass
 class Settings:
     db: DbConfig = field(default_factory=DbConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     worker: WorkerConfig = field(default_factory=WorkerConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
+    image: ImageConfig = field(default_factory=ImageConfig)
 
 
 def load() -> Settings:
@@ -65,6 +76,7 @@ def load() -> Settings:
     srv_raw = raw.get("server", {})
     wkr_raw = raw.get("worker", {})
     llm_raw = raw.get("llm", {})
+    img_raw = raw.get("image", {})
 
     # Env vars override config.toml for credentials
     conn_str = os.environ.get("DB_CONNECTION_STRING") or db_raw.get(
@@ -78,6 +90,13 @@ def load() -> Settings:
     )
     azure_key = os.environ.get("AZURE_ANTHROPIC_KEY") or llm_raw.get(
         "azure_anthropic_key", ""
+    )
+
+    openai_url = os.environ.get("AZURE_OPENAI_URL") or img_raw.get("azure_openai_url", "")
+    openai_key = os.environ.get("AZURE_OPENAI_KEY") or img_raw.get("azure_openai_key", "")
+    openai_deployment = (
+        os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+        or img_raw.get("azure_openai_deployment", ImageConfig.azure_openai_deployment)
     )
 
     return Settings(
@@ -94,14 +113,20 @@ def load() -> Settings:
             profile_entrypoint=wkr_raw.get(
                 "profile_entrypoint", WorkerConfig.profile_entrypoint
             ),
-            max_channel_videos=wkr_raw.get(
-                "max_channel_videos", WorkerConfig.max_channel_videos
+            max_channel_videos=min(
+                wkr_raw.get("max_channel_videos", WorkerConfig.max_channel_videos),
+                MAX_CHANNEL_VIDEOS,
             ),
         ),
         llm=LlmConfig(
             anthropic_api_key=anthropic_key,
             azure_anthropic_url=azure_url,
             azure_anthropic_key=azure_key,
+        ),
+        image=ImageConfig(
+            azure_openai_url=openai_url,
+            azure_openai_key=openai_key,
+            azure_openai_deployment=openai_deployment,
         ),
     )
 

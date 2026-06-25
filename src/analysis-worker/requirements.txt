@@ -9,3 +9,4 @@ mediapipe
 easyocr
 psycopg[binary]
 anthropic
+tenacity

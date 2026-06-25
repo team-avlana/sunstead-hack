@@ -3,6 +3,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 import db
+import image_gen
 import worker
 
 
@@ -52,6 +53,32 @@ def register(mcp: FastMCP) -> None:
             raise ValueError(f"No creator found with id {creator_id}")
         worker.spawn_profile_builder(creator_id)
         return {"creator_id": creator_id, "status": "started"}
+
+    @mcp.tool()
+    def generate_room_image(creator_id: str) -> dict:
+        """
+        Generate a clay-diorama room image for a creator and save it to the database.
+
+        Uses talking-head frames from the creator's analyzed videos (face + environment)
+        and the bundled style reference to call gpt-image-1 via Azure AI Foundry.
+        The resulting PNG is stored on the creators row and can be fetched via
+        GET /api/creators/{creator_id}/room-image.
+
+        Returns {creator_id, image_url} on success.
+        Raises if AZURE_OPENAI_URL / AZURE_OPENAI_KEY are not configured,
+        or if the creator does not exist.
+        """
+        creators = db.list_creators()
+        if not any(str(c["creator_id"]) == creator_id for c in creators):
+            raise ValueError(f"No creator found with id {creator_id}")
+
+        png_bytes = image_gen.generate(creator_id)
+        db.save_creator_room_image(creator_id, png_bytes, "image/png")
+
+        return {
+            "creator_id": creator_id,
+            "image_url": f"/api/creators/{creator_id}/room-image",
+        }
 
     @mcp.tool()
     def list_creator_videos(creator_id: str) -> dict:

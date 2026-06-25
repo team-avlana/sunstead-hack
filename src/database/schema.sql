@@ -48,15 +48,18 @@ CREATE TRIGGER trg_projects_touch
 --  CREATORS — global (not project-scoped). The user's own channel + references.
 -- ============================================================================
 CREATE TABLE creators (
-    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    kind         text NOT NULL CHECK (kind IN ('self', 'reference')),
-    name         text NOT NULL,
-    platform     text,                 -- youtube / tiktok / instagram / ...
-    channel_url  text,
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind            text NOT NULL CHECK (kind IN ('self', 'reference')),
+    name            text NOT NULL,
+    platform        text,                 -- youtube / tiktok / instagram / ...
+    channel_url     text,
 
-    created_at   timestamptz NOT NULL DEFAULT now(),
-    updated_at   timestamptz NOT NULL DEFAULT now(),
-    deleted_at   timestamptz
+    room_image      bytea,               -- generated room image (PNG)
+    room_image_mime text NOT NULL DEFAULT 'image/png',
+
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    deleted_at      timestamptz
 );
 
 CREATE TRIGGER trg_creators_touch
@@ -81,6 +84,7 @@ CREATE TABLE videos (
     published_at    timestamptz,
     analyzed_at     timestamptz,       -- NULL until analysis completes
     analysis_error  text,              -- non-NULL => analysis failed
+    analysis_stage  text,              -- current pipeline stage while running, NULL otherwise
 
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),

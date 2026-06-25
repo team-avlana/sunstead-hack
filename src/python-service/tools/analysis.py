@@ -10,7 +10,7 @@ from fastmcp import FastMCP
 
 import db
 import worker
-from config import settings
+from config import MAX_CHANNEL_VIDEOS, settings
 
 
 def register(mcp: FastMCP) -> None:
@@ -29,11 +29,10 @@ def register(mcp: FastMCP) -> None:
         if not creator_id:
             raise ValueError("creator_id is required")
 
-        video_id = db.insert_video(creator_id, source_url)
+        video_id, created = db.find_or_create_video(creator_id, source_url)
         worker.spawn_analysis_worker(video_id)
-        # Signal the canvas (a block referencing this video flips to "analysing").
         db.pg_notify_change(
-            {"type": "video", "action": "created", "video_id": video_id}
+            {"type": "video", "action": "created" if created else "updated", "video_id": video_id}
         )
         return {"video_id": video_id}
 
@@ -42,14 +41,19 @@ def register(mcp: FastMCP) -> None:
         channel_url: str,
         kind: str,
         name: Optional[str] = None,
+        max_videos: Optional[int] = None,
     ) -> dict:
         """
         Enumerate recent videos from a channel and start analysis for each.
 
         kind must be 'self' (your own channel) or 'reference' (a competitor
         or inspiration channel). Creates/finds a creators row, enumerates up
-        to max_channel_videos recent videos via yt-dlp, inserts a videos row
-        per URL, and spawns one worker per video. Returns immediately.
+        to max_videos recent videos via yt-dlp, inserts a videos row per URL,
+        and spawns one worker per video. Returns immediately.
+
+        max_videos defaults to the server's configured default (5) and is
+        capped at 20. Videos that are already tracked are skipped (no duplicate
+        worker is spawned).
 
         Returns {creator_id, video_ids}.
         """
@@ -57,21 +61,29 @@ def register(mcp: FastMCP) -> None:
             raise ValueError("kind must be 'self' or 'reference'")
         if not channel_url:
             raise ValueError("channel_url is required")
+        if max_videos is not None and max_videos < 1:
+            raise ValueError("max_videos must be at least 1")
+
+        limit = min(
+            max_videos if max_videos is not None else settings.worker.max_channel_videos,
+            MAX_CHANNEL_VIDEOS,
+        )
 
         creator_name = name or channel_url
         creator = db.find_or_create_creator(kind, creator_name, channel_url)
         creator_id = creator["creator_id"]
 
-        urls = _enumerate_channel(channel_url, settings.worker.max_channel_videos)
+        urls = _enumerate_channel(channel_url, limit)
 
         video_ids: list[str] = []
         for url in urls:
-            vid_id = db.insert_video(creator_id, url)
+            vid_id, created = db.find_or_create_video(creator_id, url)
             video_ids.append(vid_id)
-            worker.spawn_analysis_worker(vid_id)
-            db.pg_notify_change(
-                {"type": "video", "action": "created", "video_id": vid_id}
-            )
+            if created:
+                worker.spawn_analysis_worker(vid_id)
+                db.pg_notify_change(
+                    {"type": "video", "action": "created", "video_id": vid_id}
+                )
 
         return {"creator_id": creator_id, "video_ids": video_ids}
 
@@ -81,6 +93,12 @@ def register(mcp: FastMCP) -> None:
         Return the current analysis status and results for a video.
 
         status is one of: 'running', 'done', 'failed'.
+        analysis_stage is set while status='running' and shows which pipeline step
+        is active: 'downloading', 'detecting_shots', 'extracting_frames',
+        'transcribing', 'computing_metrics', 'analyzing_llm', 'persisting'.
+        It is null when status is 'done' or 'failed'.
+        Poll this tool to track progress — the stage lets you know whether the
+        slow LLM step has started yet and roughly how far along analysis is.
         When done, video.metrics contains the derived style data.
         shots_summary lists every shot with idx, start_sec, end_sec, and frame_id.
         frame_id is a UUID; the representative frame image is served at /frames/{frame_id}.
