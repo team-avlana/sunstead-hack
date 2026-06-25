@@ -17,6 +17,8 @@ single source of truth; **Azure AI Foundry → Anthropic** does the analysis.
 
 ## 0. Prerequisites
 - Python 3.11+ and Node 20+.
+- **`ffmpeg`** on `PATH` (the analysis-worker shells out to `ffmpeg`/`ffprobe` for
+  frame + audio extraction): `brew install ffmpeg`.
 - Credentials in **`src/python-service/.env`** (gitignored — see `.env.example`):
   ```
   DB_CONNECTION_STRING=postgres://…aivencloud.com:20891/defaultdb?sslmode=require
@@ -28,10 +30,24 @@ single source of truth; **Azure AI Foundry → Anthropic** does the analysis.
 ## 1. python-service (MCP + read API + websocket)
 ```bash
 cd src/python-service
-python -m venv .venv && ./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python server.py            # → http://127.0.0.1:9000
+python -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+# The analysis-worker is spawned with the service's interpreter (sys.executable),
+# so its deps must live in THIS venv too — install them here, not in a separate env:
+./.venv/bin/pip install -r ../analysis-worker/requirements.txt
+# Start with the venv bin (yt-dlp) + ffmpeg on PATH so the spawned worker finds them:
+PATH="$PWD/.venv/bin:$(brew --prefix)/bin:$PATH" ./.venv/bin/python server.py   # → :9000
 ```
 Smoke test: `curl http://127.0.0.1:9000/api/health` → `{"ok":true,"db":true}`.
+
+Optional worker deps degrade gracefully if missing: **`crispasr`** (speech-to-text —
+skipped, analysis continues with no transcript) and **`mediapipe`/`easyocr`** (face/OCR
+metrics — OpenCV Haar-cascade fallback for faces, OCR skipped). The vision + video-level
+LLM analysis (the storyboard, hook, tags) does **not** depend on any of these.
+
+Each worker run streams its full stdout/stderr to `src/python-service/worker-logs/<video_id>.log`
+— tail that to debug a download/analysis failure (the short reason is also stored in
+`videos.analysis_error` and surfaced by `/api/videos/{id}/status`).
 
 The DB schema is already applied to Aiven. To (re)apply on a fresh database:
 `./.venv/bin/python ../database/apply_schema.py` (add `--reset` to drop first).
@@ -86,6 +102,14 @@ toggle with the chevron + storyboard control:
 | `***` analysed →    | storyboard scenes | `metrics.llm.segments[]` joined to `shots[]` |
 
 States: **empty · not_analysed · analysing · analysed · error**.
+
+**Two ways to analyse a video:**
+1. **From the canvas** — drop a Video block (bottom dock), paste a URL in the block
+   (or the sidebar inspector) and hit **Analyse** (also **Retry** on a failed block).
+   The block POSTs `/api/analyze`, flips to **analysing**, then polls `/api/videos/{id}`
+   until the result lands — no agent required.
+2. **From your Claude (MCP)** — the agent calls `analyze_video` (and `create_artifact`
+   for a persisted block); the websocket re-pull renders progress on the canvas.
 
 ![Live Video Blocks from Postgres](demo/video-blocks-live.png)
 ![All states & disclosure levels](demo/video-blocks-states.png)

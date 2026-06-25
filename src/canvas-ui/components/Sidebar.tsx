@@ -25,6 +25,7 @@ import {
   dims,
   fmtTime,
 } from '@/lib/blockTypes'
+import { analyseVideoShape } from '@/lib/videoAnalysis'
 
 /** The live tldraw editor, published on the window by CanvasWorkspace.onMount. */
 const ed = (): Editor | undefined =>
@@ -177,6 +178,13 @@ function applyTextPart(id: TLShapeId, part: 'title' | 'subtitle' | 'body', value
     const html = setTextPart(cur, part, value)
     if (html !== cur) e.updateShape({ id, type: RAINY_TEXT, props: { html } })
   })
+}
+
+/** Trigger analysis for a single video block from the inspector. Uses the block's
+ * stored source_url / video_id (the URL field commits source_url first). See
+ * lib/videoAnalysis — local blocks trigger + self-poll; backend elements re-run. */
+function analyseVideo(id: TLShapeId) {
+  withEditor((e) => void analyseVideoShape(e, id))
 }
 
 /** Merge a patch into a video block's JSON `data` prop (editable fields only). */
@@ -492,6 +500,22 @@ function VideoAnalysis({ sel }: { sel: VideoSel }) {
           <span className="insp-status-meta">{sel.scenes} scenes</span>
         )}
       </div>
+
+      <button
+        className="insp-btn primary"
+        style={{ marginTop: 8 }}
+        onClick={() => analyseVideo(sel.id)}
+        disabled={sel.status === 'analysing' || (!d.source_url && !d.video_id)}
+        title={!d.source_url && !d.video_id ? 'Add a video URL above first' : undefined}
+      >
+        {sel.status === 'analysing'
+          ? 'Analysing…'
+          : sel.status === 'error'
+            ? 'Retry analysis'
+            : sel.status === 'analysed'
+              ? 'Re-analyse'
+              : 'Analyse video'}
+      </button>
 
       {metrics.length > 0 && (
         <div className="insp-metrics">

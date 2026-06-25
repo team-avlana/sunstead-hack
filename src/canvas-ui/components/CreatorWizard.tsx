@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useRainyStore } from '@/lib/store'
 import {
   buildImagePrompt,
   buildPayload,
@@ -36,6 +38,7 @@ export default function CreatorWizard({
   const [p, setP] = useState<CreatorRoomParams>(DEFAULT_PARAMS)
   const [photo, setPhoto] = useState<{ name: string; dataUrl: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const dark = useRainyStore((s) => s.dark)
 
   const set = (patch: Partial<CreatorRoomParams>) => setP((s) => ({ ...s, ...patch }))
   const toggleVibe = (v: string) =>
@@ -78,8 +81,13 @@ export default function CreatorWizard({
     }
   }
 
-  return (
-    <div className="ob" onKeyDown={onKey}>
+  // Portal to <body> so the modal escapes any transformed ancestor (GSAP leaves a
+  // transform on the home cards, which would otherwise trap `position: fixed` to
+  // that region). This makes it a true full-page modal over a blurred background.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className={`ob${dark ? ' dark' : ''}`} onKeyDown={onKey}>
       <div className="ob-card wizard" role="dialog" aria-modal="true" aria-label="Design your Creator Room">
         <button className="ob-close" onClick={onCancel} aria-label="Close">×</button>
         <div className="ob-dots" aria-hidden>
@@ -240,7 +248,8 @@ export default function CreatorWizard({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

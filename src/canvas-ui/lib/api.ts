@@ -35,11 +35,24 @@ export interface ProjectState {
 }
 
 export interface ArtifactPatch {
+  /** Replace the whole payload. */
   payload?: Record<string, unknown>
+  /** Shallow-merge these keys into the existing payload (e.g. {content}, {label}, {view}). */
+  payload_patch?: Record<string, unknown>
+  /** Merge a patch into the payload element with this id. */
   element_id?: string
   element_patch?: Record<string, unknown>
+  /** Remove the payload element with this id (a child block deleted on the canvas). */
+  element_remove?: string
   position?: { x?: number; y?: number; w?: number; h?: number }
   title?: string
+}
+
+export interface NewArtifact {
+  type: string
+  title?: string | null
+  payload?: Record<string, unknown>
+  position?: { x?: number; y?: number; w?: number; h?: number }
 }
 
 export interface VideoStatus {
@@ -117,6 +130,19 @@ async function mutateJson<T>(
   }
 }
 
+/**
+ * Tell the backend which project the canvas currently has open, so the embedded
+ * Claude session and its MCP tools can default to it (see
+ * python-service/active_project.py). Pass null when returning to Home / nothing
+ * is open. No-op when no backend is configured.
+ */
+export async function setActiveProject(
+  projectId: string | null,
+  name?: string | null,
+): Promise<void> {
+  await mutateJson('PUT', '/api/active-project', { project_id: projectId, name: name ?? null })
+}
+
 export async function fetchProjects(): Promise<BackendProject[]> {
   const data = await getJson<{ projects: BackendProject[] }>('/api/projects')
   return data?.projects ?? []
@@ -133,6 +159,13 @@ export async function fetchArtifact(artifactId: string): Promise<EnrichedArtifac
   return data?.artifact ?? null
 }
 
+export async function createArtifact(
+  projectId: string,
+  artifact: NewArtifact,
+): Promise<{ artifact_id: string; version: number } | null> {
+  return mutateJson('POST', `/api/projects/${encodeURIComponent(projectId)}/artifacts`, artifact)
+}
+
 export async function updateArtifact(
   artifactId: string,
   patch: ArtifactPatch,
@@ -146,6 +179,48 @@ export async function deleteArtifact(artifactId: string): Promise<{ ok: boolean 
 
 export async function fetchVideoStatus(videoId: string): Promise<VideoStatus | null> {
   return getJson<VideoStatus>(`/api/videos/${encodeURIComponent(videoId)}/status`)
+}
+
+/**
+ * Start analysis for a video URL — the canvas equivalent of the analyze_video MCP
+ * tool (POST /api/analyze). The python-service inserts a videos row, spawns the
+ * analysis-worker, and returns the new video_id; the caller then polls
+ * fetchVideoView until status flips to analysed/error. Without a creator_id, a
+ * singleton "Canvas" creator owns the video. Returns null when no backend is set.
+ */
+export async function triggerAnalysis(
+  sourceUrl: string,
+  creatorId?: string,
+): Promise<{ video_id: string; creator_id: string } | null> {
+  return mutateJson('POST', '/api/analyze', { source_url: sourceUrl, creator_id: creatorId ?? null })
+}
+
+/** Re-run analysis for an existing video (the Video Block "Retry" action). */
+export async function reanalyzeVideo(videoId: string): Promise<boolean> {
+  const res = await mutateJson<{ video_id: string }>(
+    'POST',
+    `/api/videos/${encodeURIComponent(videoId)}/reanalyze`,
+  )
+  return !!res?.video_id
+}
+
+/**
+ * Fetch the live Video Block view-model for a video (GET /api/videos/{id}),
+ * with `/frames/...` thumbnails resolved to absolute URLs so an <img> in the
+ * block can load them directly. Used by the local analysis poll loop.
+ */
+export async function fetchVideoView(videoId: string): Promise<VideoData | null> {
+  const data = await getJson<{ video: VideoData }>(`/api/videos/${encodeURIComponent(videoId)}`)
+  const v = data?.video
+  if (!v) return null
+  return {
+    ...v,
+    thumbnail: resolveAssetUrl(v.thumbnail) ?? v.thumbnail ?? null,
+    storyboard: (v.storyboard ?? []).map((sc) => ({
+      ...sc,
+      thumbnail: resolveAssetUrl(sc.thumbnail) ?? sc.thumbnail ?? null,
+    })),
+  }
 }
 
 export async function fetchCreatorVideos(creatorId: string): Promise<CreatorVideoList | null> {

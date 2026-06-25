@@ -6,47 +6,100 @@ from typing import Any, Optional
 from fastmcp import FastMCP
 from starlette.concurrency import run_in_threadpool
 
+import active_project
 import db
 import notify
+from block_normalize import BLOCK_TAXONOMY_GUIDE, WRITING_STYLE_GUIDE
+
+
+# Tool descriptions are built from the shared block-taxonomy guide so the agent
+# learns the full block vocabulary (types, formats, which fields to fill) on every
+# write tool. FastMCP only treats a plain string literal as a docstring, so we pass
+# these as explicit `description=` to the decorator instead of interpolating inline.
+_CREATE_ARTIFACT_DESC = (
+    """\
+Create a frame (a "flow") on the canvas for a project. The canvas renders it live. A
+frame is one artifact; the blocks it contains live inside its payload as `elements`.
+
+project_id defaults to the project the user currently has open on the canvas (see
+get_active_project); pass it explicitly only to target a different one.
+
+type: 'frame'  (e.g. an Ideation flow, a Storyboarding flow)
+payload: {
+  "label": str,            # frame title shown on the canvas
+  "role": str (optional),  # e.g. "ideation" | "storyboard"
+  "elements": [ <blocks — see BLOCK TAXONOMY below> ]
+}
+Example elements:
+  {"id": "el-1", "type": "text", "format": "title",
+   "title": "Hook", "body": "Line one.\\nLine two.", "x": 24, "y": 64, "w": 320, "h": 200}
+  {"id": "el-2", "type": "video", "view": "compact", "video_id": "…", "x": 360, "y": 64}
+  {"id": "el-3", "type": "image", "src": "/frames/{frame_id}", "frame_id": "…",
+   "caption": "Scene 1", "x": 0, "y": 0, "w": 320, "h": 180}
+
+For storyboards: call get_video_analysis (or get_video_shots) to get each shot's
+frame_id, then create one image element per scene (src="/frames/{frame_id}") paired with
+a text element for the scene label/description.
+
+Address one block later with update_artifact(id, element_id=<el.id>, element_patch={…}).
+position: {x, y, w, h} = the frame box on the canvas.
+
+Returns {artifact_id}.
+
+"""
+    + BLOCK_TAXONOMY_GUIDE
+    + "\n\n"
+    + WRITING_STYLE_GUIDE
+)
+
+_UPDATE_ARTIFACT_DESC = (
+    """\
+Update an existing artifact. Bumps version so the canvas can detect changes.
+
+Two update modes:
+- Whole-payload replace: pass payload={…}.
+- Addressed element update: pass element_id + element_patch to merge into the single
+  element within payload.elements that has the matching id.
+
+For a text element, patch only the structured parts you want to change, e.g.
+element_patch={"format": "title-sub", "subtitle": "…"} or {"body": "…"}; the canonical
+content/format are rebuilt from the merged parts. When you change `format`, also supply
+the fields that format needs (e.g. switching to "title" wants a `title`). For a video
+element, patch {"view": "expanded"} to change its detail level.
+
+Also supports updating position and/or title independently.
+Returns {artifact_id, version}.
+
+"""
+    + BLOCK_TAXONOMY_GUIDE
+    + "\n\n"
+    + WRITING_STYLE_GUIDE
+)
+
+
+# Resolve a tool's project_id: explicit arg wins, else the project the canvas
+# currently has open. Raises a helpful error when neither is available.
+def _resolve_project_id(project_id: Optional[str]) -> str:
+    pid = project_id or active_project.get_active_id()
+    if not pid:
+        raise ValueError(
+            "No project_id given and no project is open on the canvas. "
+            "Open a project on the canvas, or pass project_id explicitly."
+        )
+    return pid
 
 
 def register(mcp: FastMCP) -> None:
 
-    @mcp.tool()
+    @mcp.tool(description=_CREATE_ARTIFACT_DESC)
     async def create_artifact(
-        project_id: str,
-        type: str,
+        project_id: Optional[str] = None,
+        type: Optional[str] = None,
         title: Optional[str] = None,
         payload: Optional[dict] = None,
         position: Optional[dict] = None,
     ) -> dict:
-        """
-        Create a frame (a "flow") on the canvas for a project. The canvas renders it
-        live. A frame is one artifact; the blocks it contains live inside its payload
-        as elements.
-
-        type: 'frame'  (e.g. an Ideation flow, a Storyboarding flow)
-        payload: {
-          "label": str,               # frame title shown on the canvas
-          "role": str (optional),     # e.g. "ideation" | "storyboard"
-          "elements": [               # the blocks inside this frame
-            {"id": "el-1", "type": "text",  "content": "<p>…</p>", "x": 24, "y": 64, "w": 320, "h": 200},
-            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64},
-            {"id": "el-3", "type": "image", "src": "/frames/{frame_id}", "frame_id": "…",
-             "caption": str (optional), "x": 0, "y": 0, "w": 320, "h": 180}
-          ]
-        }
-        For storyboards: use get_video_analysis to get shots_summary (each shot has a
-        frame_id), then create one image element per scene using src="/frames/{frame_id}".
-        Pair each image element with a text element for the scene label/description.
-        Each element needs a stable "id"; x/y are RELATIVE to the frame's top-left.
-        Address one block later with update_artifact(id, element_id=<el.id>, element_patch={...}).
-        position: {x, y, w, h} = the frame box on the canvas.
-
-        Returns {artifact_id}.
-        """
-        if not project_id:
-            raise ValueError("project_id is required")
+        project_id = _resolve_project_id(project_id)
         if not type:
             raise ValueError("type is required")
 
@@ -73,7 +126,7 @@ def register(mcp: FastMCP) -> None:
         )
         return {"artifact_id": result["artifact_id"]}
 
-    @mcp.tool()
+    @mcp.tool(description=_UPDATE_ARTIFACT_DESC)
     async def update_artifact(
         artifact_id: str,
         payload: Optional[dict] = None,
@@ -82,17 +135,6 @@ def register(mcp: FastMCP) -> None:
         position: Optional[dict] = None,
         title: Optional[str] = None,
     ) -> dict:
-        """
-        Update an existing artifact. Bumps version so the canvas can detect changes.
-
-        Two update modes:
-        - Whole-payload replace: pass payload={...}.
-        - Addressed element update: pass element_id + element_patch to merge into
-          a single element within payload.elements that has the matching id.
-
-        Also supports updating position and/or title independently.
-        Returns {artifact_id, version}.
-        """
         if not artifact_id:
             raise ValueError("artifact_id is required")
 
@@ -132,11 +174,13 @@ def register(mcp: FastMCP) -> None:
         return result
 
     @mcp.tool()
-    def list_artifacts(project_id: str) -> list:
+    def list_artifacts(project_id: Optional[str] = None) -> list:
         """
         List all active artifacts for a project (for the agent; canvas reads DB directly).
+
+        project_id defaults to the project the user currently has open on the canvas.
         """
-        return db.list_artifacts(project_id)
+        return db.list_artifacts(_resolve_project_id(project_id))
 
     @mcp.tool()
     async def delete_artifact(artifact_id: str) -> dict:

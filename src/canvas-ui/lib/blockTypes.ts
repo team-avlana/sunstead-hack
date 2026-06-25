@@ -145,6 +145,36 @@ function headHtml(f: TextFormat, title: string, subtitle: string): string {
 }
 
 /**
+ * Build canonical block HTML from explicit, structured parts — the inverse of
+ * getTextParts(). Headings come from the format's slots; the body is split into
+ * one <p> per line. When `format` is omitted it's inferred from which parts
+ * carry text (subtitle ⇒ title-sub, title ⇒ title, else plain), so a block that
+ * supplies only {title, body} still renders as a titled card. This is how a
+ * backend element that carries {format, title, subtitle, body} (rather than a
+ * pre-baked HTML string) becomes the shape's `html`.
+ */
+export function composeTextHtml(parts: {
+  format?: TextFormat
+  title?: string
+  subtitle?: string
+  body?: string
+}): string {
+  const title = parts.title ?? ''
+  const subtitle = parts.subtitle ?? ''
+  const body = parts.body ?? ''
+  const f: TextFormat =
+    parts.format && FORMAT_SLOTS[parts.format]
+      ? parts.format
+      : subtitle.trim()
+        ? 'title-sub'
+        : title.trim()
+          ? 'title'
+          : 'plain'
+  const bodyHtml = body.split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('') || '<p></p>'
+  return headHtml(f, title, subtitle) + bodyHtml
+}
+
+/**
  * Write one slot back into the block's HTML, preserving the others. Editing the
  * title/subtitle keeps the rich body untouched; editing the body re-paragraphs
  * it (one <p> per line) — the canvas card remains the path for inline richness.

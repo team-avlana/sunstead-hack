@@ -8,6 +8,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+import block_normalize
 from config import settings
 
 _pool: ConnectionPool | None = None
@@ -84,6 +85,17 @@ def find_or_create_creator(kind: str, name: str, channel_url: str | None = None)
         return {"creator_id": str(row["id"]), "created": True}
 
 
+# Stable channel_url sentinel for the singleton creator that owns videos the user
+# analyses ad-hoc from the canvas (no explicit channel). find_or_create_creator
+# dedupes on channel_url, so repeated canvas triggers reuse the same creator.
+DEFAULT_CANVAS_CHANNEL = "rainy:canvas"
+
+
+def find_or_create_default_creator() -> str:
+    """creator_id for canvas-initiated analysis when the caller has no creator."""
+    return find_or_create_creator("reference", "Canvas", DEFAULT_CANVAS_CHANNEL)["creator_id"]
+
+
 def list_creators(kind: str | None = None) -> list[dict]:
     with get_conn() as conn:
         if kind:
@@ -132,6 +144,28 @@ def insert_video(creator_id: str, source_url: str) -> str:
             (creator_id, source_url),
         ).fetchone()
         return str(row["id"])
+
+
+def get_or_create_video(creator_id: str, source_url: str) -> tuple[str, bool]:
+    """Return (video_id, created). Reuses the live row for (creator_id, source_url)
+    if one exists — idx_videos_url is UNIQUE (creator_id, source_url) WHERE
+    deleted_at IS NULL, so a second analyse of the same URL must re-run the existing
+    video rather than insert a duplicate (which would violate the constraint)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "INSERT INTO videos (creator_id, source_url) VALUES (%s, %s) "
+            "ON CONFLICT (creator_id, source_url) WHERE deleted_at IS NULL DO NOTHING "
+            "RETURNING id",
+            (creator_id, source_url),
+        ).fetchone()
+        if row:
+            return str(row["id"]), True
+        row = conn.execute(
+            "SELECT id FROM videos WHERE creator_id = %s AND source_url = %s "
+            "AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1",
+            (creator_id, source_url),
+        ).fetchone()
+        return str(row["id"]), False
 
 
 def get_video_analysis(video_id: str) -> dict | None:
@@ -215,6 +249,7 @@ def create_artifact(
     payload: Any,
     position: Any = None,
 ) -> dict:
+    payload = block_normalize.normalize_payload(payload)
     with get_conn() as conn:
         row = conn.execute(
             "INSERT INTO artifacts (project_id, type, title, payload, position) "
@@ -229,6 +264,8 @@ def update_artifact(
     payload: Any = None,
     element_id: str | None = None,
     element_patch: Any = None,
+    element_remove: str | None = None,
+    payload_patch: Any = None,
     position: Any = None,
     title: str | None = None,
 ) -> dict | None:
@@ -244,19 +281,43 @@ def update_artifact(
         project_id = str(row["project_id"])
 
         if element_id is not None and element_patch is not None:
-            # Addressed element update within payload
+            # Addressed element update — merge the patch into the matching element.
             if isinstance(current_payload, dict):
-                elements = current_payload.get("elements", [])
+                elements = list(current_payload.get("elements", []) or [])
                 for i, el in enumerate(elements):
                     if isinstance(el, dict) and el.get("id") == element_id:
                         elements[i] = {**el, **element_patch}
                         break
                 current_payload = {**current_payload, "elements": elements}
             new_payload = current_payload
+        elif element_remove is not None:
+            # Drop the addressed element from payload.elements (block deleted on the canvas).
+            if isinstance(current_payload, dict):
+                elements = [
+                    el
+                    for el in (current_payload.get("elements", []) or [])
+                    if not (isinstance(el, dict) and el.get("id") == element_remove)
+                ]
+                current_payload = {**current_payload, "elements": elements}
+            new_payload = current_payload
+        elif payload_patch is not None:
+            # Shallow-merge top-level keys (e.g. {content}, {label}, {view}) into the
+            # existing payload — lets the canvas persist a single field without
+            # round-tripping (and clobbering) the rest of the payload.
+            new_payload = (
+                {**current_payload, **payload_patch}
+                if isinstance(current_payload, dict)
+                else payload_patch
+            )
         elif payload is not None:
             new_payload = payload
         else:
             new_payload = current_payload
+
+        # Re-assert the self-describing block contract on whatever this write
+        # produced (full replace, addressed-element merge, or shallow patch), so
+        # a patched-in title/body rebuilds its canonical content/format.
+        new_payload = block_normalize.normalize_payload(new_payload)
 
         sets = ["payload = %s", "version = version + 1"]
         params: list = [json.dumps(new_payload)]

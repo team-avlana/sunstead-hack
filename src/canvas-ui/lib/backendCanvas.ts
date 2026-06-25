@@ -17,13 +17,21 @@
  */
 
 import { createShapeId, type Editor, type TLShapeId } from 'tldraw'
-import { RAINY_TEXT, VIDEO_BLOCK, dims, type VideoData } from '@/lib/blockTypes'
+import { RAINY_TEXT, VIDEO_BLOCK, composeTextHtml, dims, type TextFormat, type VideoData } from '@/lib/blockTypes'
 import {
   fetchProjectState,
   resolveAssetUrl,
   type EnrichedArtifact,
   type ProjectState,
 } from './api'
+import {
+  isArtifactAdopted,
+  isArtifactPendingDelete,
+  isContentDirty,
+  isElementPendingRemove,
+  resolveArtRef,
+} from './backendSync'
+import { frameBox, relayoutFrame } from './frameLayout'
 import { useRainyStore } from './store'
 
 const artId = (artifactId: string): TLShapeId => createShapeId(`art-${artifactId}`)
@@ -42,6 +50,9 @@ interface ShapeDesc {
   props: Record<string, unknown>
   /** Containing frame's shape id (a block's flow); undefined = top-level. */
   parentId?: TLShapeId
+  /** tldraw shape meta — `pinned:true` opts a block out of frame auto-layout once
+   * the user has moved/resized it (so manual placement survives reload). */
+  meta?: Record<string, unknown>
 }
 
 function escapeHtml(s: string): string {
@@ -78,13 +89,27 @@ function videoShapeProps(src: Record<string, unknown>): { view: View; data: stri
   return { view, data: JSON.stringify(data), w: size.w, h: size.h }
 }
 
-/** A text element's body — element.content is HTML or plain text. */
+/** A text element's body. Prefer the self-describing structured form
+ * ({format, title, subtitle, body}) — that's what carries the layout the user
+ * picked — and fall back to a raw `content` HTML/plain string, then a label. */
 function elementTextHtml(el: Record<string, unknown>): string {
+  const str = (k: string): string | undefined => (typeof el[k] === 'string' ? (el[k] as string) : undefined)
+  const hasParts =
+    (typeof el.format === 'string' && el.format) ||
+    ['title', 'subtitle', 'body'].some((k) => str(k)?.trim())
+  if (hasParts) {
+    return composeTextHtml({
+      format: el.format as TextFormat | undefined,
+      title: str('title'),
+      subtitle: str('subtitle'),
+      body: str('body'),
+    })
+  }
   const content = el.content
   if (typeof content === 'string' && content.trim()) {
     return looksLikeHtml(content) ? content : `<p>${escapeHtml(content)}</p>`
   }
-  const label = (el.label ?? el.text ?? el.title) as string | undefined
+  const label = (el.label ?? el.text) as string | undefined
   return label ? `<p>${escapeHtml(String(label))}</p>` : '<p><em>text</em></p>'
 }
 
@@ -112,31 +137,19 @@ function textHtmlFor(a: EnrichedArtifact): string {
   return `${head}<p><em>${escapeHtml(a.type)} artifact</em></p>`
 }
 
-/** Inner padding between the furthest child edge and the frame border. The top
- * gets extra room for the frame's header/label. */
-const FRAME_PAD = 40
-const FRAME_PAD_TOP = 56
-/** A frame with no blocks still needs a usable footprint. */
-const FRAME_MIN_W = 360
-const FRAME_MIN_H = 280
-
-/** Frame box derived from its children so it always covers them (and auto-grows
- * as blocks are added or manually edited). Child x/y are relative to the frame
- * origin, so the box spans from (0,0) to the furthest child edge, plus padding.
- * Computed in the frontend — the DB's position.w/h is intentionally ignored. */
+/** Seed frame box from its children so it covers them on first paint. Once the
+ * shapes mount, `relayoutFrame` (lib/frameLayout) owns sizing + reflow as blocks
+ * resize. Child x/y are frame-local; the DB's position.w/h is intentionally
+ * ignored. */
 function frameSizeFor(children: ShapeDesc[]): { w: number; h: number } {
-  let maxRight = 0
-  let maxBottom = 0
-  for (const c of children) {
-    const cw = typeof c.props.w === 'number' ? (c.props.w as number) : 0
-    const ch = typeof c.props.h === 'number' ? (c.props.h as number) : 0
-    maxRight = Math.max(maxRight, c.x + cw)
-    maxBottom = Math.max(maxBottom, c.y + ch)
-  }
-  return {
-    w: Math.max(FRAME_MIN_W, maxRight + FRAME_PAD),
-    h: Math.max(FRAME_MIN_H, maxBottom + FRAME_PAD_TOP),
-  }
+  return frameBox(
+    children.map((c) => ({
+      x: c.x,
+      y: c.y,
+      w: typeof c.props.w === 'number' ? (c.props.w as number) : 0,
+      h: typeof c.props.h === 'number' ? (c.props.h as number) : 0,
+    })),
+  )
 }
 
 /** Expand one artifact into tldraw shapes. A 'frame' artifact yields the frame
@@ -163,12 +176,14 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
       const id = artId(`${a.artifact_id}::${String(el.id ?? `el-${i}`)}`)
       const ex = typeof el.x === 'number' ? el.x : 32 + (i % 2) * 360
       const ey = typeof el.y === 'number' ? el.y : 64 + Math.floor(i / 2) * 260
+      // A block the user has moved/resized is pinned: keep it out of masonry.
+      const meta = { pinned: el.pinned === true }
       if (el.type === 'video') {
-        children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, props: videoShapeProps(el) })
+        children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: videoShapeProps(el) })
       } else {
         const ew = typeof el.w === 'number' ? el.w : 320
         const eh = typeof el.h === 'number' ? el.h : 200
-        children.push({ id, type: RAINY_TEXT, x: ex, y: ey, parentId: frameId, props: { w: ew, h: eh, html: elementTextHtml(el) } })
+        children.push({ id, type: RAINY_TEXT, x: ex, y: ey, parentId: frameId, meta, props: { w: ew, h: eh, html: elementTextHtml(el) } })
       }
     })
 
@@ -181,8 +196,9 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
     const payload = (a.payload ?? {}) as Record<string, unknown>
     return [{ id: artId(a.artifact_id), type: VIDEO_BLOCK, x, y, props: videoShapeProps({ ...payload, video: a.video, title: a.title }) }]
   }
-  const w = typeof pos.w === 'number' ? pos.w : 440
-  const h = typeof pos.h === 'number' ? pos.h : 260
+  // Match the default text-card footprint (= analysed/expanded video block).
+  const w = typeof pos.w === 'number' ? pos.w : 360
+  const h = typeof pos.h === 'number' ? pos.h : 332
   return [{ id: artId(a.artifact_id), type: RAINY_TEXT, x, y, props: { w, h, html: textHtmlFor(a) } }]
 }
 
@@ -208,6 +224,9 @@ export async function loadBackendProject(editor: Editor, projectId: string): Pro
             /* skip shapes that fail validation */
           }
         }
+        // Pack each frame to its (seed-sized) blocks; the blocks' own auto-fit
+        // re-flows the frame again once they measure their real content height.
+        for (const d of descs) if (d.type === FRAME) relayoutFrame(editor, d.id)
       },
       { history: 'ignore' },
     )
@@ -242,6 +261,14 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
         )
 
         for (const d of orderForCreate(descs)) {
+          // Skip artifacts the user is locally authoring (adopted shape owns them)
+          // or just deleted (don't resurrect from a stale read).
+          const ref = resolveArtRef(d.id)
+          if (ref && (isArtifactAdopted(ref.artifactId) || isArtifactPendingDelete(ref.artifactId))) {
+            continue
+          }
+          if (ref?.elementId && isElementPendingRemove(ref.artifactId, ref.elementId)) continue
+
           const cur = existing.get(d.id)
           if (!cur) {
             try {
@@ -263,21 +290,18 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
               props: { data: d.props.data, w: size.w, h: size.h },
             } as any)
           } else if (d.type === FRAME) {
-            // Grow to enclose the latest content; never shrink below what the
-            // user may have dragged the frame to (auto-grow, never clip).
-            const curW = typeof (cur as any).props?.w === 'number' ? ((cur as any).props.w as number) : 0
-            const curH = typeof (cur as any).props?.h === 'number' ? ((cur as any).props.h as number) : 0
-            editor.updateShape({
-              id: d.id,
-              type: FRAME,
-              props: {
-                name: d.props.name,
-                w: Math.max(curW, d.props.w as number),
-                h: Math.max(curH, d.props.h as number),
-              },
-            } as any)
+            // Size + child layout are owned by relayoutFrame (run after this loop,
+            // and again as blocks auto-fit). Here we only refresh the name, and
+            // only when the user isn't mid-rename.
+            if (!isContentDirty(editor, d.id)) {
+              editor.updateShape({ id: d.id, type: FRAME, props: { name: d.props.name } } as any)
+            }
           } else if (d.type === RAINY_TEXT) {
-            editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)
+            // Don't overwrite text the user is editing / just edited before it
+            // round-trips to the DB.
+            if (!isContentDirty(editor, d.id)) {
+              editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)
+            }
           }
         }
 
@@ -285,6 +309,10 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
         for (const [id] of existing) {
           if (!desiredIds.has(id)) editor.deleteShapes([id])
         }
+
+        // Re-flow each frame around the patched content (new video sizes, added
+        // blocks). Text height changes re-trigger relayout as the cards re-fit.
+        for (const d of descs) if (d.type === FRAME) relayoutFrame(editor, d.id)
       },
       { history: 'ignore' },
     )

@@ -9,11 +9,12 @@ import {
   T,
   TLResizeInfo,
   TLShape,
+  TLShapeId,
   resizeBox,
   useEditor,
   useValue,
 } from 'tldraw'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import s from './VideoBlock.module.css'
 import {
   VIDEO_BLOCK,
@@ -27,6 +28,8 @@ import {
   type VideoStatus,
   type VideoView,
 } from '@/lib/blockTypes'
+import { analyseVideoShape, isBackendShape, pollVideo } from '@/lib/videoAnalysis'
+import { relayoutFrame } from '@/lib/frameLayout'
 import { DeleteButton } from './ShapeChrome'
 
 // The video taxonomy (status lifecycle, detail levels, sizing, parsing) lives in
@@ -119,7 +122,24 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   const setView = (next: View) => {
     const size = dims(next, d)
     editor.updateShape({ id: shape.id, type: VIDEO_BLOCK, props: { view: next, ...size } })
+    // Re-flow the enclosing frame so expanding/collapsing never overlaps siblings.
+    const parent = editor.getShape(shape.id)?.parentId
+    if (parent) relayoutFrame(editor, parent as TLShapeId)
   }
+
+  // Trigger analysis from the in-block controls (URL entry / Analyse / Retry).
+  // Backend-rendered elements re-run via the artifact's video_id; local blocks
+  // trigger + poll themselves (see lib/videoAnalysis).
+  const analyse = (url?: string) => void analyseVideoShape(editor, shape.id, url)
+
+  // Resume/keep polling whenever a local block is mid-analysis (covers a reload
+  // while analysing, or a trigger fired from the sidebar). Idempotent per shape.
+  const backend = isBackendShape(String(shape.id))
+  useEffect(() => {
+    if (backend) return
+    if (status !== 'analysing' || !d.video_id) return
+    pollVideo(editor, shape.id, d.video_id)
+  }, [backend, status, d.video_id, editor, shape.id])
 
   const stop = (e: React.PointerEvent) => e.stopPropagation()
   const canStoryboard = status === 'analysed' && (d.storyboard?.length ?? 0) > 0
@@ -127,22 +147,25 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
 
   return (
     <HTMLContainer>
-      <div className={`${s.card} ${s[status]}`} onPointerDown={(e) => { if (expanded) e.stopPropagation() }}>
-        <Header
-          d={d}
-          status={status}
-          view={view}
-          onToggle={() => setView(view === 'compact' ? 'expanded' : 'compact')}
-          stop={stop}
-        />
+      {/* host isolates the appear-animation aurora behind the card (see VideoBlock.module.css) */}
+      <div className={s.host}>
+        <div className={`${s.card} ${s[status]}`} onPointerDown={(e) => { if (expanded) e.stopPropagation() }}>
+          <Header
+            d={d}
+            status={status}
+            view={view}
+            onToggle={() => setView(view === 'compact' ? 'expanded' : 'compact')}
+            stop={stop}
+          />
 
-        {expanded && status === 'analysed' && (
-          <Body d={d} view={view} canStoryboard={canStoryboard} setView={setView} stop={stop} />
-        )}
-        {expanded && status === 'analysing' && <Analysing d={d} />}
-        {expanded && status === 'error' && <ErrorState d={d} />}
-        {expanded && status === 'not_analysed' && <NotAnalysed stop={stop} />}
-        {expanded && status === 'empty' && <Empty d={d} stop={stop} />}
+          {expanded && status === 'analysed' && (
+            <Body d={d} view={view} canStoryboard={canStoryboard} setView={setView} stop={stop} />
+          )}
+          {expanded && status === 'analysing' && <Analysing d={d} />}
+          {expanded && status === 'error' && <ErrorState d={d} onAnalyse={analyse} stop={stop} />}
+          {expanded && status === 'not_analysed' && <NotAnalysed d={d} onAnalyse={analyse} stop={stop} />}
+          {expanded && status === 'empty' && <Empty d={d} onAnalyse={analyse} stop={stop} />}
+        </div>
       </div>
 
       <DeleteButton
@@ -339,38 +362,92 @@ function Analysing({ d }: { d: VideoData }) {
   )
 }
 
-function ErrorState({ d }: { d: VideoData }) {
-  return (
-    <div className={s.empties}>
-      <div className={s.errBox}>{d.analysis_error || 'Analysis failed. The source may be unavailable.'}</div>
-      <button className={`${s.btn} ${s.btnGhost}`} onPointerDown={(e) => e.stopPropagation()}>Retry analysis</button>
-    </div>
-  )
+type StateProps = {
+  d: VideoData
+  onAnalyse: (url?: string) => void
+  stop: (e: React.PointerEvent) => void
 }
 
-function NotAnalysed({ stop }: { stop: (e: React.PointerEvent) => void }) {
+/** URL field + Analyse button — the in-block way to add a source and kick off
+ * analysis (the empty + not-analysed states share it). Enter submits. */
+function UrlEntry({ d, onAnalyse, stop, hint, cta }: StateProps & { hint: string; cta: string }) {
+  const [url, setUrl] = useState(d.source_url || '')
+  const trimmed = url.trim()
+  const submit = () => {
+    if (trimmed) onAnalyse(trimmed)
+  }
   return (
     <div className={s.empties}>
-      <span className={s.emptyHint}>This video hasn’t been analysed yet. Ask Rainy to analyse it to unlock tags, transcript and the storyboard.</span>
-      <button className={s.btn} onPointerDown={stop}>Analyse video</button>
-    </div>
-  )
-}
-
-function Empty({ d, stop }: { d: VideoData; stop: (e: React.PointerEvent) => void }) {
-  return (
-    <div className={s.empties}>
-      <span className={s.emptyHint}>Paste a video URL, or ask Rainy to add one to this project.</span>
+      <span className={s.emptyHint}>{hint}</span>
       <div className={s.urlRow}>
         <input
           className={s.urlInput}
           placeholder="https://…"
-          defaultValue={d.source_url || ''}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
           onPointerDown={stop}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') submit()
+          }}
         />
-        <button className={s.btn} onPointerDown={stop}>Add</button>
+        <button className={s.btn} onPointerDown={stop} onClick={submit} disabled={!trimmed}>
+          {cta}
+        </button>
       </div>
     </div>
+  )
+}
+
+function ErrorState({ d, onAnalyse, stop }: StateProps) {
+  return (
+    <div className={s.empties}>
+      <div className={s.errBox}>{d.analysis_error || 'Analysis failed. The source may be unavailable.'}</div>
+      <button
+        className={`${s.btn} ${s.btnGhost}`}
+        onPointerDown={stop}
+        onClick={() => onAnalyse()}
+      >
+        Retry analysis
+      </button>
+    </div>
+  )
+}
+
+function NotAnalysed({ d, onAnalyse, stop }: StateProps) {
+  // If a source URL is already on the block, offer a one-tap analyse; otherwise
+  // fall back to URL entry so a not-analysed block is never a dead end.
+  if (d.source_url) {
+    return (
+      <div className={s.empties}>
+        <span className={s.emptyHint}>
+          This video hasn’t been analysed yet — unlock tags, transcript and the storyboard.
+        </span>
+        <button className={s.btn} onPointerDown={stop} onClick={() => onAnalyse()}>
+          Analyse video
+        </button>
+      </div>
+    )
+  }
+  return (
+    <UrlEntry
+      d={d}
+      onAnalyse={onAnalyse}
+      stop={stop}
+      hint="Add a video URL to analyse, or ask Rainy to add one to this project."
+      cta="Analyse video"
+    />
+  )
+}
+
+function Empty({ d, onAnalyse, stop }: StateProps) {
+  return (
+    <UrlEntry
+      d={d}
+      onAnalyse={onAnalyse}
+      stop={stop}
+      hint="Paste a video URL, or ask Rainy to add one to this project."
+      cta="Analyse"
+    />
   )
 }

@@ -23,6 +23,7 @@ from starlette.routing import Mount, WebSocketRoute
 import db
 import notify
 import pty_bridge
+from block_normalize import BLOCK_TAXONOMY_GUIDE, WRITING_STYLE_GUIDE
 from config import settings
 from routes_api import routes as api_routes
 from tools import analysis, artifacts, creators, memory, projects
@@ -34,7 +35,14 @@ mcp = FastMCP(
     instructions=(
         "Video preproduction assistant. Use these tools to manage projects, "
         "trigger video/channel analysis, create and update canvas artifacts, "
-        "and store memory about goals, audience, and creative direction."
+        "and store memory about goals, audience, and creative direction. "
+        "The canvas reports which project the user currently has open: the "
+        "project-scoped tools (create_artifact, list_artifacts) default to it "
+        "when you omit project_id, and get_active_project returns it. Prefer "
+        "that over asking the user which project to use.\n\n"
+        "Artifacts you create are made of typed blocks. Choose the block type and "
+        "format that best fits the content you have so the canvas renders the right "
+        "layout:\n\n" + BLOCK_TAXONOMY_GUIDE + "\n\n" + WRITING_STYLE_GUIDE
     ),
 )
 

@@ -80,6 +80,10 @@ export type RoomMode = 'image' | 'room3d'
 /** Bundled reference-style sample shown (blurred) until a real image is generated. */
 export const SAMPLE_IMAGE = '/creator-room/sample.png'
 
+/** The default Creator Room hero shown (clean, un-blurred) until the creator
+ *  designs their own. A polished clay-render reference room. */
+export const DEFAULT_ROOM_IMAGE = '/creator-room/default.png'
+
 export function loadMode(): RoomMode {
   return ls()?.getItem(LS.mode) === 'room3d' ? 'room3d' : 'image'
 }

@@ -9,7 +9,7 @@ import { useShootingConditions } from '@/lib/daylight'
 import CreatorRoom from './CreatorRoom'
 
 // No auth yet — the signed-in creator is hardcoded.
-const USER_NAME = 'Adrian'
+const USER_NAME = 'Matthias'
 
 /** Home — greeting + shooting conditions, the Creator Room, and the project list. */
 export default function Home() {
@@ -30,7 +30,8 @@ export default function Home() {
     const ctx = gsap.context(() => {
       gsap.from('.home-topbar > *, .home-greeting > *', { y: 10, autoAlpha: 0, duration: 0.5, stagger: 0.06, ease: 'power3.out' })
       gsap.from('.home-room', { y: 14, autoAlpha: 0, duration: 0.5, ease: 'power3.out' })
-      gsap.from(el.children, { y: 12, autoAlpha: 0, duration: 0.45, stagger: 0.05, ease: 'power3.out', delay: 0.08 })
+      gsap.from('.home-projects-head', { y: 12, autoAlpha: 0, duration: 0.5, ease: 'power3.out', delay: 0.05 })
+      gsap.from(el.children, { y: 12, autoAlpha: 0, duration: 0.45, stagger: 0.05, ease: 'power3.out', delay: 0.12 })
     })
     return () => ctx.revert()
   }, [projects])
@@ -51,10 +52,7 @@ export default function Home() {
   return (
     <div className="home">
       <header className="home-topbar">
-        <div className="home-brand">
-          <RainyMark />
-          <span>Rainey</span>
-        </div>
+        <div className="home-brand">Rainey</div>
         <div className="home-avatar" title={USER_NAME} aria-label={USER_NAME}>
           {USER_NAME.charAt(0)}
         </div>
@@ -73,23 +71,32 @@ export default function Home() {
             <Conditions cond={cond} />
           </div>
 
-          <div className="home-list" ref={listRef}>
-            <button className="home-row home-row-new" onClick={onNew}>
-              <span className="home-row-plus">+</span> New Project
-            </button>
-
-            {projects?.map((m) => (
-              <button key={m.id} className="home-row" onClick={() => openProject(m.id, m.title)}>
-                <span className="home-row-title">{m.title || 'Untitled project'}</span>
-                <span className="home-row-del" role="button" title="Delete project" onClick={(e) => onDelete(m, e)}>
-                  ×
-                </span>
+          <div className="home-projects">
+            <div className="home-projects-head">
+              <span className="home-projects-title">Projects</span>
+              <button className="home-new" onClick={onNew}>
+                <span className="home-new-plus">+</span> New
               </button>
-            ))}
+            </div>
 
-            {projects && projects.length === 0 && (
-              <div className="home-empty">No projects yet — create your first one.</div>
-            )}
+            <div className="home-grid" ref={listRef}>
+              {projects?.map((m) => (
+                <button key={m.id} className="home-card" onClick={() => openProject(m.id, m.title)}>
+                  <span className="home-card-title">{m.title || 'Untitled project'}</span>
+                  <span className="home-card-meta">{m.blocks} block{m.blocks === 1 ? '' : 's'}</span>
+                  <span className="home-card-del" role="button" title="Delete project" onClick={(e) => onDelete(m, e)}>
+                    ×
+                  </span>
+                </button>
+              ))}
+
+              {projects && projects.length === 0 && (
+                <button className="home-card home-card-empty" onClick={onNew}>
+                  <span className="home-card-title">Create your first project</span>
+                  <span className="home-card-meta">Start a new canvas</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -97,41 +104,45 @@ export default function Home() {
   )
 }
 
-/** Golden hour + a few shoot-relevant weather readings under the greeting. */
+/** Golden hour + shoot conditions as one quiet, single line under the greeting. */
 function Conditions({ cond }: { cond: ReturnType<typeof useShootingConditions> }) {
   if (!cond.ready || !cond.golden) {
-    return <p className="home-conditions home-conditions-loading">Checking the light…</p>
+    return <p className="home-conditions">Checking the light…</p>
   }
   const w = cond.weather
   return (
-    <div className="home-conditions">
+    <p className="home-conditions">
       <span className="home-cond home-cond-golden">
-        <strong>{cond.golden.label}</strong> {cond.golden.range}
+        <SunGlyph />
+        {cond.golden.label} {cond.golden.range}
       </span>
       {cond.location && (
-        <span className="home-cond">
-          <span className="home-cond-ico">📍</span>
-          {cond.location.name}
-          {!cond.location.precise && <span className="home-cond-approx"> · approx</span>}
-        </span>
+        <>
+          <span className="home-cond-sep" aria-hidden>·</span>
+          <span className="home-cond">
+            {cond.location.name}
+            {!cond.location.precise && ' · approx'}
+          </span>
+        </>
       )}
-      {w ? (
-        <span className="home-cond" title={`Feels like ${w.apparentC}° · Humidity ${w.humidity}%`}>
-          <span className="home-cond-ico">{w.emoji}</span>
-          {w.tempC}° · {w.condition} · ☁ {w.cloudCover}% · 💨 {w.windKph} km/h
-        </span>
-      ) : (
-        <span className="home-cond home-cond-dim">Weather unavailable</span>
+      {w && (
+        <>
+          <span className="home-cond-sep" aria-hidden>·</span>
+          <span className="home-cond" title={`Feels like ${w.apparentC}° · Humidity ${w.humidity}%`}>
+            {w.emoji} {w.tempC}° {w.condition}
+          </span>
+        </>
       )}
-    </div>
+    </p>
   )
 }
 
-function RainyMark() {
+/** Small, muted sun mark for the golden-hour line. */
+function SunGlyph() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 18a5 5 0 0 1-1-9.9A6 6 0 0 1 18 8a4 4 0 0 1 0 8" />
-      <path d="M8 19v2M12 19v3M16 19v2" />
+    <svg className="home-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v1.5M12 19.5V21M4.2 4.2l1 1M18.8 18.8l1 1M3 12h1.5M19.5 12H21M4.2 19.8l1-1M18.8 5.2l1-1" />
     </svg>
   )
 }
