@@ -28,6 +28,7 @@ from starlette.routing import Route
 
 import active_project
 import db
+import image_gen
 import notify
 import video_view
 import worker
@@ -294,6 +295,48 @@ async def set_active_project(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "project_id": active_project.get_active_id()})
 
 
+async def list_creators(request: Request) -> JSONResponse:
+    kind = request.query_params.get("kind")
+    if kind and kind not in ("self", "reference"):
+        return JSONResponse({"error": "kind must be 'self' or 'reference'"}, status_code=400)
+    creators = await run_in_threadpool(db.list_creators, kind)
+    return JSONResponse({"creators": creators})
+
+
+async def get_creator_room_image(request: Request):
+    cid = request.path_params["creator_id"]
+    img = await run_in_threadpool(db.get_creator_room_image, cid)
+    if img is None:
+        return JSONResponse({"error": "no room image for this creator"}, status_code=404)
+    return Response(content=img["data"], media_type=img["mime_type"])
+
+
+async def post_creator_room_image(request: Request) -> JSONResponse:
+    """Trigger room image generation for a creator, save to DB, return the URL."""
+    cid = request.path_params["creator_id"]
+
+    # Optional form profile from the canvas (used to enrich the prompt).
+    profile: dict | None = None
+    try:
+        body = await request.json()
+        profile = body.get("profile") if isinstance(body, dict) else None
+    except Exception:
+        pass  # body is optional — proceed without
+
+    try:
+        png_bytes = await run_in_threadpool(image_gen.generate, cid, profile)
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": f"generation failed: {exc}"}, status_code=500)
+
+    await run_in_threadpool(db.save_creator_room_image, cid, png_bytes, "image/png")
+    return JSONResponse(
+        {"creator_id": cid, "image_url": f"/api/creators/{cid}/room-image"},
+        status_code=201,
+    )
+
+
 routes = [
     Route("/api/health", health),
     Route("/api/projects", list_projects),
@@ -308,6 +351,9 @@ routes = [
     Route("/api/videos/{video_id}/status", get_video_status),
     Route("/api/videos/{video_id}/reanalyze", reanalyze, methods=["POST"]),
     Route("/api/videos/{video_id}", get_video),
+    Route("/api/creators", list_creators),
     Route("/api/creators/{creator_id}/videos", list_creator_videos),
+    Route("/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]),
+    Route("/api/creators/{creator_id}/room-image", post_creator_room_image, methods=["POST"]),
     Route("/frames/{frame_id}", get_frame),
 ]

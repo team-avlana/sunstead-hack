@@ -1,7 +1,20 @@
 import json
-import psycopg
+import sys
+from contextlib import contextmanager
 from decimal import Decimal
+
+import psycopg
 from psycopg.rows import dict_row
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+    before_sleep_log,
+)
+import logging
+
+_log = logging.getLogger(__name__)
 
 
 def _dumps(obj) -> str:
@@ -11,8 +24,34 @@ def _dumps(obj) -> str:
     )
 
 
-def get_connection(dsn: str):
+@retry(
+    retry=retry_if_exception_type(psycopg.OperationalError),
+    stop=stop_after_attempt(3),  # 1 initial + 2 retries
+    wait=wait_fixed(30),
+    before_sleep=before_sleep_log(_log, logging.WARNING),
+    reraise=True,
+)
+def _open_connection(dsn: str):
     return psycopg.connect(dsn, row_factory=dict_row)
+
+
+@contextmanager
+def connect(dsn: str):
+    """Short-lived connection context manager with retry on OperationalError.
+
+    Retries the connect() call up to 3 times with a 30-second wait between
+    attempts, which covers transient 'too many connections' rejections.
+    Commits on clean exit, rolls back and re-raises on exception, always closes.
+    """
+    conn = _open_connection(dsn)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def load_video(conn, video_id: str) -> dict:
@@ -49,7 +88,18 @@ def update_video_download_meta(
 
 def clear_analysis_error(conn, video_id: str) -> None:
     with conn.cursor() as cur:
-        cur.execute("UPDATE videos SET analysis_error=NULL WHERE id=%s", (video_id,))
+        cur.execute(
+            "UPDATE videos SET analysis_error=NULL, analysis_stage=NULL WHERE id=%s",
+            (video_id,),
+        )
+    conn.commit()
+
+
+def set_analysis_stage(conn, video_id: str, stage: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE videos SET analysis_stage=%s WHERE id=%s", (stage, video_id)
+        )
     conn.commit()
 
 
@@ -114,14 +164,17 @@ def write_video_metrics(conn, video_id: str, metrics: dict) -> None:
 
 def set_analyzed_at(conn, video_id: str) -> None:
     with conn.cursor() as cur:
-        cur.execute("UPDATE videos SET analyzed_at=now() WHERE id=%s", (video_id,))
+        cur.execute(
+            "UPDATE videos SET analyzed_at=now(), analysis_stage=NULL WHERE id=%s",
+            (video_id,),
+        )
     conn.commit()
 
 
 def set_analysis_error(conn, video_id: str, error: str) -> None:
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE videos SET analysis_error=%s WHERE id=%s",
+            "UPDATE videos SET analysis_error=%s, analysis_stage=NULL WHERE id=%s",
             (error[:2000], video_id),
         )
     conn.commit()

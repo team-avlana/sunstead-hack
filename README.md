@@ -48,3 +48,25 @@ mcp-server/                ⚠️ SUPERSEDED early stdio/SQLite stub — see src
 - `src/python-service`, `src/analysis-worker`, `src/database` are the team backend.
 
 Start with `docs/architecture.md`, then `docs/FEASIBILITY.md` and `docs/DECISIONS.md`.
+
+## How to run
+
+### Secrets
+
+Set up the .env file as follows and fill in all keys:
+```
+DB_CONNECTION_STRING=
+AZURE_ANTHROPIC_URL=
+AZURE_ANTHROPIC_KEY=
+ELEVENLABS_API_KEY=
+AZURE_OPENAI_URL=
+AZURE_OPENAI_KEY=
+```
+
+### MCP server & analysis worker
+
+- Have Python >=3.12 installed
+- Create a `venv` and activate it (e.g. via VS Code virtual env manager)
+- Install the requirements from `src/python-service/requirements.txt` and `src/analysis-worker/requirements.txt`
+- Run the python-service via its `server.py` or use the launch config for VS code (recommended)
+- The server is active under `http://127.0.0.1:9000`

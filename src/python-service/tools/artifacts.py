@@ -166,7 +166,8 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_artifact(artifact_id: str) -> dict:
         """
-        Read back a single artifact by id (for the agent; the canvas reads from DB directly).
+        Read back a single artifact by id. Use this to inspect current element ids
+        before doing an addressed element update via update_artifact.
         """
         result = db.get_artifact(artifact_id)
         if result is None:
@@ -176,9 +177,13 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def list_artifacts(project_id: Optional[str] = None) -> list:
         """
-        List all active artifacts for a project (for the agent; canvas reads DB directly).
+        List all active (non-deleted) artifacts for a project (for the agent;
+        the canvas reads the DB directly).
 
         project_id defaults to the project the user currently has open on the canvas.
+        Use this to see what is already on the canvas before creating new artifacts,
+        so you can update existing ones rather than duplicating them.
+        Returns [{artifact_id, type, title, payload, position, version, created_at}].
         """
         return db.list_artifacts(_resolve_project_id(project_id))
 

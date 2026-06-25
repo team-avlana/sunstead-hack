@@ -24,15 +24,24 @@ shell-equivalent. See the note in server.py before exposing the service.
 
 import asyncio
 import errno
-import fcntl
 import json
 import logging
 import os
-import pty
 import signal
 import struct
-import termios
 from pathlib import Path
+from typing import Any
+
+try:
+    import fcntl
+    import pty
+    import termios
+    _PTY_AVAILABLE = True
+except ImportError:
+    fcntl: Any = None
+    pty: Any = None
+    termios: Any = None
+    _PTY_AVAILABLE = False
 
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -104,6 +113,9 @@ def _spawn() -> tuple[int, int]:
 
 
 async def terminal_endpoint(ws: WebSocket) -> None:
+    if not _PTY_AVAILABLE:
+        await ws.close(code=1011, reason="PTY not available on this platform")
+        return
     if not settings.terminal.enabled:
         await ws.close(code=1011, reason="terminal disabled")
         return

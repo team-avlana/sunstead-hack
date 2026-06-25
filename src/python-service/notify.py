@@ -118,19 +118,17 @@ async def pg_listen(dsn: str) -> None:
 
     delay = 2.0
     while True:
+        aconn = None
         try:
             aconn = await psycopg.AsyncConnection.connect(dsn, autocommit=True)
-            try:
-                await aconn.execute("LISTEN rainy_change")
-                delay = 2.0  # reset backoff on a successful connect
-                async for note in aconn.notifies():
-                    try:
-                        payload = json.loads(note.payload)
-                    except Exception:
-                        continue
-                    await _route_change(payload)
-            finally:
-                await aconn.close()
+            delay = 2.0  # reset backoff on a successful connect
+            await aconn.execute("LISTEN rainy_change")
+            async for note in aconn.notifies():
+                try:
+                    payload = json.loads(note.payload)
+                except Exception:
+                    continue
+                await _route_change(payload)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -139,3 +137,11 @@ async def pg_listen(dsn: str) -> None:
             log.warning("pg_listen connection error, retrying in %.1fs: %r", delay, exc)
             await asyncio.sleep(delay + random.uniform(0, delay * 0.25))
             delay = min(delay * 2, 30.0)
+        finally:
+            # Always close — connect() may have opened a TCP connection before
+            # raising (e.g. InterfaceError on wrong event-loop type on Windows).
+            if aconn is not None:
+                try:
+                    await aconn.close()
+                except Exception:
+                    pass

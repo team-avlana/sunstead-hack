@@ -16,12 +16,25 @@ def register(mcp: FastMCP) -> None:
         project_id: Optional[str] = None,
     ) -> dict:
         """
-        Persist a memory entry. project_id=None means user-level (spans projects).
+        Persist a memory entry that survives across sessions.
 
-        kind: goal | audience | platform | constraint | preference | note
-        key: optional short label (e.g. 'target_audience')
+        Call list_memory() at session start to reload saved context before
+        asking the user questions they've already answered.
+
+        project_id=None means user-level (applies to all projects).
+        Set project_id to scope a memory to a specific project.
+
+        kind values and what to save:
+          goal        — what the creator is trying to achieve (growth, monetisation, etc.)
+          audience    — who they're making content for (age, interest, platform context)
+          platform    — target platform and format constraints (YouTube Shorts, long-form, etc.)
+          constraint  — hard limits (budget, filming location, equipment, time per video)
+          preference  — style/tone preferences, things to always or never do
+          note        — anything else worth remembering across sessions
+
+        key: short label for filtering (e.g. 'target_audience', 'upload_cadence')
         value: the human-readable fact to remember
-        data: optional structured supplement
+        data: optional structured supplement for machine-readable fields
 
         Returns {memory_id}.
         """
@@ -37,8 +50,13 @@ def register(mcp: FastMCP) -> None:
         kind: Optional[str] = None,
     ) -> list:
         """
-        List memory entries. project_id=None returns user-level memories.
-        Optionally filter by kind.
+        List memory entries. Call this at session start to reload context.
+
+        project_id=None returns user-level memories (goals, audience, preferences, etc.).
+        Pass a project_id to also see project-scoped memories.
+        Optionally filter by kind (goal | audience | platform | constraint | preference | note).
+
+        Returns [{memory_id, kind, key, value, data, project_id, created_at}].
         """
         return db.list_memory(project_id=project_id, kind=kind)
 

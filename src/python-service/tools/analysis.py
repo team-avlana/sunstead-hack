@@ -10,7 +10,7 @@ from fastmcp import FastMCP
 
 import db
 import worker
-from config import settings
+from config import MAX_CHANNEL_VIDEOS, settings
 
 
 def register(mcp: FastMCP) -> None:
@@ -30,11 +30,10 @@ def register(mcp: FastMCP) -> None:
         if not creator_id:
             raise ValueError("creator_id is required")
 
-        video_id, _created = db.get_or_create_video(creator_id, source_url)
+        video_id, created = db.get_or_create_video(creator_id, source_url)
         worker.spawn_analysis_worker(video_id)
-        # Signal the canvas (a block referencing this video flips to "analysing").
         db.pg_notify_change(
-            {"type": "video", "action": "created", "video_id": video_id}
+            {"type": "video", "action": "created" if created else "updated", "video_id": video_id}
         )
         return {"video_id": video_id}
 
@@ -43,14 +42,22 @@ def register(mcp: FastMCP) -> None:
         channel_url: str,
         kind: str,
         name: Optional[str] = None,
+        max_videos: Optional[int] = None,
     ) -> dict:
         """
         Enumerate recent videos from a channel and start analysis for each.
 
-        kind must be 'self' (your own channel) or 'reference' (a competitor
-        or inspiration channel). Creates/finds a creators row, enumerates up
-        to max_channel_videos recent videos via yt-dlp, inserts a videos row
-        per URL, and spawns one worker per video. Returns immediately.
+        kind='self'      — the user's own channel (use for onboarding the user).
+        kind='reference' — a competitor, role model, or inspiration channel.
+                           Add freely; reference creators enrich ideation and comparison.
+
+        Recommended max_videos: 5-10. That is usually enough for a solid style profile
+        and avoids long waits. Each video takes 1-3 min; a full run takes 3-10 min.
+        Hard cap is 20. Videos already tracked are skipped (no duplicate worker).
+
+        After this call: poll get_channel_analysis(creator_id) until done==total,
+        then call build_style_profile(creator_id) to generate the aggregated profile.
+        The profile does NOT build automatically — you must trigger it.
 
         Returns {creator_id, video_ids}.
         """
@@ -58,21 +65,29 @@ def register(mcp: FastMCP) -> None:
             raise ValueError("kind must be 'self' or 'reference'")
         if not channel_url:
             raise ValueError("channel_url is required")
+        if max_videos is not None and max_videos < 1:
+            raise ValueError("max_videos must be at least 1")
+
+        limit = min(
+            max_videos if max_videos is not None else settings.worker.max_channel_videos,
+            MAX_CHANNEL_VIDEOS,
+        )
 
         creator_name = name or channel_url
         creator = db.find_or_create_creator(kind, creator_name, channel_url)
         creator_id = creator["creator_id"]
 
-        urls = _enumerate_channel(channel_url, settings.worker.max_channel_videos)
+        urls = _enumerate_channel(channel_url, limit)
 
         video_ids: list[str] = []
         for url in urls:
-            vid_id = db.insert_video(creator_id, url)
+            vid_id, created = db.get_or_create_video(creator_id, url)
             video_ids.append(vid_id)
-            worker.spawn_analysis_worker(vid_id)
-            db.pg_notify_change(
-                {"type": "video", "action": "created", "video_id": vid_id}
-            )
+            if created:
+                worker.spawn_analysis_worker(vid_id)
+                db.pg_notify_change(
+                    {"type": "video", "action": "created", "video_id": vid_id}
+                )
 
         return {"creator_id": creator_id, "video_ids": video_ids}
 
@@ -82,6 +97,12 @@ def register(mcp: FastMCP) -> None:
         Return the current analysis status and results for a video.
 
         status is one of: 'running', 'done', 'failed'.
+        analysis_stage is set while status='running' and shows which pipeline step
+        is active: 'downloading', 'detecting_shots', 'extracting_frames',
+        'transcribing', 'computing_metrics', 'analyzing_llm', 'persisting'.
+        It is null when status is 'done' or 'failed'.
+        Poll this tool to track progress — the stage lets you know whether the
+        slow LLM step has started yet and roughly how far along analysis is.
         When done, video.metrics contains the derived style data.
         shots_summary lists every shot with idx, start_sec, end_sec, and frame_id.
         frame_id is a UUID; the representative frame image is served at /frames/{frame_id}.
@@ -103,6 +124,10 @@ def register(mcp: FastMCP) -> None:
         """
         Return analysis progress for all videos belonging to a creator/channel.
 
+        Poll this after analyze_channel to track progress. When done==total, all
+        video analysis is complete and you should call build_style_profile(creator_id)
+        to generate the aggregated style profile.
+
         Returns {videos: [{video_id, status}], done: int, total: int}.
         """
         videos = db.get_channel_videos(creator_id)
@@ -114,15 +139,19 @@ def register(mcp: FastMCP) -> None:
         """
         Return the full shot and frame list for a video, including per-shot analysis.
 
-        Each shot includes idx, start_sec, end_sec, frame_id, and the complete
-        analysis data:
+        Use this for deep-dive research or to build storyboard artifacts. Each shot
+        has a representative frame (use get_frame(frame_id) to fetch the JPEG) and
+        per-shot LLM analysis describing what the creator actually did visually.
+
+        Each shot includes idx, start_sec, end_sec, frame_id, and:
           - analysis.deterministic: duration_sec, frame metrics, speech metrics
           - analysis.llm: shot_type, composition, subjects, palette, camera_movement,
-            roll, subject — the vision model output per shot
+            roll — vision-model output describing the shot
 
-        frame_id is a UUID; fetch the JPEG thumbnail with get_frame or at
-        /frames/{frame_id}. Use get_video_analysis to check status first — shots
-        are empty while analysis is still running.
+        frame_id is a UUID; fetch the JPEG with get_frame(frame_id) or reference it
+        in image elements as src='/frames/{frame_id}'.
+
+        Check get_video_analysis status first — shots array is empty while running.
         """
         full = db.get_video_full(video_id)
         if full is None:

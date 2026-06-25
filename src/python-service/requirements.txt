@@ -5,3 +5,4 @@ uvicorn[standard]
 starlette
 python-dotenv
 tomli ; python_version < "3.11"
+openai>=1.50.0
