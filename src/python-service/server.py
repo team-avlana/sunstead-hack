@@ -3,8 +3,10 @@ python-service — MCP server + websocket notification hub.
 
 Start with:
     python server.py
-or:
-    python -m uvicorn server:app --host 127.0.0.1 --port 9000
+
+Do NOT start with `python -m uvicorn server:app` — uvicorn creates its event loop
+before importing this module, so the WindowsSelectorEventLoopPolicy fix below fires
+too late and psycopg async fails on Windows.
 
 FastMCP 3.x serves over streamable-HTTP (Starlette under the hood).
 We obtain the ASGI app from FastMCP and mount it inside our own Starlette
@@ -12,7 +14,12 @@ app that also declares the /ws WebSocketRoute.
 """
 
 import asyncio
+import sys
 from contextlib import asynccontextmanager
+
+# psycopg async requires SelectorEventLoop; Windows defaults to ProactorEventLoop.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import uvicorn
 from fastmcp import FastMCP
@@ -163,4 +170,5 @@ if __name__ == "__main__":
         host=settings.server.host,
         port=settings.server.port,
         reload=False,
+        loop="none",  # don't pass ProactorEventLoop as loop_factory; use our policy instead
     )

@@ -15,13 +15,7 @@
       "name": "python-service",
       "type": "debugpy",
       "request": "launch",
-      "module": "uvicorn",
-      "args": [
-        "server:app",
-        "--host", "127.0.0.1",
-        "--port", "9000",
-        "--reload"
-      ],
+      "program": "${workspaceFolder}/src/python-service/server.py",
       "cwd": "${workspaceFolder}/src/python-service",
       "envFile": "${workspaceFolder}/.env",
       "env": {

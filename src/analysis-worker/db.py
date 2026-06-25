@@ -54,10 +54,6 @@ def connect(dsn: str):
         conn.close()
 
 
-def get_connection(dsn: str):
-    return psycopg.connect(dsn, row_factory=dict_row)
-
-
 def load_video(conn, video_id: str) -> dict:
     with conn.cursor() as cur:
         cur.execute(
