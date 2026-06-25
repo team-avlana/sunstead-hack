@@ -1,6 +1,0 @@
-# Rainy Comms Service
-fastapi>=0.115
-uvicorn[standard]>=0.30
-anthropic>=0.40          # 3D room code generation + optional image-prompt refine
-openai>=1.40            # image mode (default) — gpt-image-1
-python-dotenv>=1.0
