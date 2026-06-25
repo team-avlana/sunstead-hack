@@ -11,6 +11,15 @@ The agent is the user's own **Claude client (Claude Code / Claude Desktop)** con
 > **How to run (full guide):** [`docs/RUNNING.md`](docs/RUNNING.md)
 > **Decision log:** [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
+## External services
+
+| Service | Used for | Why |
+|---------|----------|-----|
+| **Claude** (Anthropic) | Visual scene interpretation; creator style aggregation across videos | Best-in-class vision reasoning; runs as the user's own agent over MCP so no key management on our side |
+| **ElevenLabs** | High-quality cloud transcription of reference videos | Outperforms local speech models for accented / fast-paced creator content |
+| **OpenAI** (`gpt-image-1`) | Generating creator room images and storyboard frames | Currently the strongest model for the cozy clay-render aesthetic Rainy uses |
+| **Aiven** | Hosted Postgres database | Managed open-source infra — full control, no vendor lock-in, self-hostable if needed |
+
 ## Components (`src/<component>/`)
 
 | Component | Tech | Role |
