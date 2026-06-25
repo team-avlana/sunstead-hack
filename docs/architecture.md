@@ -27,10 +27,12 @@ persistent daemon for the demo). Steps: `yt-dlp` (download) → `PySceneDetect`
 results and progress directly to Postgres.
 
 ### `canvas-ui`
-A read-only infinite canvas (Next.js + tldraw) that renders the typed artifacts
-the agent produces — storyboards, shot lists, idea boards, scripts, diagrams.
-**Reads its data directly from Postgres**; the websocket ping from the
-`python-service` only tells it when to re-pull a changed/added artifact.
+A bidirectional infinite canvas (Next.js + tldraw) that renders and edits typed
+artifacts — storyboards, shot lists, idea boards, scripts, diagrams. Reads from
+Postgres via the `python-service` REST API; the websocket ping only tells it when
+to re-pull a changed/added artifact. User edits on the canvas (move, resize, text,
+delete, create) are written back via the same API, making the canvas a co-equal
+writer alongside the agent.
 
 ### `mac-app`
 The native macOS shell (Swift/SwiftUI) the user interacts with. Hosts the
@@ -47,23 +49,23 @@ startup (good enough for the demo; can be hardened later).
 
 ```
  Claude client ──MCP/HTTP──► python-service ──spawns──► analysis-worker
-                                  │
-                          websocket ping (change signal only)
-                                  ▼
-   mac-app ◄── hosts ──    canvas-ui
-
-   Direct DB connections (shared config file → credentials):
-     python-service ──┐
-     analysis-worker ─┼──►  Postgres  (single source of truth)
-     canvas-ui ───────┘
+                                  │  ▲                        │
+                          ws ping │  │ REST writes (canvas)   │ writes
+                                  ▼  │                        ▼
+   mac-app ◄── hosts ──    canvas-ui ──────────────────►  Postgres
+                            (tldraw)    REST reads                (Aiven)
+                                        + ws change-signal    ▲
+                                                              │
+                                                  python-service + analysis-worker
 ```
 
 1. The agent calls MCP tools on the `python-service`.
 2. Content tools (artifacts, memory) → `python-service` writes Postgres directly,
-   then pings the `canvas-ui` over websocket; the canvas pulls the changed/added
-   artifact straight from Postgres.
+   then pings the `canvas-ui` over websocket; the canvas re-pulls from the REST API.
 3. Analysis tools → `python-service` spawns the `analysis-worker`, returns
-   immediately, and the worker writes progress/results to Postgres directly; the
-   agent reads them back through a separate "get analysis" tool.
-4. The `mac-app` hosts the `canvas-ui` so the user sees artifacts appear and
-   update in real time as the agent works.
+   immediately; the worker writes progress/results to Postgres and emits a Postgres
+   `NOTIFY` that is forwarded as a websocket ping to the canvas.
+4. User edits on the canvas (move, resize, text, delete, create) → `canvas-ui`
+   writes back to Postgres via the `python-service` REST API; every write triggers
+   a websocket change-signal so other sessions stay in sync.
+5. The `mac-app` hosts `canvas-ui` as a WKWebView shell (not yet built).

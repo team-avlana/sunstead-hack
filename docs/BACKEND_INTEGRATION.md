@@ -1,5 +1,12 @@
 # Backend Integration Contract
 
+> **SUPERSEDED.** This document described the pre-pivot (stdio + SQLite + SwiftUI-native canvas)
+> integration contract. The canonical architecture is now HTTP + Postgres + tldraw canvas
+> (see D20–D26 in `DECISIONS.md`). For the actual running system, see `docs/RUNNING.md` and
+> `docs/INTEGRATION_NOTES.md`. Kept for historical context only.
+
+---
+
 _Last updated: 2026-06-24._ **Frontend-first (D19):** the SwiftUI app is built first against a
 **mock op source**, so this file is the **interface the backend must satisfy**. The frontend owns
 the `CanvasOp` schema and the tool surface; the co-founder's Python backend (pipeline + FastMCP

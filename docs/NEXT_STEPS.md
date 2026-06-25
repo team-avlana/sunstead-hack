@@ -1,5 +1,12 @@
 # Next Steps
 
+> **SUPERSEDED.** This was the pre-pivot sequenced build plan (stdio MCP, SQLite, SwiftUI-native
+> infinite canvas). The architecture pivoted to HTTP + Postgres + Next.js/tldraw canvas
+> (D20–D26 in `DECISIONS.md`). What was built is documented in `docs/RUNNING.md` and
+> `docs/INTEGRATION_NOTES.md`. Kept for historical context only.
+
+---
+
 _Last updated: 2026-06-24._ Sequenced build plan. Each item names the knowledge-base doc(s) to
 read first.
 
