@@ -1,5 +1,6 @@
 """Analysis tools: trigger video/channel analysis and query progress."""
 
+import base64
 import json
 import subprocess
 import sys
@@ -100,6 +101,59 @@ def register(mcp: FastMCP) -> None:
         videos = db.get_channel_videos(creator_id)
         done = sum(1 for v in videos if v["status"] == "done")
         return {"videos": videos, "done": done, "total": len(videos)}
+
+    @mcp.tool()
+    def get_video_shots(video_id: str) -> dict:
+        """
+        Return the full shot and frame list for a video, including per-shot analysis.
+
+        Each shot includes idx, start_sec, end_sec, frame_id, and the complete
+        analysis data:
+          - analysis.deterministic: duration_sec, frame metrics, speech metrics
+          - analysis.llm: shot_type, composition, subjects, palette, camera_movement,
+            roll, subject — the vision model output per shot
+
+        frame_id is a UUID; fetch the JPEG thumbnail with get_frame or at
+        /frames/{frame_id}. Use get_video_analysis to check status first — shots
+        are empty while analysis is still running.
+        """
+        full = db.get_video_full(video_id)
+        if full is None:
+            raise ValueError(f"No video found with id {video_id}")
+        shots = [
+            {
+                "idx": s["idx"],
+                "start_sec": float(s["start_sec"]),
+                "end_sec": float(s["end_sec"]),
+                "frame_id": str(s["frame_id"]) if s.get("frame_id") else None,
+                "analysis": s.get("analysis"),
+            }
+            for s in full["shots"]
+        ]
+        return {"video_id": video_id, "shot_count": len(shots), "shots": shots}
+
+    @mcp.tool()
+    def get_frame(frame_id: str) -> dict:
+        """
+        Fetch a shot frame image as a base64 data URL.
+
+        Returns {frame_id, mime_type, data_url, url}.
+        data_url is a data:image/jpeg;base64,... string you can embed directly in
+        image elements or HTML artifacts on the canvas.
+        url is the /frames/{frame_id} path relative to the API base URL.
+
+        Obtain frame_id values from get_video_shots or get_video_analysis shots_summary.
+        """
+        frame = db.get_frame(frame_id)
+        if frame is None:
+            raise ValueError(f"No frame found with id {frame_id}")
+        data_b64 = base64.b64encode(frame["data"]).decode("ascii")
+        return {
+            "frame_id": frame_id,
+            "mime_type": frame["mime_type"],
+            "data_url": f"data:{frame['mime_type']};base64,{data_b64}",
+            "url": f"/frames/{frame_id}",
+        }
 
 
 def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:

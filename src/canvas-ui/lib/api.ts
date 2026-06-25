@@ -1,5 +1,5 @@
 /**
- * Read API client for the python-service (the canvas is a static export and
+ * API client for the python-service (the canvas is a static export and
  * cannot open Postgres directly — see docs/INTEGRATION_NOTES.md #4).
  *
  * Base URL comes from NEXT_PUBLIC_RAINY_API_URL (e.g. http://localhost:9000).
@@ -34,6 +34,37 @@ export interface ProjectState {
   artifacts: EnrichedArtifact[]
 }
 
+export interface ArtifactPatch {
+  payload?: Record<string, unknown>
+  element_id?: string
+  element_patch?: Record<string, unknown>
+  position?: { x?: number; y?: number; w?: number; h?: number }
+  title?: string
+}
+
+export interface VideoStatus {
+  video_id: string
+  status: 'analysing' | 'analysed' | 'error'
+  title: string | null
+  duration_sec: number | null
+  analyzed_at: string | null
+  analysis_error: string | null
+}
+
+export interface CreatorVideoItem {
+  video_id: string
+  status: 'analysing' | 'analysed' | 'error'
+  title: string | null
+  source_url: string
+  duration_sec: number | null
+  thumbnail: string | null
+}
+
+export interface CreatorVideoList {
+  creator_id: string
+  videos: CreatorVideoItem[]
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Backend project ids are UUIDs; local seeds use slugs / `p-…` ids. */
@@ -65,6 +96,27 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
+async function mutateJson<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T | null> {
+  const base = apiBase()
+  if (!base) return null
+  try {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
 export async function fetchProjects(): Promise<BackendProject[]> {
   const data = await getJson<{ projects: BackendProject[] }>('/api/projects')
   return data?.projects ?? []
@@ -79,6 +131,25 @@ export async function fetchArtifact(artifactId: string): Promise<EnrichedArtifac
     `/api/artifacts/${encodeURIComponent(artifactId)}`,
   )
   return data?.artifact ?? null
+}
+
+export async function updateArtifact(
+  artifactId: string,
+  patch: ArtifactPatch,
+): Promise<{ artifact_id: string; version: number } | null> {
+  return mutateJson('PUT', `/api/artifacts/${encodeURIComponent(artifactId)}`, patch)
+}
+
+export async function deleteArtifact(artifactId: string): Promise<{ ok: boolean } | null> {
+  return mutateJson('DELETE', `/api/artifacts/${encodeURIComponent(artifactId)}`)
+}
+
+export async function fetchVideoStatus(videoId: string): Promise<VideoStatus | null> {
+  return getJson<VideoStatus>(`/api/videos/${encodeURIComponent(videoId)}/status`)
+}
+
+export async function fetchCreatorVideos(creatorId: string): Promise<CreatorVideoList | null> {
+  return getJson<CreatorVideoList>(`/api/creators/${encodeURIComponent(creatorId)}/videos`)
 }
 
 /** Resolve a frame/thumbnail URL returned by the API (relative `/frames/...`) to absolute. */
