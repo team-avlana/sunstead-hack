@@ -675,6 +675,70 @@ def project_ids_for_video(video_id: str) -> list[str]:
     return [str(r["project_id"]) for r in rows]
 
 
+# ── Storyboard frames ─────────────────────────────────────────────────────────
+
+def save_storyboard_frame(
+    project_id: str,
+    concept: str,
+    shot_type: str,
+    aspect_ratio: str,
+    image: bytes,
+    mime_type: str = "image/png",
+) -> str:
+    """Insert a storyboard frame row and return its UUID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "INSERT INTO storyboard_frames "
+            "(project_id, concept, shot_type, aspect_ratio, image, mime_type) "
+            "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            (project_id, concept, shot_type, aspect_ratio, image, mime_type),
+        ).fetchone()
+    return str(row["id"])
+
+
+def get_storyboard_frame(frame_id: str) -> dict | None:
+    """Return {data: bytes, mime_type: str, concept: str, shot_type: str} or None."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT image, mime_type, concept, shot_type, aspect_ratio, created_at "
+            "FROM storyboard_frames WHERE id = %s AND deleted_at IS NULL",
+            (frame_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "data": bytes(row["image"]),
+        "mime_type": row["mime_type"],
+        "concept": row["concept"],
+        "shot_type": row["shot_type"],
+        "aspect_ratio": row["aspect_ratio"],
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+def list_storyboard_frames(project_id: str) -> list[dict]:
+    """List all storyboard frames for a project (metadata only, no image bytes)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, concept, shot_type, aspect_ratio, created_at "
+            "FROM storyboard_frames "
+            "WHERE project_id = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC",
+            (project_id,),
+        ).fetchall()
+    return [
+        {
+            "storyboard_frame_id": str(r["id"]),
+            "concept": r["concept"],
+            "shot_type": r["shot_type"],
+            "aspect_ratio": r["aspect_ratio"],
+            "image_url": f"/api/storyboard/{r['id']}",
+            "created_at": r["created_at"].isoformat(),
+        }
+        for r in rows
+    ]
+
+
 def pg_notify_change(payload: dict) -> None:
     """Emit a Postgres NOTIFY on 'rainy_change'. The server's listener forwards it
     to websocket subscribers. Used for cross-process signals (e.g. analyze_video)."""

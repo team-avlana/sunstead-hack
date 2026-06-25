@@ -44,7 +44,12 @@ def _video_view(src: dict) -> dict:
         return {"video_id": None, "status": state, "tags": [], "storyboard": []}
     full = db.get_video_full(video_id)
     if full is None:
-        return {"video_id": video_id, "status": "not_analysed", "tags": [], "storyboard": []}
+        return {
+            "video_id": video_id,
+            "status": "not_analysed",
+            "tags": [],
+            "storyboard": [],
+        }
     return video_view.derive_video(full["video"], full["shots"])
 
 
@@ -63,6 +68,7 @@ def _enrich_artifact(artifact: dict) -> dict:
 
 
 # ── handlers ───────────────────────────────────────────────────────────────────
+
 
 async def health(_: Request) -> JSONResponse:
     try:
@@ -104,7 +110,11 @@ async def get_video(request: Request) -> JSONResponse:
         return JSONResponse({"error": "video not found"}, status_code=404)
     view = video_view.derive_video(full["video"], full["shots"])
     shots_summary = [
-        {"idx": s["idx"], "start_sec": float(s["start_sec"]), "end_sec": float(s["end_sec"])}
+        {
+            "idx": s["idx"],
+            "start_sec": float(s["start_sec"]),
+            "end_sec": float(s["end_sec"]),
+        }
         for s in full["shots"]
     ]
     return JSONResponse({"video": view, "shots_summary": shots_summary})
@@ -145,7 +155,9 @@ async def create_artifact(request: Request) -> JSONResponse:
         },
         project_id=pid,
     )
-    return JSONResponse({"artifact_id": result["artifact_id"], "version": result["version"]})
+    return JSONResponse(
+        {"artifact_id": result["artifact_id"], "version": result["version"]}
+    )
 
 
 async def update_artifact(request: Request) -> JSONResponse:
@@ -243,7 +255,8 @@ async def analyze(request: Request) -> JSONResponse:
     await run_in_threadpool(worker.spawn_analysis_worker, video_id)
     # Signal any all-projects listeners; the canvas block also polls the status API.
     await run_in_threadpool(
-        db.pg_notify_change, {"type": "video", "action": "created", "video_id": video_id}
+        db.pg_notify_change,
+        {"type": "video", "action": "created", "video_id": video_id},
     )
     return JSONResponse({"video_id": video_id, "creator_id": creator_id})
 
@@ -278,6 +291,14 @@ async def get_frame(request: Request):
     return Response(content=frame["data"], media_type=frame["mime_type"])
 
 
+async def get_storyboard_frame(request: Request):
+    frame_id = request.path_params["frame_id"]
+    frame = await run_in_threadpool(db.get_storyboard_frame, frame_id)
+    if frame is None:
+        return JSONResponse({"error": "storyboard frame not found"}, status_code=404)
+    return Response(content=frame["data"], media_type=frame["mime_type"])
+
+
 async def get_active_project(_: Request) -> JSONResponse:
     """The project the canvas currently has open (mirrors the MCP tool)."""
     return JSONResponse(active_project.get_active())
@@ -298,7 +319,9 @@ async def set_active_project(request: Request) -> JSONResponse:
 async def list_creators(request: Request) -> JSONResponse:
     kind = request.query_params.get("kind")
     if kind and kind not in ("self", "reference"):
-        return JSONResponse({"error": "kind must be 'self' or 'reference'"}, status_code=400)
+        return JSONResponse(
+            {"error": "kind must be 'self' or 'reference'"}, status_code=400
+        )
     creators = await run_in_threadpool(db.list_creators, kind)
     return JSONResponse({"creators": creators})
 
@@ -307,7 +330,9 @@ async def get_creator_room_image(request: Request):
     cid = request.path_params["creator_id"]
     img = await run_in_threadpool(db.get_creator_room_image, cid)
     if img is None:
-        return JSONResponse({"error": "no room image for this creator"}, status_code=404)
+        return JSONResponse(
+            {"error": "no room image for this creator"}, status_code=404
+        )
     return Response(content=img["data"], media_type=img["mime_type"])
 
 
@@ -351,9 +376,16 @@ routes = [
     Route("/api/videos/{video_id}/status", get_video_status),
     Route("/api/videos/{video_id}/reanalyze", reanalyze, methods=["POST"]),
     Route("/api/videos/{video_id}", get_video),
+    Route("/api/storyboard/{frame_id}", get_storyboard_frame),
     Route("/api/creators", list_creators),
     Route("/api/creators/{creator_id}/videos", list_creator_videos),
-    Route("/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]),
-    Route("/api/creators/{creator_id}/room-image", post_creator_room_image, methods=["POST"]),
+    Route(
+        "/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]
+    ),
+    Route(
+        "/api/creators/{creator_id}/room-image",
+        post_creator_room_image,
+        methods=["POST"],
+    ),
     Route("/frames/{frame_id}", get_frame),
 ]

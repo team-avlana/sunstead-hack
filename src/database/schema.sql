@@ -224,3 +224,25 @@ CREATE INDEX idx_memory_project ON memory (project_id) WHERE deleted_at IS NULL;
 CREATE TRIGGER trg_memory_touch
     BEFORE UPDATE ON memory
     FOR EACH ROW EXECUTE FUNCTION touch_timestamps();
+
+-- ============================================================================
+--  STORYBOARD_FRAMES — AI-generated images for future video ideas.
+--  Each row is one panel: a concept/scene description → gpt-image-1.5 PNG.
+--  The image is served via GET /api/storyboard/{id} and embedded in canvas
+--  artifacts as image elements with src='/api/storyboard/{id}'.
+-- ============================================================================
+CREATE TABLE storyboard_frames (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id   uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    concept      text NOT NULL,           -- scene/shot description used as prompt
+    shot_type    text NOT NULL DEFAULT 'medium shot',
+    aspect_ratio text NOT NULL DEFAULT '1:1',
+    image        bytea NOT NULL,          -- raw PNG bytes
+    mime_type    text NOT NULL DEFAULT 'image/png',
+
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    deleted_at   timestamptz
+);
+
+CREATE INDEX idx_storyboard_frames_project ON storyboard_frames (project_id)
+    WHERE deleted_at IS NULL;
