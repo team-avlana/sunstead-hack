@@ -3,4 +3,5 @@ psycopg[binary,pool]
 yt-dlp
 uvicorn[standard]
 starlette
+python-dotenv
 tomli ; python_version < "3.11"
