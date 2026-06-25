@@ -3,61 +3,62 @@
 import { useEffect, useState } from 'react'
 import CreatorWizard from './CreatorWizard'
 import { requestRoomGeneration, type RoomGenerationPayload } from '@/lib/creatorRoomParams'
-import { loadGeneratedImage, SAMPLE_IMAGE } from '@/lib/creatorRoom'
+import { clearGeneratedImage, DEFAULT_ROOM_IMAGE } from '@/lib/creatorRoom'
 
 type Status = { kind: 'idle' | 'hint'; msg?: string }
 
 /**
- * The Creator Room hero — a clean 2D image. The painted room is produced by the
- * Python service; until one exists we show the bundled reference sample, blurred.
- * A subtle "Redesign" affordance opens the wizard to (re)collect the room brief.
- * (The earlier in-browser 3D diorama + live-generate UI was retired — see git.)
+ * The Creator Room hero — a clean 2D clay-render image. We always show the
+ * bundled default room (image generation via the Python service is still a stub,
+ * so it never produces a real custom image yet). A single clean "Design my room"
+ * pill floats over the art and opens the wizard to collect/revise the room brief.
+ * (The earlier 3D diorama UI was retired — see git.)
  */
 export default function CreatorRoom() {
-  // SSR renders the deterministic sample; the real (cached) image loads on mount
-  // so server and client markup agree.
-  const [image, setImage] = useState<string | null>(null)
   const [wizard, setWizard] = useState(false)
+  const [briefSaved, setBriefSaved] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   useEffect(() => {
-    setImage(loadGeneratedImage())
-    // First visit (no brief saved yet) → invite them to design their room.
-    if (!window.localStorage.getItem('rainy:room:profile')) setWizard(true)
+    // Generation produces no real image yet, so anything in the legacy
+    // `rainy:room:image` slot is stale — purge it so an old cached image can't
+    // flash over the default room. (Previously it was loaded and painted on top.)
+    clearGeneratedImage()
+    setBriefSaved(!!window.localStorage.getItem('rainy:room:profile'))
   }, [])
 
-  // Wizard finished → persist the brief and (stub) trigger generation. The real
-  // 2D render comes from the Python service; today this saves the payload + hints.
+  // Wizard finished → (stub) trigger generation + hint. The real 2D render comes
+  // from the Python service later; today this just saves the brief.
   const onWizardComplete = (payload: RoomGenerationPayload) => {
     setWizard(false)
+    setBriefSaved(true)
     void requestRoomGeneration(payload)
-    setStatus({ kind: 'hint', msg: 'Saved your room brief ✨ — Rainy will paint it from the service soon.' })
+    setStatus({ kind: 'hint', msg: 'Saved your room brief ✨ — Rainey will paint it from the service soon.' })
   }
-
-  const showSample = !image
 
   return (
     <section className="room">
       <div className="room-stage">
-        <img className={`room-img${showSample ? ' sample' : ''}`} src={image ?? SAMPLE_IMAGE} alt="Your Creator Room" />
+        <img className="room-img" src={DEFAULT_ROOM_IMAGE} alt="Your Creator Room" />
 
-        {showSample && (
-          <div className="room-cta">
-            <span className="room-cta-title">Your Creator Room</span>
-            <span className="room-cta-sub">Answer a few quick questions and Rainy paints your cozy clay room — character and all.</span>
-            <button className="room-btn primary" onClick={() => setWizard(true)}>✨ Design my room</button>
-          </div>
-        )}
-
-        {/* Bare image once painted; a subtle hover button keeps the wizard reachable. */}
-        {!showSample && (
-          <button className="room-redesign" onClick={() => setWizard(true)}>✨ Redesign</button>
-        )}
+        {/* One clean, always-visible pill keeps the wizard a tap away. */}
+        <button className="room-redesign" onClick={() => setWizard(true)}>
+          <SparkIcon />
+          {briefSaved ? 'Redesign room' : 'Design my room'}
+        </button>
 
         {status.msg && <div className={`room-status ${status.kind}`} role="status">{status.msg}</div>}
       </div>
 
       {wizard && <CreatorWizard onComplete={onWizardComplete} onCancel={() => setWizard(false)} />}
     </section>
+  )
+}
+
+function SparkIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2.5l1.7 5.1a4 4 0 0 0 2.7 2.7l5.1 1.7-5.1 1.7a4 4 0 0 0-2.7 2.7L12 21.5l-1.7-5.1a4 4 0 0 0-2.7-2.7L2.5 12l5.1-1.7a4 4 0 0 0 2.7-2.7L12 2.5z" />
+    </svg>
   )
 }

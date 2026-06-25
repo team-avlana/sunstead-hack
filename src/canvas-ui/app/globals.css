@@ -62,61 +62,80 @@ button, input { font-family: inherit; }
   font-size: 21px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink);
 }
 .home-avatar {
-  width: 42px; height: 42px; border-radius: 999px;
+  width: 40px; height: 40px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #3c3f47; color: #fff; font-size: 17px; font-weight: 700;
-  box-shadow: var(--shadow-sm); cursor: default; user-select: none;
+  background: linear-gradient(140deg, #5b8def, var(--primary));
+  color: #fff; font-size: 16px; font-weight: 800; letter-spacing: 0.01em;
+  box-shadow: 0 4px 14px rgba(var(--primary-rgb), 0.34), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  cursor: default; user-select: none;
 }
 
-/* Two-column body: Creator Room on the left, greeting + projects on the right. */
+/* Two-column body: a big Creator Room on the left, greeting + projects on the right. */
 .home-main {
-  display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
-  gap: 48px; align-items: center;
-  max-width: 1240px; margin: 0 auto; padding: 24px 40px 72px;
+  display: grid; grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.78fr);
+  gap: 44px; align-items: center;
+  max-width: 1320px; margin: 0 auto; padding: 20px 40px 64px;
 }
 .home-room { min-width: 0; }
 
-.home-side { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+.home-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .home-greeting h1 {
-  margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.03em; color: var(--ink);
+  margin: 0; font-size: 38px; font-weight: 800; letter-spacing: -0.03em; color: var(--ink);
 }
 
-/* Golden hour + shoot-relevant weather under the greeting. */
-.home-conditions { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; }
-.home-conditions-loading { margin: 12px 0 0; font-size: 14px; color: var(--ink-dim); }
-.home-cond { font-size: 14px; font-weight: 600; color: var(--ink-dim); letter-spacing: -0.01em; }
-.home-cond strong { color: var(--ink); font-weight: 800; }
-.home-cond-golden { color: var(--ink); }
-.home-cond-ico { margin-right: 6px; }
-.home-cond-approx, .home-cond-dim { color: var(--ink-dim); font-weight: 500; }
+/* ---- Golden hour + conditions: one quiet line under the greeting ---- */
+.home-conditions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  margin: 11px 0 0; font-size: 13.5px; font-weight: 500; color: var(--ink-dim); letter-spacing: -0.01em;
+}
+.home-cond { display: inline-flex; align-items: center; gap: 5px; }
+.home-cond-golden { color: var(--ink); font-weight: 600; }
+.home-sun { color: #d8943f; flex: none; }
+.home-cond-sep { color: var(--ink-dim); opacity: 0.45; }
 
-/* Project list — full-width pill rows. */
-.home-list { display: flex; flex-direction: column; gap: 12px; }
-.home-row {
-  position: relative; display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 58px; padding: 0 22px;
-  border: 0; border-radius: 16px; cursor: pointer; font-family: inherit;
-  font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
-  background: #eceae4; box-shadow: var(--shadow-sm);
-  transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+/* ---- Projects: a compact, glassy card grid ---- */
+.home-projects { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.home-projects-head { display: flex; align-items: center; justify-content: space-between; }
+.home-projects-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim);
 }
-.home-row:hover { transform: translateY(-1px); background: #e6e3db; box-shadow: var(--shadow-md); }
-.home-row:active { transform: translateY(0); }
-.home-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.home-row-new {
-  background: #3c3f47; color: #fff; gap: 8px; box-shadow: var(--shadow-md);
+.home-new {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer; font-family: inherit;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: var(--primary); box-shadow: var(--primary-shadow);
+  transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
 }
-.home-row-new:hover { background: #2e313a; }
-.home-row-plus { font-size: 22px; font-weight: 400; line-height: 1; }
-.home-row-del {
-  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-  width: 26px; height: 26px; border-radius: 999px;
+.home-new:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.home-new:active { transform: translateY(0); }
+.home-new-plus { font-size: 16px; font-weight: 500; line-height: 1; margin-top: -1px; }
+
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+.home-card {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px;
+  min-height: 70px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 16px;
+  cursor: pointer; font-family: inherit; text-align: left;
+  background: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: var(--shadow-sm);
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.home-card:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.92); box-shadow: var(--shadow-md); }
+.home-card:active { transform: translateY(0); }
+.home-card-title {
+  font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.home-card-meta { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
+.home-card-del {
+  position: absolute; right: 9px; top: 9px;
+  width: 24px; height: 24px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 18px; line-height: 1; color: var(--ink-dim); background: rgba(18, 24, 48, 0.05);
+  font-size: 16px; line-height: 1; color: var(--ink-dim); background: rgba(18, 24, 48, 0.05);
   opacity: 0; transition: opacity .14s ease, background .14s ease, color .14s ease;
 }
-.home-row:hover .home-row-del { opacity: 1; }
-.home-row-del:hover { background: rgba(229, 72, 77, 0.16); color: #e5484d; }
+.home-card:hover .home-card-del { opacity: 1; }
+.home-card-del:hover { background: rgba(229, 72, 77, 0.16); color: #e5484d; }
 
 /* ============================================================
    Creator Room — the 2D clay-room hero (painted by the Python service)
@@ -127,39 +146,31 @@ button, input { font-family: inherit; }
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  max-height: 72vh;
-  border-radius: 28px;
+  max-height: 84vh;
+  /* Squircle frame on a clean surface — matches the canvas' rounded chrome. */
+  border-radius: 38px;
   overflow: hidden;
-  /* Floats borderless on the warm page background, like the reference art. */
-  background: transparent;
+  background: var(--canvas);
+  border: 1px solid var(--primary-border);
+  box-shadow: var(--card-shadow);
 }
 
-/* ---- the painted room image (contain → the whole isometric room is visible) ---- */
-.room-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+/* ---- the painted room image fills the squircle (square art in a square stage) ---- */
+.room-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* subtle hover affordance once a room exists */
+/* Clean, always-visible glass pill — the one way into the design wizard. */
 .room-redesign {
-  position: absolute; right: 14px; bottom: 14px; z-index: 3;
-  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.86);
-  -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3;
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(16px) saturate(170%); backdrop-filter: blur(16px) saturate(170%);
   box-shadow: var(--shadow-sm); cursor: pointer; font-family: inherit;
-  height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--ink);
-  opacity: 0; transform: translateY(4px); transition: opacity .16s ease, transform .16s ease, background .14s ease;
+  height: 38px; padding: 0 17px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: var(--ink);
+  opacity: 0.94; transition: opacity .16s ease, transform .16s ease, background .16s ease, box-shadow .16s ease;
 }
-.room-stage:hover .room-redesign { opacity: 1; transform: none; }
-.room-redesign:hover { background: #fff; }
-/* Until a real image is generated, the reference sample sits blurred + dimmed
-   behind the CTA (the blur also hides the reference's annotation marks). */
-.room-img.sample { filter: blur(7px) saturate(1.05) brightness(0.94); transform: scale(1.06); }
-.room-cta {
-  position: absolute; inset: 0; z-index: 2;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  text-align: center; padding: 24px;
-  background: radial-gradient(120% 90% at 50% 45%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
-}
-.room-cta-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); text-shadow: 0 1px 12px rgba(255, 255, 255, 0.9); }
-.room-cta-sub { font-size: 13.5px; font-weight: 500; color: var(--ink); max-width: 40ch; line-height: 1.5; text-shadow: 0 1px 10px rgba(255, 255, 255, 0.9); }
-.room-cta .room-btn { margin-top: 6px; height: 38px; padding: 0 18px; font-size: 14px; }
+.room-redesign:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); background: #fff; box-shadow: var(--shadow-md); }
+.room-redesign:active { transform: translateX(-50%) translateY(0); }
+.room-redesign svg { color: var(--primary); }
 
 /* Spinner — still used by the room-design wizard's "building" step. */
 .room-spinner {
@@ -206,8 +217,8 @@ button, input { font-family: inherit; }
 .ob {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center; padding: 24px;
-  background: rgba(18, 24, 48, 0.28);
-  -webkit-backdrop-filter: blur(8px) saturate(120%); backdrop-filter: blur(8px) saturate(120%);
+  background: rgba(18, 24, 48, 0.32);
+  -webkit-backdrop-filter: blur(16px) saturate(120%); backdrop-filter: blur(16px) saturate(120%);
   animation: ob-fade 180ms ease;
 }
 @keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -273,8 +284,8 @@ button, input { font-family: inherit; }
   text-align: center; min-height: 220px; padding: 20px;
 }
 
-/* ---- CreatorWizard (image-params) -------------------------------------- */
-.ob-card.wizard { max-width: 540px; max-height: 88vh; overflow-y: auto; }
+/* ---- CreatorWizard (image-params) — centered pop-up modal --------------- */
+.ob-card.wizard { max-width: 560px; max-height: 88vh; overflow-y: auto; }
 .ob-mt { margin-top: 14px; }
 .ob-flabel { display: block; margin: 18px 0 8px; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
 
@@ -340,13 +351,11 @@ button, input { font-family: inherit; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap;
 }
 
-.home-empty { padding: 18px 4px; color: var(--ink-dim); font-size: 14px; }
-
 /* Stack the columns on narrow viewports. */
 @media (max-width: 860px) {
   .home-main { grid-template-columns: 1fr; gap: 28px; padding: 16px 24px 56px; }
-  .home-greeting h1 { font-size: 34px; }
-  .home-room { max-width: 460px; margin: 0 auto; }
+  .home-greeting h1 { font-size: 32px; }
+  .home-room { max-width: 540px; margin: 0 auto; }
 }
 @media (max-width: 640px) {
   .ob-card { padding: 24px 20px 18px; }
@@ -835,6 +844,17 @@ button, input { font-family: inherit; }
 .rainy-text-card:active { cursor: grabbing; }
 .rainy-text-card.is-editing { cursor: text; }
 .rainy-text-card.is-small { border-radius: 13px; padding: 14px 16px; }
+/* Selection / hover border drawn on the card itself (tldraw's overlay indicator
+   is suppressed for this shape so the trash button can sit above the border —
+   see RainyTextShape `hideSelectionBoundsFg`/`getIndicatorPath`). `--tl-scale`
+   (= 1/zoom) keeps the ring a constant ~1.5px on screen at any zoom, matching
+   tldraw's native indicator; `--tl-color-selected` follows the light/dark theme. */
+.rainy-text-card.is-hovered {
+  box-shadow: 0 0 0 calc(1.5px * var(--tl-scale)) color-mix(in srgb, var(--tl-color-selected) 40%, transparent), var(--card-shadow);
+}
+.rainy-text-card.is-selected {
+  box-shadow: 0 0 0 calc(1.5px * var(--tl-scale)) var(--tl-color-selected), var(--card-shadow);
+}
 /* Always top-aligned, whether empty or not. The caret blinks in a fixed spot
    from the moment the card is created and the text flows straight down from
    there — no jump from centre to top when the first character lands. */
@@ -1071,6 +1091,52 @@ button, input { font-family: inherit; }
   --shadow-lg: 0 20px 54px rgba(0, 0, 0, 0.60), 0 4px 12px rgba(0, 0, 0, 0.40);
 }
 
+/* ---- Home + its wizard live in `.rainy-app` (not `.rainy-root`), so they need
+   their own dark palette. Re-point the tokens on `.home`; the nested wizard
+   (`.ob`) inherits them. A few hardcoded-white surfaces are flipped below. ---- */
+.rainy-app.dark .home {
+  --canvas: #0e1219;
+  --border: rgba(255, 255, 255, 0.10);
+  --ink: #e8ebf3;
+  --ink-dim: #8b93a7;
+  --primary-border: rgba(var(--primary-rgb), 0.30);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.40), 0 12px 30px rgba(0, 0, 0, 0.50);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 54px rgba(0, 0, 0, 0.60), 0 4px 12px rgba(0, 0, 0, 0.40);
+  background: #0e1219;
+}
+/* Home surfaces */
+.rainy-app.dark .home-card { background: rgba(255, 255, 255, 0.05); }
+.rainy-app.dark .home-card:hover { background: rgba(255, 255, 255, 0.09); }
+.rainy-app.dark .home-card-del { background: rgba(255, 255, 255, 0.08); }
+.rainy-app.dark .room-stage { background: var(--canvas); }
+.rainy-app.dark .room-redesign { background: rgba(34, 40, 54, 0.72); }
+.rainy-app.dark .room-redesign:hover { background: rgba(44, 51, 68, 0.94); }
+.rainy-app.dark .room-status { background: rgba(34, 40, 54, 0.92); }
+/* Wizard surfaces. The modal is portaled to <body> (outside `.rainy-app`), so it
+   carries its own `.dark` flag and re-points its tokens here, then flips the
+   panels that hardcode white. */
+.ob.dark {
+  --border: rgba(255, 255, 255, 0.10);
+  --ink: #e8ebf3;
+  --ink-dim: #8b93a7;
+  --primary-border: rgba(var(--primary-rgb), 0.30);
+}
+.ob.dark .ob-card { background: #11151c; }
+.ob.dark .ob-input,
+.ob.dark .ob-textarea,
+.ob.dark .ob-chip,
+.ob.dark .ob-opt,
+.ob.dark .ob-pet { background: rgba(255, 255, 255, 0.05); }
+.ob.dark .ob-close,
+.ob.dark .ob-seg,
+.ob.dark .ob-dots span,
+.ob.dark .ob-prompt { background: rgba(255, 255, 255, 0.08); }
+.ob.dark .room-btn.ghost { background: rgba(255, 255, 255, 0.06); }
+.ob.dark .ob-opt.on,
+.ob.dark .ob-pet.on { background: rgba(var(--primary-rgb), 0.16); }
+
 /* Glass surfaces that hardcode a light tint → dark glass. */
 .rainy-root.dark .rainy-dock { background: rgba(24, 28, 40, 0.82); }
 .rainy-root.dark .rainy-tool { color: var(--ink); }
@@ -1084,15 +1150,8 @@ button, input { font-family: inherit; }
 .rainy-root.dark .rainy-sidebar-show { background: rgba(34, 40, 54, 0.92); }
 .rainy-root.dark .rainy-sidebar-show:hover { background: rgba(44, 51, 68, 0.96); }
 
-/* --- Claude Code panel on dark glass --- */
-.rainy-root.dark .rainy-claude {
-  background: rgba(22, 26, 38, 0.62);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-.rainy-root.dark .cc-collapse:hover { background: rgba(255, 255, 255, 0.08); }
-.rainy-root.dark .cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
-.rainy-root.dark .rainy-claude-show { background: rgba(34, 40, 54, 0.92); }
-.rainy-root.dark .rainy-claude-show:hover { background: rgba(44, 51, 68, 0.96); }
+/* Claude Code panel on dark glass → see `.rainy-app.dark .rainy-claude*` at the
+   end of this file (the panel moved to the app shell so it themes on Home too). */
 
 .rainy-root.dark .ci-collapse:hover { background: rgba(255, 255, 255, 0.08); }
 /* Inspector variant rows + action pills on dark glass. */
@@ -1130,3 +1189,43 @@ button, input { font-family: inherit; }
 .rainy-root.dark .rt-menu-item:hover { background: rgba(255, 255, 255, 0.08); }
 .rainy-root.dark .rt-menu-item.on { background: rgba(59, 110, 246, 0.18); }
 .rainy-root.dark .rt-menu-preview { background: rgba(255, 255, 255, 0.06); }
+/* The "Aa" + duplicate pill hardcodes a white surface (like .rt-menu did) and
+   its hover/active tints are dark-on-light — re-point both for night mode. */
+.rainy-root.dark .rt-main { background: #1a1f2c; }
+.rainy-root.dark .rt-pill:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rt-pill.on { background: rgba(255, 255, 255, 0.10); }
+.rainy-root.dark .rt-icon:hover { background: rgba(255, 255, 255, 0.08); }
+
+/* ============================================================
+   App shell — persists the Claude panel across Home ⇄ canvas
+   ============================================================
+   .rainy-app wraps BOTH Home and the canvas; <ClaudePanel/> is rendered as a
+   constant sibling inside it, so the single `claude` session (websocket + PTY)
+   mounts once and survives every navigation instead of resetting. Plain fixed
+   positioning bounds the absolutely-positioned panel without trapping
+   descendant fixed elements (Home, the canvas, tldraw popups). */
+.rainy-app { position: fixed; inset: 0; }
+
+/* Reserve the right gutter on Home when Claude is open so the project list
+   isn't hidden behind the panel (the canvas floats it as glass over the
+   infinite surface and needs no reserve). 420px panel + 12px inset. */
+.home { transition: padding-right .3s ease; }
+.rainy-app.claude-open .home { padding-right: 432px; }
+@media (max-width: 760px) {
+  /* Too narrow to reserve — let the panel overlay; the user can collapse it. */
+  .rainy-app.claude-open .home { padding-right: 0; }
+}
+
+/* The panel now lives in the app shell (above the canvas), not inside
+   .rainy-root, so its dark-glass styling is keyed to .rainy-app.dark — which
+   also themes it on Home. This supersedes the earlier
+   `.rainy-root.dark .rainy-claude*` rules (which no longer match, the panel
+   having moved outside .rainy-root). */
+.rainy-app.dark .rainy-claude {
+  background: rgba(22, 26, 38, 0.62);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.rainy-app.dark .cc-collapse:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-app.dark .cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
+.rainy-app.dark .rainy-claude-show { background: rgba(34, 40, 54, 0.92); }
+.rainy-app.dark .rainy-claude-show:hover { background: rgba(44, 51, 68, 0.96); }

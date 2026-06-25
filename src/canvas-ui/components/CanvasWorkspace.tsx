@@ -13,6 +13,7 @@ import 'tldraw/tldraw.css'
 import { hasBackend, isBackendId } from '@/lib/api'
 import { RAINY_TEXT } from '@/lib/blockTypes'
 import { loadBackendProject } from '@/lib/backendCanvas'
+import { attachBackendSync } from '@/lib/backendSync'
 import { installBridge } from '@/lib/bridge'
 import { attachProjectAutosave, loadProjectIntoEditor } from '@/lib/projectCanvas'
 import { connectRealtime } from '@/lib/realtime'
@@ -156,7 +157,9 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
       () => editor.off('event', onCanvasEvent),
       installBridge(editor),
       connectRealtime(editor, projectId),
-      attachOutboundSync(editor),
+      // Outbound edits: backend projects write user edits through to Postgres
+      // (full bidirectional CRUD); local projects forward them to the native shell.
+      isBackend ? attachBackendSync(editor, projectId) : attachOutboundSync(editor),
       // Local autosave only for XML/localStorage projects — backend projects are
       // sourced from Postgres and reconciled by realtime, never saved locally.
       ...(isBackend ? [] : [attachProjectAutosave(editor, projectId)]),

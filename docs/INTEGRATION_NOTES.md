@@ -51,4 +51,34 @@ Implemented on `feature/rainy-canvas-mcp-integration` (see `docs/RUNNING.md`):
   live analysis (`video_view.derive_video`). Cross-process change-signals use Postgres
   `LISTEN/NOTIFY` (no DDL on the shared DB).
 
-Still open: forcing the canvas fully read-only (#1) and the `mac-app` static-export packaging.
+Still open: the `mac-app` static-export packaging.
+
+## Reconciliation status — 2026-06-25 (canvas → backend writes: full CRUD)
+**Decision reversed: the canvas is now intentionally _editable_ (bidirectional), not read-only (#1).**
+The product wants users to edit on the canvas and have it persist, with the agent and the canvas as
+co-equal writers of the same `artifacts`. Implemented:
+- **Write HTTP API.** `python-service` now exposes the write half alongside the reads:
+  `POST /api/projects/{id}/artifacts` (create) and `PUT`/`DELETE /api/artifacts/{id}`. `PUT` accepts
+  `position`, `title`, whole-`payload`, **`payload_patch`** (shallow-merge), **`element_patch`**
+  (merge one `payload.elements[]` by id), and **`element_remove`** (drop one element). Every write
+  bumps `version` and broadcasts the same WS change-signal as the MCP tools.
+- **Outbound sync.** `lib/backendSync.ts` (`attachBackendSync`) listens for genuine *user* edits to
+  backend shapes and maps them to those writes: move→`position`/`element_patch{x,y}`,
+  resize→`element_patch{w,h}`, text→`payload_patch{content}` (top-level) or structured
+  `element_patch{format,title,subtitle,body}` (frame child — see below), video view→`{view}`,
+  frame rename→`payload_patch{label}`+`title`, delete→`DELETE`/`element_remove`, and create→`POST`
+  then "adopt" the shape (id map) so reconciliation doesn't duplicate it. Debounced + coalesced.
+- **No-clobber guards.** The reconcile loop (`syncBackendProject`) skips overwriting content that's
+  being edited / was just edited (content-dirty grace + the active editing shape), and won't
+  re-create an artifact the user just deleted (pending-delete) — so a write survives its own
+  round-trip and the 6s poll.
+- **Structured text + `block_normalize`.** Because `db.update_artifact` runs
+  `block_normalize.normalize_payload` (structured `{format,title,subtitle,body}` parts win and
+  rebuild `content`), a frame's text *element* is written structurally, not as raw `content`, or the
+  normalizer would rebuild it from stale parts. Top-level text artifacts aren't normalized, so they
+  keep raw `content`. Kept in sync with `canvas-ui/lib/blockTypes.ts`.
+- **Verified** end-to-end against the live DB: create / payload_patch / element_patch (merge) /
+  position / element_remove / delete, plus the structured-text round-trip and its counter-proof.
+
+Net: `docs/architecture.md` still describes the canvas as "read-only" — that is now **superseded**
+for artifact authoring; the canvas is a bidirectional view over `artifacts`.

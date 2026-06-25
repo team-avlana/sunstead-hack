@@ -10,6 +10,7 @@ import {
   T,
   TLResizeInfo,
   TLShape,
+  TLShapeId,
   resizeBox,
   useEditor,
   useValue,
@@ -27,6 +28,7 @@ import {
   restructure,
   setDefaultTextFormat,
 } from '@/lib/blockTypes'
+import { relayoutFrame } from '@/lib/frameLayout'
 import { DeleteButton } from './ShapeChrome'
 
 /**
@@ -56,8 +58,17 @@ declare module 'tldraw' {
 
 export type RainyTextShape = TLShape<typeof RAINY_TEXT>
 
-const LARGE = { w: 440, h: 260 }
+// Sized to read as a sibling of the video block: same width as a video card
+// (360) and the height of an analysed/expanded video (see lib/blockTypes `dims`,
+// status 'analysed' → h 332), so text + video cards share one visual footprint.
+const LARGE = { w: 360, h: 332 }
 const SMALL_MAX_H = 150
+/** Auto-height floor. The card hugs its content — AI-generated text and the
+ * user's own typing both grow/shrink it instead of scrolling inside a fixed box
+ * — never collapsing below this. Width stays put (it matches the video block);
+ * only height tracks the content. Re-flowing the enclosing frame so siblings
+ * don't overlap is delegated to lib/frameLayout `relayoutFrame`. */
+const MIN_H = 56
 
 export class RainyTextShapeUtil extends ShapeUtil<RainyTextShape> {
   static override type = RAINY_TEXT
@@ -93,15 +104,21 @@ export class RainyTextShapeUtil extends ShapeUtil<RainyTextShape> {
     return <RainyText shape={shape} />
   }
 
-  getIndicatorPath(shape: RainyTextShape) {
-    const path = new Path2D()
-    const r = 16
-    if (typeof path.roundRect === 'function') {
-      path.roundRect(0, 0, shape.props.w, shape.props.h, r)
-    } else {
-      path.rect(0, 0, shape.props.w, shape.props.h)
-    }
-    return path
+  // tldraw paints the selection border + hover indicator on a *canvas overlay*
+  // that sits above the shapes layer (z 500 vs 300), so it always covers the
+  // card's own chrome (the trash button, the toolbar) no matter their z-index.
+  // We opt this shape out of both — the empty indicator path draws nothing and
+  // `hideSelectionBoundsFg` drops the bounding-box stroke — and redraw the
+  // rounded selection/hover border *on the card itself* (see `.rainy-text-card`
+  // `.is-selected`/`.is-hovered` in globals.css). The border then lives in the
+  // HTML layer beneath the trash, so the trash sits cleanly on top. Resize
+  // handles are unaffected and still render.
+  override hideSelectionBoundsFg() {
+    return true
+  }
+
+  getIndicatorPath() {
+    return new Path2D()
   }
 }
 
@@ -159,10 +176,14 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
   const editor = useEditor()
   const isEditing = useValue('editing', () => editor.getEditingShapeId() === shape.id, [editor, shape.id])
   const isHovered = useValue('hovered', () => editor.getHoveredShapeId() === shape.id, [editor, shape.id])
+  // We render our own selection/hover border on the card (tldraw's overlay
+  // indicator is suppressed for this shape — see the util above).
+  const isSelected = useValue('selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
   const [formatOpen, setFormatOpen] = useState(false)
   const [zoneHover, setZoneHover] = useState(false)
 
   const saveTimer = useRef<number | undefined>(undefined)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const tiptap = useTiptap({
     immediatelyRender: false,
@@ -219,6 +240,40 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
 
   useEffect(() => () => window.clearTimeout(saveTimer.current), [])
 
+  // Auto-fit the card's height to its content. We measure the prose's natural
+  // height (it lives in the DOM regardless of the card's clipped box) and patch
+  // shape.props.h to match — so AI-generated text and the user's typing both
+  // resize the card live. A ResizeObserver catches every reflow (typing, an
+  // external html update, or a width change). Height patches are history-ignored
+  // (they never land in undo). After resizing, we re-flow the enclosing frame (if
+  // any) so siblings don't overlap and the frame grows/shrinks to fit. Width is
+  // left untouched.
+  useEffect(() => {
+    if (!tiptap) return
+    const prose = tiptap.view.dom as HTMLElement
+    const fit = () => {
+      const card = cardRef.current
+      if (!card) return
+      const cs = getComputedStyle(card)
+      const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+      const target = Math.max(MIN_H, Math.ceil(prose.scrollHeight + padV))
+      const cur = editor.getShape<RainyTextShape>(shape.id)
+      if (!cur || Math.abs(target - cur.props.h) <= 1) return
+      // Auto-fit height is derived, not a user edit — apply it as a `remote` change
+      // (history-ignored) so it isn't pushed to Postgres. relayoutFrame does the same.
+      editor.store.mergeRemoteChanges(() =>
+        editor.run(() => editor.updateShape({ id: shape.id, type: RAINY_TEXT, props: { h: target } }), {
+          history: 'ignore',
+        }),
+      )
+      if (cur.parentId) relayoutFrame(editor, cur.parentId as TLShapeId)
+    }
+    const ro = new ResizeObserver(fit)
+    ro.observe(prose)
+    fit()
+    return () => ro.disconnect()
+  }, [tiptap, editor, shape.id])
+
   const isSmall = shape.props.h < SMALL_MAX_H
   // Active area = the whole dome (card + space above), via the .rt-zone hover.
   const showMain = zoneHover || isHovered || isEditing || formatOpen
@@ -274,7 +329,12 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
       >
         <DeleteButton editor={editor} id={shape.id} show={showMain} />
 
-        <div className={`rainy-text-card${isSmall ? ' is-small' : ''}${isEditing ? ' is-editing' : ''}`}>
+        <div
+          ref={cardRef}
+          className={`rainy-text-card${isSmall ? ' is-small' : ''}${isEditing ? ' is-editing' : ''}${
+            isSelected ? ' is-selected' : isHovered ? ' is-hovered' : ''
+          }`}
+        >
           <div
             className="rainy-text-content"
             onPointerDown={stop}

@@ -1,4 +1,6 @@
 from fastmcp import FastMCP
+
+import active_project
 import db
 
 
@@ -26,3 +28,14 @@ def register(mcp: FastMCP) -> None:
         memories, or to resume work on a previous video.
         """
         return db.list_projects()
+
+    @mcp.tool()
+    def get_active_project() -> dict:
+        """Which project the user currently has open on the canvas.
+
+        Returns {project_id, name}; both are null when the user is on the Home
+        screen (no project open). The project-scoped tools (create_artifact,
+        list_artifacts) default to this project when you omit project_id, so you
+        normally don't need to ask the user which project they mean — just read
+        it from here."""
+        return active_project.get_active()

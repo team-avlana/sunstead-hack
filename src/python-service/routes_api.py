@@ -4,11 +4,14 @@ Mounted alongside the MCP server in server.py.
     GET    /api/health
     GET    /api/projects
     GET    /api/projects/{project_id}        -> {project, artifacts:[enriched]}
+    POST   /api/projects/{project_id}/artifacts -> create; broadcasts WS change signal
     GET    /api/artifacts/{artifact_id}      -> enriched artifact
     PUT    /api/artifacts/{artifact_id}      -> update; broadcasts WS change signal
     DELETE /api/artifacts/{artifact_id}      -> soft-delete; broadcasts WS change signal
+    POST   /api/analyze                      -> start analysis for a URL -> {video_id}
     GET    /api/videos/{video_id}            -> {video, shots_summary}
     GET    /api/videos/{video_id}/status     -> lightweight status poll
+    POST   /api/videos/{video_id}/reanalyze  -> re-run analysis for a video
     GET    /api/creators/{creator_id}/videos -> video list with status + metadata
     GET    /frames/{frame_id}               -> JPEG image served from the frames table
 
@@ -23,10 +26,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+import active_project
 import db
 import image_gen
 import notify
 import video_view
+import worker
 
 
 def _video_view(src: dict) -> dict:
@@ -39,7 +44,12 @@ def _video_view(src: dict) -> dict:
         return {"video_id": None, "status": state, "tags": [], "storyboard": []}
     full = db.get_video_full(video_id)
     if full is None:
-        return {"video_id": video_id, "status": "not_analysed", "tags": [], "storyboard": []}
+        return {
+            "video_id": video_id,
+            "status": "not_analysed",
+            "tags": [],
+            "storyboard": [],
+        }
     return video_view.derive_video(full["video"], full["shots"])
 
 
@@ -58,6 +68,7 @@ def _enrich_artifact(artifact: dict) -> dict:
 
 
 # ── handlers ───────────────────────────────────────────────────────────────────
+
 
 async def health(_: Request) -> JSONResponse:
     try:
@@ -99,10 +110,54 @@ async def get_video(request: Request) -> JSONResponse:
         return JSONResponse({"error": "video not found"}, status_code=404)
     view = video_view.derive_video(full["video"], full["shots"])
     shots_summary = [
-        {"idx": s["idx"], "start_sec": float(s["start_sec"]), "end_sec": float(s["end_sec"])}
+        {
+            "idx": s["idx"],
+            "start_sec": float(s["start_sec"]),
+            "end_sec": float(s["end_sec"]),
+        }
         for s in full["shots"]
     ]
     return JSONResponse({"video": view, "shots_summary": shots_summary})
+
+
+async def create_artifact(request: Request) -> JSONResponse:
+    """Create an artifact for a project (the canvas authoring a new block/flow).
+    Mirrors the MCP create_artifact tool so canvas-originated and agent-originated
+    creates land identically and both ping the websocket."""
+    pid = request.path_params["project_id"]
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    type_ = body.get("type") or "frame"
+    try:
+        result = await run_in_threadpool(
+            lambda: db.create_artifact(
+                project_id=pid,
+                type_=type_,
+                title=body.get("title"),
+                payload=body.get("payload") or {},
+                position=body.get("position"),
+            )
+        )
+    except Exception:
+        # Most likely an unknown project_id (FK violation). Don't echo the DB error.
+        return JSONResponse({"error": "could not create artifact"}, status_code=400)
+
+    await notify.broadcast(
+        {
+            "type": "artifact",
+            "action": "created",
+            "artifact_id": result["artifact_id"],
+            "project_id": pid,
+            "version": result["version"],
+        },
+        project_id=pid,
+    )
+    return JSONResponse(
+        {"artifact_id": result["artifact_id"], "version": result["version"]}
+    )
 
 
 async def update_artifact(request: Request) -> JSONResponse:
@@ -118,6 +173,8 @@ async def update_artifact(request: Request) -> JSONResponse:
             payload=body.get("payload"),
             element_id=body.get("element_id"),
             element_patch=body.get("element_patch"),
+            element_remove=body.get("element_remove"),
+            payload_patch=body.get("payload_patch"),
             position=body.get("position"),
             title=body.get("title"),
         )
@@ -165,6 +222,59 @@ async def get_video_status(request: Request) -> JSONResponse:
     return JSONResponse(status)
 
 
+async def analyze(request: Request) -> JSONResponse:
+    """Start analysis for a video URL — the canvas equivalent of the analyze_video
+    MCP tool (Video Block "Analyse" button / sidebar). Inserts a videos row, spawns
+    the analysis-worker, and returns the new video_id; the block then polls
+    /api/videos/{video_id} until status flips to analysed/error.
+
+    Body: {source_url, creator_id?}. Without creator_id, a singleton "Canvas"
+    creator owns the video (see db.find_or_create_default_creator)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    source_url = (body.get("source_url") or "").strip()
+    if not source_url:
+        return JSONResponse({"error": "source_url is required"}, status_code=400)
+
+    creator_id = body.get("creator_id")
+    try:
+        if not creator_id:
+            creator_id = await run_in_threadpool(db.find_or_create_default_creator)
+        # Reuse the existing video when the same URL is analysed again (the worker
+        # re-runs idempotently), so a repeat analyse doesn't hit the unique index.
+        video_id, _created = await run_in_threadpool(
+            db.get_or_create_video, creator_id, source_url
+        )
+    except Exception:
+        # Don't echo the DB error (it can carry the DSN/credentials).
+        return JSONResponse({"error": "could not start analysis"}, status_code=400)
+
+    await run_in_threadpool(worker.spawn_analysis_worker, video_id)
+    # Signal any all-projects listeners; the canvas block also polls the status API.
+    await run_in_threadpool(
+        db.pg_notify_change,
+        {"type": "video", "action": "created", "video_id": video_id},
+    )
+    return JSONResponse({"video_id": video_id, "creator_id": creator_id})
+
+
+async def reanalyze(request: Request) -> JSONResponse:
+    """Re-run analysis for an existing video (Video Block "Retry" button). The
+    worker is idempotent — it clears the prior error and replaces shots/frames."""
+    vid = request.path_params["video_id"]
+    status = await run_in_threadpool(db.get_video_status, vid)
+    if status is None:
+        return JSONResponse({"error": "video not found"}, status_code=404)
+    await run_in_threadpool(worker.spawn_analysis_worker, vid)
+    await run_in_threadpool(
+        db.pg_notify_change, {"type": "video", "action": "reanalyze", "video_id": vid}
+    )
+    return JSONResponse({"video_id": vid, "status": "analysing"})
+
+
 async def list_creator_videos(request: Request) -> JSONResponse:
     cid = request.path_params["creator_id"]
     videos = await run_in_threadpool(db.get_creator_videos, cid)
@@ -189,10 +299,29 @@ async def get_storyboard_frame(request: Request):
     return Response(content=frame["data"], media_type=frame["mime_type"])
 
 
+async def get_active_project(_: Request) -> JSONResponse:
+    """The project the canvas currently has open (mirrors the MCP tool)."""
+    return JSONResponse(active_project.get_active())
+
+
+async def set_active_project(request: Request) -> JSONResponse:
+    """The canvas reports the open project here on navigation; the embedded
+    Claude session reads it back via the get_active_project MCP tool."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    project_id = body.get("project_id")
+    active_project.set_active(project_id, body.get("name"))
+    return JSONResponse({"ok": True, "project_id": active_project.get_active_id()})
+
+
 async def list_creators(request: Request) -> JSONResponse:
     kind = request.query_params.get("kind")
     if kind and kind not in ("self", "reference"):
-        return JSONResponse({"error": "kind must be 'self' or 'reference'"}, status_code=400)
+        return JSONResponse(
+            {"error": "kind must be 'self' or 'reference'"}, status_code=400
+        )
     creators = await run_in_threadpool(db.list_creators, kind)
     return JSONResponse({"creators": creators})
 
@@ -201,7 +330,9 @@ async def get_creator_room_image(request: Request):
     cid = request.path_params["creator_id"]
     img = await run_in_threadpool(db.get_creator_room_image, cid)
     if img is None:
-        return JSONResponse({"error": "no room image for this creator"}, status_code=404)
+        return JSONResponse(
+            {"error": "no room image for this creator"}, status_code=404
+        )
     return Response(content=img["data"], media_type=img["mime_type"])
 
 
@@ -234,16 +365,27 @@ async def post_creator_room_image(request: Request) -> JSONResponse:
 routes = [
     Route("/api/health", health),
     Route("/api/projects", list_projects),
+    Route("/api/active-project", get_active_project, methods=["GET", "HEAD"]),
+    Route("/api/active-project", set_active_project, methods=["PUT"]),
     Route("/api/projects/{project_id}", get_project),
+    Route("/api/projects/{project_id}/artifacts", create_artifact, methods=["POST"]),
     Route("/api/artifacts/{artifact_id}", get_artifact, methods=["GET", "HEAD"]),
     Route("/api/artifacts/{artifact_id}", update_artifact, methods=["PUT"]),
     Route("/api/artifacts/{artifact_id}", delete_artifact, methods=["DELETE"]),
+    Route("/api/analyze", analyze, methods=["POST"]),
     Route("/api/videos/{video_id}/status", get_video_status),
+    Route("/api/videos/{video_id}/reanalyze", reanalyze, methods=["POST"]),
     Route("/api/videos/{video_id}", get_video),
     Route("/api/storyboard/{frame_id}", get_storyboard_frame),
     Route("/api/creators", list_creators),
     Route("/api/creators/{creator_id}/videos", list_creator_videos),
-    Route("/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]),
-    Route("/api/creators/{creator_id}/room-image", post_creator_room_image, methods=["POST"]),
+    Route(
+        "/api/creators/{creator_id}/room-image", get_creator_room_image, methods=["GET"]
+    ),
+    Route(
+        "/api/creators/{creator_id}/room-image",
+        post_creator_room_image,
+        methods=["POST"],
+    ),
     Route("/frames/{frame_id}", get_frame),
 ]

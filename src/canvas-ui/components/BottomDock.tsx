@@ -29,8 +29,8 @@ function createTextCard(editor: Editor) {
   // Seed with the last-picked format's structure so the card opens pre-shaped.
   const html = templateHtml(getDefaultTextFormat())
   editor.run(() => {
-    // x/y is the top-left; nudge so the default-size card lands centered.
-    editor.createShape({ id, type: RAINY_TEXT, x: c.x - 220, y: c.y - 130, props: { html } })
+    // x/y is the top-left; nudge by half the default size (360×332) so the card lands centered.
+    editor.createShape({ id, type: RAINY_TEXT, x: c.x - 180, y: c.y - 166, props: { html } })
     editor.select(id)
     editor.setEditingShape(id)
   })

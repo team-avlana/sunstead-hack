@@ -22,14 +22,15 @@ def register(mcp: FastMCP) -> None:
 
         Inserts a videos row (analyzed_at NULL = in-progress), spawns the
         analysis-worker subprocess in the background, and returns immediately
-        with the new video_id. Poll get_video_analysis to track progress.
+        with the video_id. Re-analysing the same URL for a creator reuses the
+        existing video (re-runs idempotently). Poll get_video_analysis to track.
         """
         if not source_url:
             raise ValueError("source_url is required")
         if not creator_id:
             raise ValueError("creator_id is required")
 
-        video_id, created = db.find_or_create_video(creator_id, source_url)
+        video_id, created = db.get_or_create_video(creator_id, source_url)
         worker.spawn_analysis_worker(video_id)
         db.pg_notify_change(
             {"type": "video", "action": "created" if created else "updated", "video_id": video_id}
@@ -80,7 +81,7 @@ def register(mcp: FastMCP) -> None:
 
         video_ids: list[str] = []
         for url in urls:
-            vid_id, created = db.find_or_create_video(creator_id, url)
+            vid_id, created = db.get_or_create_video(creator_id, url)
             video_ids.append(vid_id)
             if created:
                 worker.spawn_analysis_worker(vid_id)
@@ -106,6 +107,12 @@ def register(mcp: FastMCP) -> None:
         shots_summary lists every shot with idx, start_sec, end_sec, and frame_id.
         frame_id is a UUID; the representative frame image is served at /frames/{frame_id}.
         Use frame_id when building storyboard artifacts that reference shot thumbnails.
+
+        Turning this into canvas blocks (see create_artifact for the full taxonomy):
+        match each piece of the result to the block format that fits it — the hook → a
+        text block with format:"title" titled "Hook"; each shot/scene → an image block
+        (its frame_id) paired with a format:"title-sub" text block holding the scene
+        label + timecode + description; transcript or freeform notes → format:"plain".
         """
         result = db.get_video_analysis(video_id)
         if result is None:
