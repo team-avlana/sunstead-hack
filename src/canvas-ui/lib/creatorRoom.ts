@@ -274,6 +274,14 @@ const ROOM_DOC = `<!doctype html>
          font: 600 11px/1.3 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   #label { left: 16px; bottom: 14px; color: #aab0bd; letter-spacing: .02em; }
   #tip   { right: 16px; bottom: 14px; color: #c2c7d1; font-weight: 500; }
+  /* avatar variant cycler — lets you "pick" a look */
+  .pick { position: fixed; left: 16px; top: 14px; display: flex; align-items: center; gap: 8px;
+          pointer-events: auto; user-select: none;
+          font: 600 11px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #8a8f9c; }
+  .pick button { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(20,28,60,.12);
+          background: rgba(255,255,255,.72); color: #5a6072; cursor: pointer; font-size: 11px; line-height: 1; }
+  .pick button:hover { background: #fff; }
+  .pick span { min-width: 64px; text-align: center; letter-spacing: .02em; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -286,6 +294,7 @@ const ROOM_DOC = `<!doctype html>
 <canvas id="c"></canvas>
 <div class="hud" id="label"></div>
 <div class="hud" id="tip">drag to orbit · scroll to zoom</div>
+<div class="pick" id="pick"><button id="prev" title="Previous avatar">&#9664;</button><span id="pickLabel">Avatar 1</span><button id="next" title="Next avatar">&#9654;</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -463,6 +472,7 @@ const zones = {};
   const g = new THREE.Group(); g.name = z; scene.add(g); zones[z] = g;
 });
 const hotspots = [];
+const animators = [];   // idle component animations, advanced each frame (see render loop)
 function hotspot(mesh, zone, id, link) {
   mesh.userData = { zone: zone, id: id, link: link || null, hot: true, base: mesh.material.emissive ? mesh.material.emissive.clone() : new THREE.Color(0) };
   mesh.material.emissive = new THREE.Color(0x000000);
@@ -652,6 +662,118 @@ catcher.rotation.x = -Math.PI / 2; catcher.position.y = -0.52; catcher.receiveSh
   zones.companions.add(hp);
 })();
 
+// ===========================================================================
+// AVATAR — the creator, seated and filming (the room's heartbeat). The chair is
+// built once; the *person* swaps via the on-screen variant cycler so you can pick
+// a look. This is the first slice of the combinatorial kit (avatars x props).
+// ===========================================================================
+(function avatarRig() {
+  const chairCol = 0x8a5a3c, wood = 0x6f4a30;
+  const rig = new THREE.Group(); rig.position.set(2.5, 0, 0.15); rig.rotation.y = -0.62; scene.add(rig);
+
+  // reclined lounge chair (matches the reference pose)
+  rig.add(at(rbox(0.86, 0.14, 0.82, chairCol, 0.12), 0, 0.92, 0));            // seat
+  const back = at(rbox(0.86, 0.98, 0.16, chairCol, 0.12), 0, 1.46, -0.36); back.rotation.x = -0.14; rig.add(back);
+  rig.add(at(rbox(0.14, 0.4, 0.66, chairCol, 0.06), -0.48, 1.14, 0));         // armrests
+  rig.add(at(rbox(0.14, 0.4, 0.66, chairCol, 0.06),  0.48, 1.14, 0));
+  [[-0.34, -0.32], [0.34, -0.32], [-0.34, 0.3], [0.34, 0.3]].forEach(function (p) {
+    rig.add(at(cyl(0.045, 0.055, 0.92, wood), p[0], 0.46, p[1]));             // legs
+  });
+
+  // pickable looks (skin / hair / shirt). First one matches the reference render.
+  const LOOKS = [
+    { skin: 0xd7a07a, hair: 0x2b211b, shirt: 0xb06a4f },
+    { skin: 0xf2cda6, hair: 0x4a2f1c, shirt: 0x6f8f7a },
+    { skin: 0x8a5836, hair: 0x141414, shirt: 0x44639a },
+    { skin: 0xe7b58f, hair: 0x6b4a2a, shirt: 0xcaa24a },
+  ];
+
+  function person(look) {
+    const g = new THREE.Group();
+    const dark = 0x2c2f38;
+    g.add(at(rbox(0.6, 0.34, 0.56, look.shirt, 0.16), 0, 1.14, 0.06));        // hips
+    g.add(at(rbox(0.22, 0.2, 0.6, look.shirt, 0.09), -0.15, 1.02, 0.34));     // thighs
+    g.add(at(rbox(0.22, 0.2, 0.6, look.shirt, 0.09),  0.15, 1.02, 0.34));
+    g.add(at(rbox(0.2, 0.78, 0.2, 0x3a3f4a, 0.07), -0.15, 0.55, 0.6));        // shins
+    g.add(at(rbox(0.2, 0.78, 0.2, 0x3a3f4a, 0.07),  0.15, 0.55, 0.6));
+    g.add(at(rbox(0.22, 0.12, 0.32, 0x23262f, 0.05), -0.15, 0.18, 0.74));     // shoes
+    g.add(at(rbox(0.22, 0.12, 0.32, 0x23262f, 0.05),  0.15, 0.18, 0.74));
+    const torso = at(rbox(0.6, 0.66, 0.42, look.shirt, 0.18), 0, 1.6, 0.02); torso.rotation.x = 0.08; g.add(torso);
+    g.add(at(cyl(0.09, 0.11, 0.13, look.skin), 0, 1.92, 0.05));               // neck
+    const head = at(sphere(0.26, look.skin), 0, 2.13, 0.07); head.scale.set(1, 1.07, 0.98); g.add(head);
+    const cap = at(sphere(0.285, look.hair), 0, 2.19, 0.03); cap.scale.set(1.06, 0.92, 1.08); g.add(cap);
+    g.add(at(rbox(0.5, 0.22, 0.42, look.hair, 0.1), 0, 2.18, -0.07));         // back hair
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 10, 24, Math.PI), clay(dark));
+    band.position.set(0, 2.2, 0.04); g.add(band);                            // headphone arc
+    g.add(at(cyl(0.095, 0.095, 0.07, dark), -0.28, 2.06, 0.05).rotateZ(Math.PI / 2)); // ear cups
+    g.add(at(cyl(0.095, 0.095, 0.07, dark),  0.28, 2.06, 0.05).rotateZ(Math.PI / 2));
+    g.add(at(rbox(0.18, 0.46, 0.2, look.shirt, 0.08), -0.34, 1.6, 0.06));     // upper arms
+    g.add(at(rbox(0.18, 0.46, 0.2, look.shirt, 0.08),  0.34, 1.6, 0.06));
+    const hands = new THREE.Group();                                          // forearms + hands (typing)
+    hands.add(at(cyl(0.075, 0.085, 0.42, look.skin, 12), -0.26, 1.4, 0.34).rotateX(Math.PI / 2 - 0.35));
+    hands.add(at(cyl(0.075, 0.085, 0.42, look.skin, 12),  0.26, 1.4, 0.34).rotateX(Math.PI / 2 - 0.35));
+    hands.add(at(sphere(0.09, look.skin), -0.2, 1.3, 0.56));
+    hands.add(at(sphere(0.09, look.skin),  0.2, 1.3, 0.56));
+    g.add(hands);
+    g.add(at(rbox(0.52, 0.04, 0.34, 0x2b2f3a, 0.02), 0, 1.26, 0.5));          // laptop base
+    const lap = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32),
+      new THREE.MeshStandardMaterial({ map: screenTexture('Editing'), emissive: 0x20242f, emissiveIntensity: 0.5, roughness: 0.4 }));
+    lap.position.set(0, 1.46, 0.36); lap.rotation.x = -0.5; g.add(lap);       // laptop screen
+    return { group: g, torso: torso, head: head, hands: hands, headY: head.position.y, handsY: hands.position.y };
+  }
+
+  let AV = null;
+  let idx = hash(((PROFILE.creator && PROFILE.creator.name) || 'Creator') + 'avatar') % LOOKS.length;
+  function setAvatar(i) {
+    idx = ((i % LOOKS.length) + LOOKS.length) % LOOKS.length;
+    if (AV) rig.remove(AV.group);
+    AV = person(LOOKS[idx]);
+    rig.add(AV.group);
+    const lbl = document.getElementById('pickLabel'); if (lbl) lbl.textContent = 'Avatar ' + (idx + 1);
+  }
+  setAvatar(idx);
+
+  const prev = document.getElementById('prev'), next = document.getElementById('next');
+  if (prev) prev.addEventListener('click', function () { setAvatar(idx - 1); });
+  if (next) next.addEventListener('click', function () { setAvatar(idx + 1); });
+
+  animators.push(function (t) {                                               // breathing + idle typing
+    if (!AV) return;
+    AV.torso.scale.y = 1 + Math.sin(t * 1.5) * 0.013;
+    AV.head.position.y = AV.headY + Math.sin(t * 1.5 + 0.5) * 0.008;
+    AV.hands.position.y = AV.handsY + Math.sin(t * 8.0) * 0.005;
+  });
+})();
+
+// ===========================================================================
+// RAINEY — the signature reindeer figurine on the back-wall shelf (the mascot).
+// Soft glowing nose, slow look-around.
+// ===========================================================================
+(function rainey() {
+  const brown = 0x9c6a3a, dark = 0x6f4a28;
+  const g = new THREE.Group(); g.position.set(0.55, 4.36, -4.5); g.scale.setScalar(0.9);
+  g.add(at(rbox(0.34, 0.22, 0.18, brown, 0.07), 0, 0.18, 0));                 // body
+  const neck = at(rbox(0.12, 0.2, 0.12, brown, 0.05), 0.13, 0.3, 0); neck.rotation.z = -0.4; g.add(neck);
+  const head = at(sphere(0.1, brown), 0.22, 0.4, 0); head.scale.set(1.1, 0.9, 0.9); g.add(head);
+  g.add(at(sphere(0.05, dark), 0.31, 0.37, 0));                              // snout
+  const noseMat = new THREE.MeshStandardMaterial({ color: 0xff6a4a, emissive: 0xff5a3a, emissiveIntensity: 1.2, roughness: 0.5 });
+  g.add(at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.03, 1), noseMat), 0.35, 0.37, 0)); // glowing nose
+  g.add(at(rbox(0.03, 0.06, 0.02, brown, 0.01), 0.2, 0.49, 0.06));            // ears
+  g.add(at(rbox(0.03, 0.06, 0.02, brown, 0.01), 0.2, 0.49, -0.06));
+  [0.05, -0.05].forEach(function (z) {                                        // antlers
+    const a = at(cyl(0.008, 0.012, 0.14, dark, 6), 0.18, 0.52, z); a.rotation.z = -0.3; g.add(a);
+    const b = at(cyl(0.006, 0.008, 0.07, dark, 6), 0.13, 0.6, z); b.rotation.z = 0.5; g.add(b);
+  });
+  [[-0.1, 0.06], [-0.1, -0.06], [0.1, 0.06], [0.1, -0.06]].forEach(function (p) {
+    g.add(at(cyl(0.018, 0.022, 0.18, dark, 6), p[0], 0.06, p[1]));            // legs
+  });
+  zones.library.add(g);
+  animators.push(function (t) {
+    noseMat.emissiveIntensity = 1.0 + Math.sin(t * 2.2) * 0.5;
+    g.rotation.y = Math.sin(t * 0.5) * 0.06;
+  });
+})();
+
 // ---- hotspot interaction -------------------------------------------------
 const ray = new THREE.Raycaster();
 const ptr = new THREE.Vector2();
@@ -716,7 +838,13 @@ addEventListener('resize', resize); resize();
 document.getElementById('label').textContent =
   ((PROFILE.creator && PROFILE.creator.name) || 'Creator') + "'s room";
 
-renderer.setAnimationLoop(function () { controls.update(); composer.render(); });
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(function () {
+  const t = clock.getElapsedTime();
+  if (!reduced) { for (let i = 0; i < animators.length; i++) animators[i](t); }
+  controls.update();
+  composer.render();
+});
 
 // tell the host we're alive (lets it hide its loading state)
 parent.postMessage({ source: 'rainy-room', type: 'ready' }, '*');
