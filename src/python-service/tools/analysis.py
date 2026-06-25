@@ -61,35 +61,7 @@ def register(mcp: FastMCP) -> None:
 
         Returns {creator_id, video_ids}.
         """
-        if kind not in ("self", "reference"):
-            raise ValueError("kind must be 'self' or 'reference'")
-        if not channel_url:
-            raise ValueError("channel_url is required")
-        if max_videos is not None and max_videos < 1:
-            raise ValueError("max_videos must be at least 1")
-
-        limit = min(
-            max_videos if max_videos is not None else settings.worker.max_channel_videos,
-            MAX_CHANNEL_VIDEOS,
-        )
-
-        creator_name = name or channel_url
-        creator = db.find_or_create_creator(kind, creator_name, channel_url)
-        creator_id = creator["creator_id"]
-
-        urls = _enumerate_channel(channel_url, limit)
-
-        video_ids: list[str] = []
-        for url in urls:
-            vid_id, created = db.get_or_create_video(creator_id, url)
-            video_ids.append(vid_id)
-            if created:
-                worker.spawn_analysis_worker(vid_id)
-                db.pg_notify_change(
-                    {"type": "video", "action": "created", "video_id": vid_id}
-                )
-
-        return {"creator_id": creator_id, "video_ids": video_ids}
+        return start_channel_analysis(channel_url, kind, name, max_videos)
 
     @mcp.tool()
     def get_video_analysis(video_id: str) -> dict:
@@ -190,6 +162,57 @@ def register(mcp: FastMCP) -> None:
             "data_url": f"data:{frame['mime_type']};base64,{data_b64}",
             "url": f"/frames/{frame_id}",
         }
+
+
+def start_channel_analysis(
+    channel_url: str,
+    kind: str,
+    name: Optional[str] = None,
+    max_videos: Optional[int] = None,
+) -> dict:
+    """Enumerate a channel and spawn analysis for each new video. Shared by the
+    analyze_channel MCP tool and the POST /api/analyze-channel HTTP route.
+
+    kind='self' reuses (and updates) the single self creator rather than inserting
+    a duplicate; kind='reference' dedupes references on channel_url. Returns
+    {creator_id, video_ids}. Raises ValueError on bad input, RuntimeError if
+    channel enumeration (yt-dlp) fails.
+    """
+    if kind not in ("self", "reference"):
+        raise ValueError("kind must be 'self' or 'reference'")
+    if not channel_url:
+        raise ValueError("channel_url is required")
+    if max_videos is not None and max_videos < 1:
+        raise ValueError("max_videos must be at least 1")
+
+    limit = min(
+        max_videos if max_videos is not None else settings.worker.max_channel_videos,
+        MAX_CHANNEL_VIDEOS,
+    )
+
+    creator_name = name or channel_url
+    if kind == "self":
+        # Exactly one self creator: fill in the real channel on the placeholder.
+        creator_id = db.get_or_create_self_creator()["creator_id"]
+        db.update_creator(creator_id, name=creator_name, channel_url=channel_url)
+    else:
+        creator_id = db.find_or_create_creator("reference", creator_name, channel_url)[
+            "creator_id"
+        ]
+
+    urls = _enumerate_channel(channel_url, limit)
+
+    video_ids: list[str] = []
+    for url in urls:
+        vid_id, created = db.get_or_create_video(creator_id, url)
+        video_ids.append(vid_id)
+        if created:
+            worker.spawn_analysis_worker(vid_id)
+            db.pg_notify_change(
+                {"type": "video", "action": "created", "video_id": vid_id}
+            )
+
+    return {"creator_id": creator_id, "video_ids": video_ids}
 
 
 def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:

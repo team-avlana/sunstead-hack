@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {
   Tldraw,
   type Editor,
@@ -102,6 +102,10 @@ const components: TLComponents = {
 
 export default function CanvasWorkspace({ projectId }: { projectId: string }) {
   const dark = useRainyStore((s) => s.dark)
+  // Gentle loading veil: shown over the canvas while this project's artifacts are
+  // fetched from Postgres (or local storage) and laid out, then faded out once the
+  // final arrangement has settled. Resets per project (the canvas remounts by key).
+  const [ready, setReady] = useState(false)
   const handleMount = useCallback((editor: Editor) => {
     ;(window as any).__rainyEditor = editor
 
@@ -179,16 +183,35 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
       ),
     ]
 
+    // Reveal the canvas once shapes are created AND their async auto-fit/relayout
+    // (and zoomToFit) have had a couple of frames to settle — so the veil lifts on
+    // the *final* arrangement, not a half-laid-out flash. A timeout backstop lifts
+    // it regardless if a fetch hangs.
+    let revealed = false
+    const reveal = () => {
+      if (revealed) return
+      revealed = true
+      if (!editor.isDisposed) setReady(true)
+    }
+    const finishLoading = () => {
+      if (editor.isDisposed) return reveal()
+      requestAnimationFrame(() => requestAnimationFrame(reveal))
+    }
+    const backstop = window.setTimeout(reveal, 8000)
+
     // Render this project's blocks. Backend projects pull from Postgres; if that
     // fails (or it's a local id) fall back to the XML/localStorage project.
     if (isBackend) {
-      void loadBackendProject(editor, projectId).then((ok) => {
-        if (!ok && !editor.isDisposed) void loadProjectIntoEditor(editor, projectId)
-      })
+      void loadBackendProject(editor, projectId)
+        .then((ok) => {
+          if (!ok && !editor.isDisposed) return loadProjectIntoEditor(editor, projectId)
+        })
+        .finally(finishLoading)
     } else {
-      void loadProjectIntoEditor(editor, projectId)
+      void loadProjectIntoEditor(editor, projectId).finally(finishLoading)
     }
 
+    disposers.push(() => window.clearTimeout(backstop))
     return () => disposers.forEach((dispose) => dispose())
   }, [projectId])
 
@@ -200,6 +223,11 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
         shapeUtils={shapeUtils}
         onMount={handleMount}
       />
+      {/* Gentle on-brand loading veil; `is-ready` fades it out once laid out. */}
+      <div className={`rainy-loading${ready ? ' is-ready' : ''}`} aria-hidden={ready}>
+        <div className="rainy-loading-orb" />
+        <div className="rainy-loading-label">Setting up your canvas…</div>
+      </div>
     </div>
   )
 }

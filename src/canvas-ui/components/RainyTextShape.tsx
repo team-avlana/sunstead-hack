@@ -254,6 +254,14 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
     const fit = () => {
       const card = cardRef.current
       if (!card) return
+      // When a card scrolls off-screen tldraw *culls* it by setting display:none on
+      // its container (the component stays mounted). That collapses scrollHeight to
+      // 0, and a naive measure here would shrink the card to MIN_H and fire a frame
+      // relayout — so every sibling jumps around as you pan, then jumps back when
+      // the card returns. Bail while hidden (offsetParent is null under display:none);
+      // the ResizeObserver fires again with the real height once it's visible. This
+      // keeps culled cards at their true size, so re-entry is a no-op (no relayout).
+      if (card.offsetParent === null) return
       const cs = getComputedStyle(card)
       const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
       const target = Math.max(MIN_H, Math.ceil(prose.scrollHeight + padV))

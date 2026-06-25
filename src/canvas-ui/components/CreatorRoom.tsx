@@ -4,42 +4,70 @@ import { useEffect, useState } from 'react'
 import CreatorWizard from './CreatorWizard'
 import { requestRoomGeneration, type RoomGenerationPayload } from '@/lib/creatorRoomParams'
 import { clearGeneratedImage, DEFAULT_ROOM_IMAGE } from '@/lib/creatorRoom'
+import { fetchSelfCreator, hasBackend, roomImageUrl } from '@/lib/api'
 
 type Status = { kind: 'idle' | 'hint'; msg?: string }
 
 /**
- * The Creator Room hero — a clean 2D clay-render image. We always show the
- * bundled default room (image generation via the Python service is still a stub,
- * so it never produces a real custom image yet). A single clean "Design my room"
- * pill floats over the art and opens the wizard to collect/revise the room brief.
- * (The earlier 3D diorama UI was retired — see git.)
+ * The Creator Room hero — a clean 2D clay-render image. Shows the backend-
+ * generated room when one exists for the 'self' creator, otherwise the bundled
+ * default. A single clean "Design my room" pill floats over the art and opens
+ * the wizard; finishing it POSTs the brief to the python-service, which renders
+ * the room from the prompt + the creator's real talking-head frames.
  */
 export default function CreatorRoom() {
   const [wizard, setWizard] = useState(false)
   const [briefSaved, setBriefSaved] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const [roomSrc, setRoomSrc] = useState<string>(DEFAULT_ROOM_IMAGE)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    // Generation produces no real image yet, so anything in the legacy
-    // `rainy:room:image` slot is stale — purge it so an old cached image can't
-    // flash over the default room. (Previously it was loaded and painted on top.)
+    // The legacy `rainy:room:image` slot is unused now — purge any stale value.
     clearGeneratedImage()
     setBriefSaved(!!window.localStorage.getItem('rainy:room:profile'))
+    // If the backend already rendered a room for this user, show it.
+    let alive = true
+    if (hasBackend()) {
+      void fetchSelfCreator().then((self) => {
+        if (!alive || !self?.has_room_image) return
+        const url = roomImageUrl(self.creator_id, self.style_profile_at ?? 'saved')
+        if (url) setRoomSrc(url)
+      })
+    }
+    return () => {
+      alive = false
+    }
   }, [])
 
-  // Wizard finished → (stub) trigger generation + hint. The real 2D render comes
-  // from the Python service later; today this just saves the brief.
-  const onWizardComplete = (payload: RoomGenerationPayload) => {
+  // Wizard finished → POST the brief to the service and swap in the rendered room.
+  const onWizardComplete = async (payload: RoomGenerationPayload) => {
     setWizard(false)
     setBriefSaved(true)
-    void requestRoomGeneration(payload)
-    setStatus({ kind: 'hint', msg: 'Saved your room brief ✨ — Rainey will paint it from the service soon.' })
+    setGenerating(true)
+    setStatus({ kind: 'hint', msg: 'Designing your room… this takes ~20s ✨' })
+    const result = await requestRoomGeneration(payload)
+    setGenerating(false)
+    if (result.ok) {
+      setRoomSrc(result.imageUrl)
+      setStatus({ kind: 'hint', msg: 'Your Creator Room is ready ✨' })
+    } else if (result.reason === 'no-backend') {
+      setStatus({ kind: 'hint', msg: 'Saved your room brief — connect the service to generate it.' })
+    } else {
+      setStatus({ kind: 'hint', msg: 'Couldn’t generate the room just now — your brief is saved, try again.' })
+    }
   }
 
   return (
     <section className="room">
-      <div className="room-stage">
-        <img className="room-img" src={DEFAULT_ROOM_IMAGE} alt="Your Creator Room" />
+      <div className={`room-stage${generating ? ' generating' : ''}`}>
+        <img className="room-img" src={roomSrc} alt="Your Creator Room" />
+        {generating && (
+          <div className="room-generating" role="status" aria-live="polite">
+            <span className="room-generating-spin" aria-hidden />
+            <span>Designing your room…</span>
+          </div>
+        )}
 
         {/* Two glass collapsibles float over the art — the library (docs) top-left
             and the content-setup (presets + style) bottom-right, echoing the room. */}

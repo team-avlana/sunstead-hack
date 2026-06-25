@@ -261,6 +261,24 @@ button, input { font-family: inherit; }
   border: 1px solid var(--border); box-shadow: var(--shadow-sm); color: var(--ink-dim);
 }
 
+/* While the service renders the room: dim the art + a centered glass spinner. */
+.room-stage.generating .room-img { filter: blur(2px) brightness(0.92); transition: filter .3s ease; }
+.room-generating {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  font-size: 13.5px; font-weight: 700; color: var(--ink);
+  background: rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.rainy-app.dark .room-generating { color: #fff; background: rgba(18, 24, 48, 0.34); }
+.room-generating-spin {
+  width: 30px; height: 30px; border-radius: 999px;
+  border: 3px solid rgba(var(--primary-rgb), 0.22);
+  border-top-color: var(--primary);
+  animation: room-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .room-generating-spin { animation-duration: 2s; } }
+
 /* ============================================================
    Onboarding wizard — few-questions, one screen at a time
    ============================================================ */
@@ -473,6 +491,83 @@ button, input { font-family: inherit; }
   isolation: isolate;
   contain: strict;
   transform: translateZ(0);
+}
+
+/* ── Canvas loading veil ──────────────────────────────────────────────────
+   A gentle, on-brand loading state painted over the infinite canvas while a
+   project's artifacts are fetched and laid out. It hides tldraw's mount flash,
+   breathes softly with a soft primary-tinted aurora, then fades out (via
+   `.is-ready`) once the final arrangement has settled — revealing the canvas
+   underneath in one calm motion. */
+.rainy-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  background: var(--canvas);
+  /* Don't swallow input — and once faded, it's fully transparent to hit-testing. */
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 620ms ease;
+}
+.rainy-loading.is-ready {
+  opacity: 0;
+  /* After the fade, drop it from paint so nothing lingers over the live canvas. */
+  visibility: hidden;
+  transition: opacity 620ms ease, visibility 0s linear 620ms;
+}
+
+/* Soft breathing orb in the brand primary, wrapped in a wider aurora halo. */
+.rainy-loading-orb {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(var(--primary-rgb), 0.95),
+    rgba(var(--primary-rgb), 0.55) 58%,
+    rgba(var(--primary-rgb), 0) 72%
+  );
+  animation: rainy-loading-breathe 1.8s ease-in-out infinite;
+}
+.rainy-loading-orb::before {
+  content: '';
+  position: absolute;
+  inset: -24px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--primary-rgb), 0.22), transparent 68%);
+  animation: rainy-loading-halo 1.8s ease-in-out infinite;
+}
+
+.rainy-loading-label {
+  margin-top: 22px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ink-dim);
+  animation: rainy-loading-fade 1.8s ease-in-out infinite;
+}
+
+@keyframes rainy-loading-breathe {
+  0%, 100% { transform: scale(0.86); opacity: 0.72; }
+  50%      { transform: scale(1.06); opacity: 1; }
+}
+@keyframes rainy-loading-halo {
+  0%, 100% { transform: scale(0.9); opacity: 0.42; }
+  50%      { transform: scale(1.24); opacity: 0.82; }
+}
+@keyframes rainy-loading-fade {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rainy-loading-orb,
+  .rainy-loading-orb::before,
+  .rainy-loading-label { animation: none; }
 }
 
 /* Dot grid: GPU-composited, never intercept pointer/hit-testing (Figma-style). */
@@ -778,6 +873,83 @@ button, input { font-family: inherit; }
   background: rgba(18, 24, 48, 0.05); border-radius: 999px; padding: 3px 9px; white-space: nowrap;
 }
 
+/* ---------- Outline / Layers tree (hierarchical canvas map) ----------
+   Replaces the old block inspector: a navigable, nested list of every shape on
+   the canvas. Frames are branches; their child blocks indent underneath. Hover
+   here highlights the matching shape on the canvas and vice-versa. */
+.ci-count {
+  margin-left: 7px; font-size: 11px; font-weight: 600; color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.outline {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 0 -6px; padding: 2px 0;
+  animation: inspIn .26s ease both;
+}
+.outline-row {
+  position: relative;
+  display: flex; align-items: center; gap: 7px;
+  height: 28px; padding-right: 10px;
+  border-radius: 8px; cursor: default; user-select: none;
+  color: var(--ink); white-space: nowrap;
+  transition: background .12s ease;
+}
+.outline-row:hover,
+.outline-row.is-hovered { background: rgba(18, 24, 48, 0.05); }
+.outline-row.is-selected {
+  background: rgba(70, 110, 255, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(70, 110, 255, 0.40);
+}
+.outline-row.is-selected.is-hovered { background: rgba(70, 110, 255, 0.16); }
+/* Hover from the canvas: a leading accent rail so it reads even mid-scroll. */
+.outline-row.is-hovered::before {
+  content: ''; position: absolute; left: 2px; top: 6px; bottom: 6px;
+  width: 2.5px; border-radius: 2px; background: rgba(70, 110, 255, 0.55);
+}
+.outline-row.is-selected.is-hovered::before { display: none; }
+
+.outline-twirl {
+  flex: none; width: 16px; height: 16px; margin: 0; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--ink-dim);
+  border-radius: 4px; cursor: pointer;
+}
+.outline-twirl:hover { background: rgba(18, 24, 48, 0.10); color: var(--ink); }
+.outline-twirl-spacer { flex: none; width: 16px; height: 16px; }
+
+.outline-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; color: var(--ink-dim);
+}
+.outline-ico.k-frame { color: #7a7f8e; }
+.outline-ico.k-text { color: #6b7280; }
+.outline-ico.k-video { color: #d24b6b; }
+.outline-ico.k-image { color: #2f8f6b; }
+
+.outline-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font-size: 12.5px; font-weight: 500; letter-spacing: -0.005em;
+}
+.outline-row.is-selected .outline-name { font-weight: 600; }
+.outline-badge {
+  flex: none; font-size: 10.5px; font-weight: 600; color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  background: rgba(18, 24, 48, 0.06); border-radius: 999px; padding: 1px 7px;
+}
+
+.outline-empty {
+  flex: 1; align-items: center; justify-content: center; text-align: center;
+  gap: 8px; padding: 24px 16px; color: var(--ink-dim);
+}
+.outline-empty-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 11px;
+  background: rgba(18, 24, 48, 0.05); color: var(--ink-dim);
+}
+.outline-empty-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+.outline-empty-text { margin: 0; max-width: 200px; font-size: 11.5px; line-height: 1.5; }
+
 /* ============================================================
    Canvas frames (tldraw frame shape, reskinned — see FrameShape.tsx)
    ============================================================ */
@@ -1079,6 +1251,36 @@ button, input { font-family: inherit; }
 .rainy-root.dark .shape-trash { background: #232a39; color: #c2c9d8; }
 .rainy-root.dark .shape-trash:hover { background: #ef4444; color: #fff; }
 
+/* Frame — the "tidy / auto-arrange" action. Same circle as the delete button but
+   with a neutral hover (not red), tucked against the top-right edge so it clears
+   the trash + grip on the left. */
+.shape-tidy {
+  position: absolute;
+  z-index: 6;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-dim);
+  box-shadow: var(--card-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 120ms ease, transform 120ms ease, color 130ms ease, box-shadow 130ms ease;
+  pointer-events: none;
+}
+.shape-tidy.show { opacity: 1; transform: scale(1); pointer-events: auto; }
+.shape-tidy:hover { color: var(--ink); box-shadow: var(--shadow-md); }
+.shape-tidy:active { transform: scale(0.94); }
+.frame-tidy { top: 14px; right: -15px; }
+.rainy-root.dark .shape-tidy { background: #232a39; color: #8b93a6; }
+.rainy-root.dark .shape-tidy:hover { color: #e6eaf2; }
+
 /* ============================================================
    Shared block chrome — the Notion-style "drag" grip
    A small white pill of six dots on the block's left edge. Appears on hover
@@ -1212,6 +1414,12 @@ button, input { font-family: inherit; }
 .rainy-app.dark .room-redesign { background: rgba(34, 40, 54, 0.72); }
 .rainy-app.dark .room-redesign:hover { background: rgba(44, 51, 68, 0.94); }
 .rainy-app.dark .room-status { background: rgba(34, 40, 54, 0.92); }
+/* Floating library / content-setup glass cards — flip to dark glass so the
+   token-driven ink text (which goes light in dark mode) stays readable, and
+   repoint the dark-on-light hairlines + hover to light-on-dark. */
+.rainy-app.dark .room-overlay { background: rgba(28, 33, 46, 0.80); }
+.rainy-app.dark .room-overlay-section { border-top-color: rgba(255, 255, 255, 0.08); }
+.rainy-app.dark .room-overlay-sec-head:hover { background: rgba(255, 255, 255, 0.05); }
 /* Wizard surfaces. The modal is portaled to <body> (outside `.rainy-app`), so it
    carries its own `.dark` flag and re-points its tokens here, then flips the
    panels that hardcode white. */
@@ -1263,6 +1471,23 @@ button, input { font-family: inherit; }
 .rainy-root.dark .insp-btn.danger { color: #ff6b6b; }
 .rainy-root.dark .insp-btn.danger:hover { background: rgba(255, 107, 107, 0.12); }
 .rainy-root.dark .insp-empty-icon { background: rgba(255, 255, 255, 0.07); }
+
+/* Outline / Layers tree on dark glass. */
+.rainy-root.dark .outline-row:hover,
+.rainy-root.dark .outline-row.is-hovered { background: rgba(255, 255, 255, 0.07); }
+.rainy-root.dark .outline-row.is-selected {
+  background: rgba(90, 130, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(90, 130, 255, 0.5);
+}
+.rainy-root.dark .outline-row.is-selected.is-hovered { background: rgba(90, 130, 255, 0.24); }
+.rainy-root.dark .outline-row.is-hovered::before { background: rgba(120, 150, 255, 0.7); }
+.rainy-root.dark .outline-twirl:hover { background: rgba(255, 255, 255, 0.10); }
+.rainy-root.dark .outline-ico.k-frame { color: #9aa0b0; }
+.rainy-root.dark .outline-ico.k-text { color: #9ca3b3; }
+.rainy-root.dark .outline-ico.k-video { color: #f08aa3; }
+.rainy-root.dark .outline-ico.k-image { color: #5cc69e; }
+.rainy-root.dark .outline-badge { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .outline-empty-icon { background: rgba(255, 255, 255, 0.07); }
 
 /* Header icon actions + editable/read-only fields in dark */
 .rainy-root.dark .ci-act:hover { background: rgba(255, 255, 255, 0.08); }

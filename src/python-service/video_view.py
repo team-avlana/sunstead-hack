@@ -155,6 +155,72 @@ def _storyboard(llm: dict, shots: list[dict]) -> list[dict]:
     return scenes
 
 
+def _pct(x: Any) -> str | None:
+    return f"{round(float(x) * 100)}%" if isinstance(x, (int, float)) else None
+
+
+def _secs(x: Any) -> str | None:
+    return f"{round(float(x), 1)}s" if isinstance(x, (int, float)) else None
+
+
+def _num(x: Any, digits: int = 0) -> str | None:
+    if not isinstance(x, (int, float)):
+        return None
+    return str(round(float(x), digits)) if digits else str(round(float(x)))
+
+
+def metrics_summary(video: dict) -> list[dict]:
+    """Headline video-level metrics for the deep-dive view, grouped.
+
+    Pulls from videos.metrics (deterministic aggregates + llm synthesis) — the
+    rich layer the Video Block doesn't surface — and skips any missing keys.
+    Each item: {group, label, value}. Returns [] for an unanalysed video.
+    """
+    metrics = video.get("metrics") if isinstance(video.get("metrics"), dict) else {}
+    det = metrics.get("deterministic") if isinstance(metrics, dict) else None
+    llm = metrics.get("llm") if isinstance(metrics, dict) else None
+    det = det if isinstance(det, dict) else {}
+    llm = llm if isinstance(llm, dict) else {}
+
+    out: list[dict] = []
+
+    def add(group: str, label: str, value: Any) -> None:
+        if value is None or value == "":
+            return
+        out.append({"group": group, "label": label, "value": str(value)})
+
+    # Pacing
+    add("Pacing", "Cuts / min", _num(det.get("cut_frequency"), 1))
+    add("Pacing", "Avg shot", _secs(det.get("avg_shot_len")))
+    add("Pacing", "Fast cuts", _pct(det.get("fast_cut_ratio")))
+    add("Pacing", "Long takes", _pct(det.get("long_take_ratio")))
+    add("Pacing", "To first cut", _secs(det.get("time_to_first_cut")))
+
+    # Speech
+    add("Speech", "Words / min", _num(det.get("words_per_minute")))
+    add("Speech", "Total words", _num(det.get("total_words")))
+    add("Speech", "Speech", _pct(det.get("speech_ratio")))
+    add("Speech", "Silence", _pct(det.get("silence_ratio")))
+    add("Speech", "Reading level", llm.get("reading_level"))
+
+    # Visual
+    add("Visual", "Talking head", _pct(det.get("talking_head_ratio")))
+    add("Visual", "On-screen text", _pct(det.get("onscreen_text_ratio")))
+    add("Visual", "Warm/cool", _num(det.get("warm_cool_balance"), 2))
+    add("Visual", "Brightness", _num(det.get("avg_brightness")))
+    add("Visual", "Saturation", _num(det.get("avg_saturation")))
+
+    # Narrative (llm synthesis)
+    hs = llm.get("hook_strength")
+    add("Narrative", "Hook strength", f"{hs}/10" if isinstance(hs, (int, float)) else None)
+    add("Narrative", "B-roll density", llm.get("broll_density"))
+    add("Narrative", "A/B-roll ratio", _num(llm.get("ab_roll_ratio"), 2))
+    add("Narrative", "Scriptedness", (llm.get("scriptedness") or "").replace("_", " ") or None)
+    add("Narrative", "CTA", llm.get("cta_type") if llm.get("cta_present") else None)
+
+    return out
+
+
 def derive_video(video: dict, shots: list[dict] | None = None) -> dict:
     """Build the Video Block view-model. `video` is a videos row (with metrics);
     `shots` is the list of shot rows (idx, start_sec, end_sec, frame_path, analysis)."""

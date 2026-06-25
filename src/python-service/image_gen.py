@@ -113,6 +113,7 @@ def _build_prompt(
     creator_id: str,
     profile: dict[str, Any] | None,
     frames: list[dict],
+    has_avatar: bool = False,
 ) -> str:
     """Assemble the structured room prompt from DB analysis + optional form profile."""
 
@@ -204,8 +205,8 @@ def _build_prompt(
     )
 
     # ── avatar clause ─────────────────────────────────────────────────────────
-    # Photo mode when we have face frames; description mode otherwise.
-    if frames:
+    # Photo mode when we have an uploaded avatar or face frames; else description.
+    if frames or has_avatar:
         avatar_clause = (
             "stylize the person in the attached reference photo as the clay character — "
             "keep their likeness (face, skin tone, hairstyle, glasses, clothing style), "
@@ -259,27 +260,42 @@ def _build_prompt(
 # ---------------------------------------------------------------------------
 
 
-def generate(creator_id: str, profile: dict[str, Any] | None = None) -> bytes:
+def generate(
+    creator_id: str,
+    profile: dict[str, Any] | None = None,
+    avatar_photo: bytes | None = None,
+    prompt: str | None = None,
+) -> bytes:
     """Generate a room PNG for the given creator using images.edit().
 
     images.edit() is required (not images.generate()) because reference images
     are passed via the `image` parameter — images.generate() is text-to-image only.
 
-    Passes up to 5 file inputs (style reference + talking-head frames, one per
-    distinct video) and a structured prompt. Returns a transparent-background PNG.
+    Passes up to 5 file inputs (style reference + an optional uploaded avatar
+    photo + talking-head frames, one per distinct video) and a prompt.
+    `avatar_photo` is the user's face uploaded in the Creator Room wizard; when
+    present it anchors the clay character's likeness. `prompt`, when provided (the
+    canvas wizard already builds a complete one), is used verbatim; otherwise the
+    prompt is synthesised from `profile` + the creator's DB style profile. Either
+    way the real talking-head frames are attached as references. Returns a PNG.
     """
     client = _client()
 
     # Fetch frames once — used for both prompt building and image inputs.
     frames = db.get_creator_frames_for_room(creator_id, limit=4)
     logger.info(
-        "Generating room image for creator %s (%d frames from %d video(s))",
+        "Generating room image for creator %s (%d frames from %d video(s), avatar=%s, prompt=%s)",
         creator_id,
         len(frames),
         len({f["video_id"] for f in frames}),
+        bool(avatar_photo),
+        "given" if prompt else "derived",
     )
 
-    prompt = _build_prompt(creator_id, profile, frames)
+    if not prompt:
+        prompt = _build_prompt(
+            creator_id, profile, frames, has_avatar=bool(avatar_photo)
+        )
     logger.debug("Room prompt (%d chars): %s…", len(prompt), prompt[:120])
 
     # ── assemble image inputs for images.edit() ───────────────────────────────
@@ -294,6 +310,11 @@ def generate(creator_id: str, profile: dict[str, Any] | None = None) -> bytes:
         )
     else:
         logger.warning("Style reference not found at %s", _SAMPLE_IMAGE)
+
+    # The uploaded face goes in right after the style reference so the model
+    # treats it as the avatar likeness (the prompt's photo clause refers to it).
+    if avatar_photo:
+        image_inputs.append(("avatar.png", BytesIO(avatar_photo), "image/png"))
 
     for i, frame in enumerate(frames):
         ext = "jpg" if "jpeg" in frame["mime_type"] else "png"

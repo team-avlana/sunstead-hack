@@ -13,7 +13,7 @@ import {
   useEditor,
   useValue,
 } from 'tldraw'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import s from './ImageBlock.module.css'
 import { IMAGE_BLOCK } from '@/lib/blockTypes'
 import { DeleteButton, DragHandle } from './ShapeChrome'
@@ -104,9 +104,16 @@ function ImageBlock({ shape }: { shape: ImageBlockShape }) {
 
   // Per-src load lifecycle: 'loading' → 'ready' | 'error'. Reset when src changes
   // (a reconcile can swap the underlying frame/panel for this element).
+  const imgRef = useRef<HTMLImageElement>(null)
   const [load, setLoad] = useState<'loading' | 'ready' | 'error'>(src ? 'loading' : 'error')
   useEffect(() => {
-    setLoad(src ? 'loading' : 'error')
+    // Defensive against a cached image whose `load` event we'd otherwise wait on
+    // forever: tldraw culls offscreen shapes and remounts them on pan-back, so
+    // this <img> can mount with an already-decoded src (common in the Mac
+    // WKWebView). If it's already complete, skip straight to 'ready'.
+    const el = imgRef.current
+    if (src && el?.complete && el.naturalWidth > 0) setLoad('ready')
+    else setLoad(src ? 'loading' : 'error')
   }, [src])
 
   const showChrome = isHovered || isSelected || trashHover
@@ -119,6 +126,7 @@ function ImageBlock({ shape }: { shape: ImageBlockShape }) {
           <div className={s.media}>
             {src && load !== 'error' ? (
               <img
+                ref={imgRef}
                 src={src}
                 alt={caption || 'storyboard panel'}
                 className={s.img}

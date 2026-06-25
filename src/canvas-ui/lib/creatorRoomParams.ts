@@ -2,12 +2,13 @@
  * Creator Room — image-generation parameters + prompt builder.
  *
  * The wizard (CreatorWizard.tsx) collects these params, `buildImagePrompt`
- * fills the placeholder prompt (docs/CREATOR_ROOM_IMAGE_PROMPT.md), and
- * `buildPayload` assembles `{ params, prompt, aspectRatio, avatarPhoto }` to send
- * to the Python service's image endpoint. `requestRoomGeneration` is a STUB —
- * the cofounder wires the real POST; today it only persists/logs the payload so
- * the wizard is ready to trigger generation without firing it.
+ * fills the prompt (docs/CREATOR_ROOM_IMAGE_PROMPT.md), and `buildPayload`
+ * assembles `{ params, prompt, aspectRatio, avatarPhoto }`. `requestRoomGeneration`
+ * POSTs that to the python-service (POST /api/creators/{self}/room-image via
+ * lib/api) and returns the URL of the generated room PNG.
  */
+
+import { fetchSelfCreator, generateRoomImage, hasBackend, roomImageUrl } from '@/lib/api'
 
 export type CreatorType = 'content-creator' | 'filmmaker' | 'pro-cinematographer'
 export type AvatarMode = 'photo' | 'description'
@@ -130,7 +131,7 @@ FIXED LAYOUT — always include ALL of these, in these same areas:
 STYLE LOCK: keep the SAME isometric camera angle every time; one cohesive room; soft warm shadows; miniature diorama feel. Absolutely NO text, letters, watermark, UI, or any extra people beyond the single avatar. Square 1:1 aspect ratio.`
 }
 
-// ---- payload + (stubbed) trigger -------------------------------------------
+// ---- payload + generation trigger ------------------------------------------
 
 export interface RoomGenerationPayload {
   params: CreatorRoomParams
@@ -144,22 +145,93 @@ export function buildPayload(params: CreatorRoomParams, avatarPhoto?: { name: st
   return { params, prompt: buildImagePrompt(params), aspectRatio: '1:1', avatarPhoto }
 }
 
-/**
- * STUB — the cofounder will implement the real POST to the Python service image
- * endpoint (prompt + optional avatar photo → generated room image). For now we
- * persist + log the payload so the wizard is fully wired and ready to trigger.
- */
-export async function requestRoomGeneration(payload: RoomGenerationPayload): Promise<void> {
-  // TODO(cofounder): POST { prompt, aspectRatio, avatarPhoto } to the image
-  // endpoint and stream back the generated room image; persist + show it.
-  if (typeof window !== 'undefined') {
-    const slim = { ...payload, avatarPhoto: payload.avatarPhoto ? { name: payload.avatarPhoto.name, dataUrl: '(omitted)' } : undefined }
-    try {
-      window.localStorage.setItem('rainey:room:lastBrief', JSON.stringify(slim))
-    } catch {
-      /* quota — fine */
-    }
-    // eslint-disable-next-line no-console
-    console.info('[Rainey] Room brief ready (generation not wired yet):', slim)
+/** Persist the room brief so it survives reloads and the no-backend fallback. */
+function persistBrief(payload: RoomGenerationPayload): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      'rainy:room:lastBrief',
+      JSON.stringify({
+        ...payload,
+        avatarPhoto: payload.avatarPhoto ? { name: payload.avatarPhoto.name, dataUrl: '(omitted)' } : undefined,
+      }),
+    )
+    window.localStorage.setItem('rainy:room:profile', JSON.stringify(payload.params))
+  } catch {
+    /* quota — fine */
   }
+}
+
+/** `creator_type` → the backend's recording-setup key (image_gen._SETUP_MAP). */
+const SHOOTER_FOR: Record<CreatorType, string> = {
+  'content-creator': 'iphone',
+  filmmaker: 'mirrorless',
+  'pro-cinematographer': 'dslr',
+}
+
+const splitList = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean)
+
+/** Collapse the chosen vibe words to the backend's lighting bucket. */
+function deriveLighting(vibe: string[]): string {
+  const v = vibe.map((x) => x.toLowerCase())
+  if (v.some((x) => x === 'moody' || x === 'dark')) return 'moody'
+  if (v.some((x) => x === 'bright' || x === 'clean')) return 'bright'
+  if (v.some((x) => x === 'warm' || x === 'cozy')) return 'warm'
+  return 'neutral'
+}
+
+/**
+ * Map the wizard's flat params to the backend `profile` shape that
+ * image_gen._build_prompt reads (creator / library / content / style /
+ * companions). Sent as a fallback alongside the ready-made `prompt`.
+ */
+export function paramsToProfile(p: CreatorRoomParams): Record<string, unknown> {
+  return {
+    creator: {
+      niche: p.niche,
+      vibe: [...p.vibe, ...(p.vibeExtra?.trim() ? [p.vibeExtra.trim()] : [])],
+    },
+    avatarDescription: p.avatarMode === 'description' ? p.avatarDescription : '',
+    library: {
+      interests: splitList(p.interests),
+      reads: splitList(p.books),
+      shows: splitList(p.showsFilms),
+      roleModels: splitList(p.roleModels),
+    },
+    content: { shooter: SHOOTER_FOR[p.creatorType], gear: [] },
+    style: { lighting: deriveLighting(p.vibe), materials: p.roomDesign },
+    companions: {
+      pet: p.companionKind === 'pet' ? p.companionPet : 'none',
+      props: p.companionKind === 'prop' && p.companionProp ? [p.companionProp] : [],
+    },
+  }
+}
+
+export type RoomGenerationResult =
+  | { ok: true; imageUrl: string }
+  | { ok: false; reason: 'no-backend' | 'error' }
+
+/**
+ * Generate the Creator Room image on the python-service and return the URL of
+ * the saved PNG. The wizard's prompt is used verbatim; the uploaded face (photo
+ * mode) anchors the avatar likeness. Always persists the brief; returns
+ * {ok:false} when no backend is configured or generation fails (the caller then
+ * keeps the default room).
+ */
+export async function requestRoomGeneration(payload: RoomGenerationPayload): Promise<RoomGenerationResult> {
+  persistBrief(payload)
+  if (!hasBackend()) return { ok: false, reason: 'no-backend' }
+
+  const self = await fetchSelfCreator()
+  if (!self) return { ok: false, reason: 'error' }
+
+  const res = await generateRoomImage(self.creator_id, {
+    prompt: payload.prompt,
+    profile: paramsToProfile(payload.params),
+    avatarPhoto: payload.avatarPhoto?.dataUrl,
+  })
+  if (!res) return { ok: false, reason: 'error' }
+
+  const url = roomImageUrl(self.creator_id, Date.now())
+  return url ? { ok: true, imageUrl: url } : { ok: false, reason: 'error' }
 }

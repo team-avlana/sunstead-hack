@@ -26,7 +26,7 @@
  * back out as new edits.
  */
 
-import type { Editor, TLShapeId } from 'tldraw'
+import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat } from '@/lib/blockTypes'
 import {
   createArtifact,
@@ -35,6 +35,7 @@ import {
   type ArtifactPatch,
   type NewArtifact,
 } from './api'
+import { frameBox, packColumns, type LayoutBox } from './frameLayout'
 
 /** tldraw's built-in frame shape type (used as a flow container). */
 const FRAME = 'frame'
@@ -193,6 +194,72 @@ function draftArtifact(shape: any): NewArtifact | null {
 }
 
 const CREATABLE = new Set<string>([RAINY_TEXT, VIDEO_BLOCK, FRAME])
+
+/**
+ * Manual "tidy" — re-flow EVERY block in a frame into the clean, non-overlapping
+ * column layout (`packColumns`) and persist it, so the arrangement sticks instead
+ * of snapping back on the next reload. Unlike the automatic `relayoutFrame` (which
+ * leaves pinned, i.e. user-moved, blocks exactly where they are), this treats all
+ * blocks as free and clears their pin — the user explicitly asked for everything
+ * to be re-arranged.
+ *
+ * The new positions are applied on-canvas as a remote/history-ignored change — the
+ * same channel relayoutFrame writes through — so the move doesn't echo back out as
+ * a user edit (which would otherwise re-pin every block, see handleUpdated →
+ * pinChild). We then write the new x/y + cleared pin straight to Postgres, one
+ * element_patch per block. Because packColumns is idempotent and the pins are now
+ * cleared, a reload re-derives the exact same layout. Persistence is a no-op for
+ * non-backend (local) frames (their children resolve to no element ref).
+ */
+export function tidyFrame(editor: Editor, frameId: TLShapeId): void {
+  const frame = editor.getShape(frameId)
+  if (!frame || frame.type !== FRAME) return
+  const kids = editor
+    .getSortedChildIdsForParent(frameId)
+    .map((id) => editor.getShape(id))
+    .filter((sh): sh is TLShape => !!sh)
+  const boxes: LayoutBox[] = []
+  for (const k of kids) {
+    const p = k.props as { w?: unknown; h?: unknown }
+    if (typeof p.w === 'number' && typeof p.h === 'number') {
+      boxes.push({ id: k.id, x: k.x, y: k.y, w: p.w, h: p.h })
+    }
+  }
+  if (!boxes.length) return
+
+  const pos = packColumns(boxes)
+  const enclosing = frameBox(boxes.map((b) => ({ ...b, ...(pos.get(b.id) ?? { x: b.x, y: b.y }) })))
+
+  // 1) Apply on-canvas immediately (derived layout → no outbound echo, no re-pin).
+  editor.store.mergeRemoteChanges(() => {
+    editor.run(
+      () => {
+        for (const k of kids) {
+          const np = pos.get(k.id)
+          if (!np) continue
+          editor.updateShape({ id: k.id, type: k.type, x: np.x, y: np.y, meta: { ...k.meta, pinned: false } } as any)
+        }
+        editor.updateShape({ id: frameId, type: FRAME, props: { w: enclosing.w, h: enclosing.h } } as any)
+      },
+      { history: 'ignore' },
+    )
+  })
+
+  // 2) Persist new position + cleared pin per block, so a reload stays tidy.
+  for (const k of kids) {
+    const np = pos.get(k.id)
+    if (!np) continue
+    const ref = resolveArtRef(k.id)
+    if (!ref?.elementId) continue // top-level / local shape: nothing to persist here
+    const ep: Record<string, unknown> = { x: num(np.x), y: num(np.y), pinned: false }
+    if (k.type === RAINY_TEXT || k.type === IMAGE_BLOCK) {
+      const p = k.props as { w?: unknown; h?: unknown }
+      ep.w = num(p.w)
+      ep.h = num(p.h)
+    }
+    void updateArtifact(ref.artifactId, { element_id: ref.elementId, element_patch: ep })
+  }
+}
 
 // ── attach ────────────────────────────────────────────────────────────────────
 

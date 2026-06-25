@@ -7,6 +7,9 @@ import { useIsoLayoutEffect } from '@/lib/useIso'
 import { useRainyStore } from '@/lib/store'
 import { useShootingConditions } from '@/lib/daylight'
 import CreatorRoom from './CreatorRoom'
+// CreatorStudio (channel ingest + Style DNA) is built but hidden for now —
+// import + render it in home-side to bring it back.
+// import CreatorStudio from './CreatorStudio'
 
 // No auth yet — the signed-in creator is hardcoded.
 const USER_NAME = 'Matthias'
@@ -70,6 +73,9 @@ export default function Home() {
             </h1>
             <Conditions cond={cond} />
           </div>
+
+          {/* Creator Studio (channel ingest + Style DNA) — hidden for now.
+              Re-enable by rendering <CreatorStudio /> here. */}
 
           <div className="home-projects">
             <div className="home-projects-head">

@@ -217,14 +217,106 @@ def list_creators(kind: str | None = None) -> list[dict]:
 def get_style_profile(creator_id: str) -> dict | None:
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT summary, profile FROM style_profiles "
+            "SELECT summary, profile, created_at FROM style_profiles "
             "WHERE creator_id = %s AND deleted_at IS NULL "
             "ORDER BY created_at DESC LIMIT 1",
             (creator_id,),
         ).fetchone()
     if not row:
         return None
-    return {"summary": row["summary"], "profile": row["profile"]}
+    return {
+        "summary": row["summary"],
+        "profile": row["profile"],
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+def get_or_create_self_creator() -> dict:
+    """The single kind='self' creator (the user). There is at most one.
+
+    Created on first access with a placeholder name when none exists, so the
+    Creator Room / style profile have a stable anchor even before the user has
+    onboarded a channel. Channel ingest (kind='self') later fills in the real
+    name/channel_url via update_creator rather than inserting a second self.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, kind, name, channel_url FROM creators "
+            "WHERE kind = 'self' AND deleted_at IS NULL ORDER BY created_at LIMIT 1"
+        ).fetchone()
+        if not row:
+            row = conn.execute(
+                "INSERT INTO creators (kind, name) VALUES ('self', %s) "
+                "RETURNING id, kind, name, channel_url",
+                ("You",),
+            ).fetchone()
+    return {
+        "creator_id": str(row["id"]),
+        "kind": row["kind"],
+        "name": row["name"],
+        "channel_url": row["channel_url"],
+    }
+
+
+def update_creator(
+    creator_id: str,
+    name: str | None = None,
+    channel_url: str | None = None,
+    platform: str | None = None,
+) -> dict | None:
+    """Patch a creator's display fields (used when onboarding fills in the real
+    channel for the placeholder self creator). No-op fields are left untouched."""
+    sets: list[str] = []
+    params: list = []
+    if name is not None:
+        sets.append("name = %s")
+        params.append(name)
+    if channel_url is not None:
+        sets.append("channel_url = %s")
+        params.append(channel_url)
+    if platform is not None:
+        sets.append("platform = %s")
+        params.append(platform)
+    if not sets:
+        return {"creator_id": creator_id}
+    params.append(creator_id)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE creators SET {', '.join(sets)} "
+            "WHERE id = %s AND deleted_at IS NULL RETURNING id",
+            params,
+        ).fetchone()
+    return {"creator_id": str(row["id"])} if row else None
+
+
+def creator_overview(creator_id: str) -> dict | None:
+    """Cheap creator status flags for the home screen — never loads the room
+    image bytes. Returns None if the creator doesn't exist."""
+    with get_conn() as conn:
+        creator = conn.execute(
+            "SELECT (room_image IS NOT NULL) AS has_room "
+            "FROM creators WHERE id = %s AND deleted_at IS NULL",
+            (creator_id,),
+        ).fetchone()
+        if not creator:
+            return None
+        prof = conn.execute(
+            "SELECT created_at FROM style_profiles "
+            "WHERE creator_id = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC LIMIT 1",
+            (creator_id,),
+        ).fetchone()
+        vids = conn.execute(
+            "SELECT count(*) AS total, count(analyzed_at) AS done "
+            "FROM videos WHERE creator_id = %s AND deleted_at IS NULL",
+            (creator_id,),
+        ).fetchone()
+    return {
+        "has_room_image": bool(creator["has_room"]),
+        "style_profile_at": prof["created_at"].isoformat() if prof else None,
+        "video_count": vids["total"],
+        "analyzed_count": vids["done"],
+    }
 
 
 # ── Videos ───────────────────────────────────────────────────────────────────

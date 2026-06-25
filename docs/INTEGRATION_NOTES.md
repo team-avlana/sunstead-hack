@@ -82,3 +82,27 @@ co-equal writers of the same `artifacts`. Implemented:
 
 Net: `docs/architecture.md` still describes the canvas as "read-only" — that is now **superseded**
 for artifact authoring; the canvas is a bidirectional view over `artifacts`.
+
+## Reconciliation status — 2026-06-25 (image blocks: storyboard / shot-list visualisation)
+The block taxonomy documented an `image` element (`{src, frame_id, caption?}`) and the backend already
+emitted it (`generate_storyboard_frame` → an artifact with `src='/api/storyboard/{id}'`; past-video
+storyboards use `src='/frames/{id}'`), but the canvas had **no image renderer** — `backendCanvas.expandArtifact`
+only branched on `video`, so image elements fell through to the text card and rendered empty. Implemented
+the missing half so storyboard and shot-list flows are visual:
+- **Image block.** New tldraw shape `image-block` (`components/ImageBlockShape.tsx` + `ImageBlock.module.css`),
+  taxonomy in `lib/blockTypes.ts` (`IMAGE_BLOCK` / `ImageData`), registered in `CanvasWorkspace`. Renders the
+  image with a caption bar + shot-type badge, a loading skeleton, and a broken-frame fallback (frames live on
+  the worker host and can 404). Mirrors the Video block (canEdit=false, resizeBox, delete/grip chrome).
+- **Rendering + reconcile.** `backendCanvas` maps `type:'image'` elements onto the shape, resolving `src`
+  through `resolveAssetUrl` (relative `/frames/...` and `/api/storyboard/...` → absolute; `data:`/`http`
+  pass through), with caption falling back through `caption`/`concept`/`label`. Reconcile patches
+  `src`/`caption`/`shotType` but not `w`/`h`, so a user resize survives a re-pull.
+- **Outbound sync.** `backendSync.buildPatch` persists image move/resize as `element_patch {x,y,w,h}` (a video's
+  size is view-derived, so only text + image carry `w/h`); image children pin out of frame auto-layout like
+  any moved block.
+- **Shot lists** have no dedicated MCP output — they're agent-authored frames built from `get_video_shots`
+  (frame_id + shot_type + timecode + per-shot analysis): image blocks paired with `title-sub` text.
+- **Verified** end-to-end against the live DB: a demo project ("POV: the feature ships — full prepro") with
+  research/ideation/script/storyboard/shot-list frames; image elements round-trip intact through
+  `create_artifact`/`block_normalize`, the read API enriches the video element, and every referenced
+  `/frames/{id}` returns `200 image/jpeg`.
