@@ -97,6 +97,18 @@ def _spawn() -> tuple[int, int]:
         env.setdefault("TERM", "xterm-256color")
         # A real interactive run: make sure the CLI doesn't think it's piped.
         env.pop("CI", None)
+        # If the service is being run under a Python debugger (debugpy/pydevd),
+        # it has monkeypatched os.exec* to notify the debug session that the
+        # process is being replaced — a round-trip that times out after 5s when
+        # the debugger can't follow into the `claude` TUI, stalling the terminal
+        # for minutes. Detach pydevd in the child before exec so that hook is a
+        # no-op. Harmless when no debugger is attached.
+        try:
+            import pydevd  # type: ignore
+
+            pydevd.stoptrace()
+        except Exception:
+            pass
         argv, cwd = _resolve_launch()
         try:
             os.chdir(cwd)

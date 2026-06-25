@@ -22,7 +22,11 @@
         "APP_CONFIG": "${workspaceFolder}/src/python-service/config.toml"
       },
       "console": "integratedTerminal",
-      "justMyCode": false
+      "justMyCode": false,
+      // The /pty bridge fork+exec's the `claude` CLI; without this, debugpy
+      // tries to track the replaced child and hangs 5s per exec
+      // ("Sending message related to process being replaced timed-out").
+      "subProcess": false
     }
   ]
 }
