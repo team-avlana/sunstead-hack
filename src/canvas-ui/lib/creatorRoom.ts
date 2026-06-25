@@ -248,6 +248,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const PROFILE = "__RAINY_PROFILE__";
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -276,8 +282,9 @@ renderer.setClearColor(L.clear, 1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-// ACES tone mapping turns flat MeshStandard into a soft, photographic clay look.
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// AgX tone mapping keeps warm hues true (ACES hue-shifts terracotta->yellow) and
+// gives the soft, photographic roll-off that reads as clay. OutputPass applies it.
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = L.exposure;
 
 const scene = new THREE.Scene();
@@ -324,7 +331,11 @@ fill.position.set(-8, 6, 4);
 scene.add(fill);
 
 // ---- material + geometry helpers -----------------------------------------
-function clay(color) { return new THREE.MeshStandardMaterial({ color: color, roughness: 0.85, metalness: 0.02 }); }
+function clay(color) {
+  // Clay surface: high roughness, zero metalness (metalness reads plastic), soft
+  // env response. No emissive lift — it blows out under bloom.
+  return new THREE.MeshStandardMaterial({ color: color, roughness: 0.92, metalness: 0.0, envMapIntensity: 0.9 });
+}
 function rbox(w, h, d, color, r) {
   const rad = r == null ? Math.min(w, h, d) * 0.14 : r;
   const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, rad), clay(color));
@@ -626,6 +637,27 @@ canvas.addEventListener('click', function (e) {
   }
 });
 
+// ---- clay post-processing: AO -> bloom -> SMAA -> AgX --------------------
+// Ambient occlusion (GTAO) is the single biggest clay contributor — it deepens
+// the soft contact darkening in every crease. Bloom blooms the warm lamps; SMAA
+// re-adds the antialiasing that post-processing disables; OutputPass tone-maps.
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+gtao.output = GTAOPass.OUTPUT.Default;
+gtao.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.0, thickness: 1.0, scale: 1.0, samples: 16, screenSpaceRadius: false });
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, radiusExponent: 1, rings: 2, samples: 16 });
+gtao.blendIntensity = 1.0;
+composer.addPass(gtao);
+
+// Very subtle — only the actual lamp/emissive cores should bloom, not the walls.
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.16, 0.6, 0.92);
+composer.addPass(bloom);
+
+composer.addPass(new SMAAPass(innerWidth, innerHeight));
+composer.addPass(new OutputPass());
+
 // ---- resize + render loop ------------------------------------------------
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h;
@@ -633,13 +665,15 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  composer.setPixelRatio(Math.min(devicePixelRatio, 2));
 }
 addEventListener('resize', resize); resize();
 
 document.getElementById('label').textContent =
   ((PROFILE.creator && PROFILE.creator.name) || 'Creator') + "'s room";
 
-renderer.setAnimationLoop(function () { controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(function () { controls.update(); composer.render(); });
 
 // tell the host we're alive (lets it hide its loading state)
 parent.postMessage({ source: 'rainy-room', type: 'ready' }, '*');
