@@ -44,11 +44,25 @@ class LlmConfig:
 
 
 @dataclass
+class TerminalConfig:
+    """The Claude Code CLI hosted in a PTY for the canvas's right-side panel.
+
+    `command` is the argv spawned in the pseudo-terminal (never user-controlled).
+    `cwd` is the working directory claude opens in (default: the user's home).
+    """
+
+    enabled: bool = True
+    command: list[str] = field(default_factory=lambda: ["claude"])
+    cwd: str = ""
+
+
+@dataclass
 class Settings:
     db: DbConfig = field(default_factory=DbConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     worker: WorkerConfig = field(default_factory=WorkerConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
+    terminal: TerminalConfig = field(default_factory=TerminalConfig)
 
 
 def load() -> Settings:
@@ -63,6 +77,7 @@ def load() -> Settings:
     srv_raw = raw.get("server", {})
     wkr_raw = raw.get("worker", {})
     llm_raw = raw.get("llm", {})
+    term_raw = raw.get("terminal", {})
 
     # Env vars override config.toml for credentials
     conn_str = (
@@ -90,6 +105,16 @@ def load() -> Settings:
             max_channel_videos=wkr_raw.get("max_channel_videos", WorkerConfig.max_channel_videos),
         ),
         llm=LlmConfig(azure_anthropic_url=azure_url, azure_anthropic_key=azure_key),
+        terminal=TerminalConfig(
+            enabled=str(os.environ.get("RAINY_TERMINAL_ENABLED", term_raw.get("enabled", True))).lower()
+            not in ("0", "false", "no"),
+            command=(
+                os.environ["RAINY_CLAUDE_COMMAND"].split()
+                if os.environ.get("RAINY_CLAUDE_COMMAND")
+                else term_raw.get("command", ["claude"])
+            ),
+            cwd=os.environ.get("RAINY_CLAUDE_CWD") or term_raw.get("cwd", ""),
+        ),
     )
 
 

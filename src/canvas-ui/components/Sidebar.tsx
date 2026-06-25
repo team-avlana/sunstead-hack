@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { gsap } from 'gsap'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import { useIsoLayoutEffect } from '@/lib/useIso'
@@ -14,12 +14,16 @@ import {
   type TextFormat,
   type VideoView,
   type VideoStatus,
+  type VideoData,
   inferFormat,
   restructure,
   setDefaultTextFormat,
   textIsEmpty,
+  getTextParts,
+  setTextPart,
   parse,
   dims,
+  fmtTime,
 } from '@/lib/blockTypes'
 
 /** The live tldraw editor, published on the window by CanvasWorkspace.onMount. */
@@ -31,13 +35,14 @@ const ed = (): Editor | undefined =>
 // inspector renders from plain data and never reaches into the editor to draw.
 // ===========================================================================
 
-type TextSel = { id: TLShapeId; kind: 'text'; format: TextFormat; empty: boolean }
+type TextSel = { id: TLShapeId; kind: 'text'; format: TextFormat; empty: boolean; html: string }
 type VideoSel = {
   id: TLShapeId
   kind: 'video'
   view: VideoView
   status: VideoStatus
   scenes: number
+  data: VideoData
 }
 type OtherSel = { id: TLShapeId; kind: 'other'; shapeType: string }
 type Sel = TextSel | VideoSel | OtherSel
@@ -45,7 +50,7 @@ type Sel = TextSel | VideoSel | OtherSel
 function normalize(shape: TLShape): Sel {
   if (shape.type === RAINY_TEXT) {
     const html = String((shape.props as any).html ?? '')
-    return { id: shape.id, kind: 'text', format: inferFormat(html), empty: textIsEmpty(html) }
+    return { id: shape.id, kind: 'text', format: inferFormat(html), empty: textIsEmpty(html), html }
   }
   if (shape.type === VIDEO_BLOCK) {
     const d = parse(String((shape.props as any).data ?? ''))
@@ -55,6 +60,7 @@ function normalize(shape: TLShape): Sel {
       view: (String((shape.props as any).view || 'compact') as VideoView),
       status: d.status ?? 'empty',
       scenes: d.storyboard?.length ?? 0,
+      data: d,
     }
   }
   return { id: shape.id, kind: 'other', shapeType: shape.type }
@@ -160,14 +166,28 @@ function applyVideoView(ids: TLShapeId[], next: VideoView) {
   })
 }
 
-function editText(id: TLShapeId) {
-  withEditor((e) =>
-    e.run(() => {
-      e.select(id)
-      e.setEditingShape(id)
-      e.setCurrentTool('select.editing_shape')
-    }),
-  )
+/** Write one editable text slot (title / subtitle / body) back to a text block. */
+function applyTextPart(id: TLShapeId, part: 'title' | 'subtitle' | 'body', value: string) {
+  withEditor((e) => {
+    const shape = e.getShape(id)
+    if (!shape || shape.type !== RAINY_TEXT) return
+    // Don't stomp the card while the user is editing it directly on the canvas.
+    if (e.getEditingShapeId() === id) return
+    const cur = String((shape.props as any).html ?? '')
+    const html = setTextPart(cur, part, value)
+    if (html !== cur) e.updateShape({ id, type: RAINY_TEXT, props: { html } })
+  })
+}
+
+/** Merge a patch into a video block's JSON `data` prop (editable fields only). */
+function applyVideoData(id: TLShapeId, patch: Partial<VideoData>) {
+  withEditor((e) => {
+    const shape = e.getShape(id)
+    if (!shape || shape.type !== VIDEO_BLOCK) return
+    const d = parse(String((shape.props as any).data ?? ''))
+    const next = { ...d, ...patch }
+    e.updateShape({ id, type: VIDEO_BLOCK, props: { data: JSON.stringify(next) } })
+  })
 }
 
 const duplicate = (ids: TLShapeId[]) => withEditor((e) => e.duplicateShapes(ids, { x: 28, y: 28 }))
@@ -227,15 +247,40 @@ export default function Sidebar() {
         <div className="ci">
           <div className="ci-head">
             <div className="ci-title">{panelTitle(sel)}</div>
-            <button
-              type="button"
-              className="ci-collapse"
-              title="Hide sidebar"
-              aria-label="Hide sidebar"
-              onClick={toggleSidebar}
-            >
-              <SidebarIcon size={18} />
-            </button>
+            <div className="ci-head-actions">
+              {sel.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="ci-act"
+                    title={`Duplicate${sel.length > 1 ? ` (${sel.length})` : ''}`}
+                    aria-label="Duplicate"
+                    onClick={() => duplicate(sel.map((s) => s.id))}
+                  >
+                    <CopyIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="ci-act danger"
+                    title={`Delete${sel.length > 1 ? ` (${sel.length})` : ''}`}
+                    aria-label="Delete"
+                    onClick={() => remove(sel.map((s) => s.id))}
+                  >
+                    <TrashIcon />
+                  </button>
+                  <span className="ci-act-sep" />
+                </>
+              )}
+              <button
+                type="button"
+                className="ci-collapse"
+                title="Hide sidebar"
+                aria-label="Hide sidebar"
+                onClick={toggleSidebar}
+              >
+                <SidebarIcon size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="insp" key={bodyKey}>
@@ -258,7 +303,7 @@ export default function Sidebar() {
 }
 
 function panelTitle(sel: Sel[]): string {
-  if (sel.length === 0) return 'Canvas'
+  if (sel.length === 0) return 'Rainey'
   if (sel.length > 1) return `${sel.length} selected`
   const s = sel[0]
   return s.kind === 'text' ? 'Text block' : s.kind === 'video' ? 'Video block' : 'Block'
@@ -301,10 +346,10 @@ function TextInspector({ sels }: { sels: TextSel[] }) {
   const ids = sels.map((s) => s.id)
   const multi = sels.length > 1
   const current = allSame(sels.map((s) => s.format)) ? sels[0].format : null
-  const allEmpty = sels.every((s) => s.empty)
 
   return (
     <>
+      {/* 1 — container type (the layout the block takes) */}
       <Section label="Layout">
         <Variants
           options={TEXT_FORMAT_OPTIONS.map((o) => ({
@@ -317,25 +362,30 @@ function TextInspector({ sels }: { sels: TextSel[] }) {
         />
       </Section>
 
-      <Section label={multi ? 'Actions' : 'Next steps'}>
-        {!multi && (
-          <button className="insp-btn primary" onClick={() => editText(ids[0])}>
-            {allEmpty ? 'Start writing' : 'Edit text'}
-          </button>
-        )}
-        <button className="insp-btn" onClick={() => duplicate(ids)}>
-          Duplicate{multi ? ` (${ids.length})` : ''}
-        </button>
-        <button className="insp-btn danger" onClick={() => remove(ids)}>
-          Delete{multi ? ` (${ids.length})` : ''}
-        </button>
-      </Section>
+      {/* 2 — one component per input field */}
+      {!multi && <TextFields sel={sels[0]} />}
 
-      <p className="insp-hint">
-        {multi
-          ? 'Pick a layout to apply it to every selected text block — your text is kept.'
-          : 'Switch the layout above, or edit the card directly on the canvas.'}
-      </p>
+      {multi && <p className="insp-hint">Pick a layout to apply it to every selected text block — your text is kept.</p>}
+    </>
+  )
+}
+
+/** One self-contained Field component per editable slot the format exposes. */
+function TextFields({ sel }: { sel: TextSel }) {
+  const parts = getTextParts(sel.html)
+  return (
+    <>
+      {(sel.format === 'title' || sel.format === 'title-sub') && (
+        <Field
+          label={sel.format === 'title' ? 'Header' : 'Title'}
+          value={parts.title}
+          onCommit={(v) => applyTextPart(sel.id, 'title', v)}
+        />
+      )}
+      {sel.format === 'title-sub' && (
+        <Field label="Subtitle" value={parts.subtitle} onCommit={(v) => applyTextPart(sel.id, 'subtitle', v)} />
+      )}
+      <Field label="Text" multiline value={parts.body} onCommit={(v) => applyTextPart(sel.id, 'body', v)} />
     </>
   )
 }
@@ -377,6 +427,7 @@ function VideoInspector({ sels }: { sels: VideoSel[] }) {
 
   return (
     <>
+      {/* 1 — container type (compactness level) */}
       <Section label="Detail">
         <Variants
           options={VIDEO_VIEW_OPTIONS.map((o) => ({
@@ -391,53 +442,105 @@ function VideoInspector({ sels }: { sels: VideoSel[] }) {
         />
       </Section>
 
+      {/* 2 — one component per editable field */}
       {single && (
-        <Section label="Status">
-          <div className={`insp-status s_${single.status}`}>
-            <span className="insp-status-dot" />
-            <span>{STATUS_LABEL[single.status]}</span>
-            {single.status === 'analysed' && single.scenes > 0 && (
-              <span className="insp-status-meta">{single.scenes} scenes</span>
-            )}
-          </div>
-        </Section>
+        <>
+          <Field
+            label="Video URL"
+            value={single.data.source_url ?? ''}
+            placeholder="https://…"
+            onCommit={(v) => applyVideoData(single.id, { source_url: v.trim() || null })}
+          />
+          <Field
+            label="Title"
+            value={single.data.title ?? ''}
+            placeholder="Untitled video"
+            onCommit={(v) => applyVideoData(single.id, { title: v })}
+          />
+
+          {/* 3 — read-only, service-driven detail */}
+          <VideoAnalysis sel={single} />
+        </>
       )}
 
-      <Section label={multi ? 'Actions' : 'Next steps'}>
-        {single && single.status === 'analysed' && single.scenes > 0 && (
-          <button
-            className="insp-btn primary"
-            onClick={() => applyVideoView(ids, single.view === 'full' ? 'expanded' : 'full')}
-          >
-            {single.view === 'full' ? 'Hide storyboard' : 'Show full storyboard'}
-          </button>
-        )}
-        <button className="insp-btn" onClick={() => duplicate(ids)}>
-          Duplicate{multi ? ` (${ids.length})` : ''}
-        </button>
-        <button className="insp-btn danger" onClick={() => remove(ids)}>
-          Delete{multi ? ` (${ids.length})` : ''}
-        </button>
-      </Section>
-
-      <p className="insp-hint">{single ? videoHint(single.status) : 'Pick a detail level for every selected video.'}</p>
+      {multi && <p className="insp-hint">Pick a detail level for every selected video.</p>}
     </>
   )
 }
 
-function videoHint(status: VideoStatus): string {
-  switch (status) {
-    case 'empty':
-      return 'Add a video URL on the card, or ask Rainey to add one to this project.'
-    case 'not_analysed':
-      return 'Ask Rainey to analyse this video to unlock its tags, transcript and storyboard.'
-    case 'analysing':
-      return 'Analysis is running — tags, transcript and the storyboard appear when it finishes.'
-    case 'analysed':
-      return 'Switch the detail above to reveal the summary, transcript and storyboard.'
-    case 'error':
-      return 'Analysis failed. Ask Rainey to retry, or check the source URL on the card.'
-  }
+/**
+ * Read-only analysis fields — these come from the Comms Service, so they're shown
+ * for consistency but not editable. Collapsed by default so they don't eat the
+ * panel; the metric row stays visible as a quick summary.
+ */
+function VideoAnalysis({ sel }: { sel: VideoSel }) {
+  const d = sel.data
+  const [open, setOpen] = useState(false)
+  const metrics: { k: string; v: string }[] = []
+  if (d.duration_sec) metrics.push({ k: 'Duration', v: fmtTime(d.duration_sec) })
+  if (d.shot_count) metrics.push({ k: 'Shots', v: String(d.shot_count) })
+  if (d.storyboard?.length) metrics.push({ k: 'Scenes', v: String(d.storyboard.length) })
+
+  const hasDetail = !!(d.description || d.transcript || d.tags?.length || d.hook?.text)
+
+  return (
+    <Section label="Analysis">
+      <div className={`insp-status s_${sel.status}`}>
+        <span className="insp-status-dot" />
+        <span>{STATUS_LABEL[sel.status]}</span>
+        {sel.status === 'analysed' && sel.scenes > 0 && (
+          <span className="insp-status-meta">{sel.scenes} scenes</span>
+        )}
+      </div>
+
+      {metrics.length > 0 && (
+        <div className="insp-metrics">
+          {metrics.map((m) => (
+            <div key={m.k} className="insp-metric">
+              <span className="insp-metric-v">{m.v}</span>
+              <span className="insp-metric-k">{m.k}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasDetail && (
+        <>
+          <button className="insp-disclose" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            <Chevron open={open} />
+            {open ? 'Hide details' : 'Show details'}
+          </button>
+          {open && (
+            <div className="insp-readonly">
+              {d.tags?.length ? (
+                <ReadRow label="Tags">
+                  <div className="insp-chips">
+                    {d.tags.map((t, i) => (
+                      <span key={i} className="insp-chip">{t}</span>
+                    ))}
+                  </div>
+                </ReadRow>
+              ) : null}
+              {d.hook?.text ? <ReadRow label="Hook"><p className="insp-ro-text">“{d.hook.text}”</p></ReadRow> : null}
+              {d.description ? <ReadRow label="Summary"><p className="insp-ro-text">{d.description}</p></ReadRow> : null}
+              {d.transcript ? (
+                <ReadRow label="Transcript"><p className="insp-ro-text insp-ro-scroll">{d.transcript}</p></ReadRow>
+              ) : null}
+            </div>
+          )}
+        </>
+      )}
+    </Section>
+  )
+}
+
+function ReadRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="insp-ro-row">
+      <span className="insp-ro-label">{label}</span>
+      {children}
+    </div>
+  )
 }
 
 function VideoPreview({ v }: { v: VideoView }) {
@@ -461,41 +564,21 @@ function VideoPreview({ v }: { v: VideoView }) {
 // ---- Other / mixed --------------------------------------------------------
 
 function OtherInspector({ sels }: { sels: OtherSel[] }) {
-  const ids = sels.map((s) => s.id)
   const name = sels.length > 1 ? `${sels.length} blocks` : shapeLabel(sels[0].shapeType)
   return (
-    <>
-      <Section label="Block">
-        <div className="insp-summary">{name}</div>
-      </Section>
-      <Section label="Actions">
-        <button className="insp-btn" onClick={() => duplicate(ids)}>
-          Duplicate{sels.length > 1 ? ` (${ids.length})` : ''}
-        </button>
-        <button className="insp-btn danger" onClick={() => remove(ids)}>
-          Delete{sels.length > 1 ? ` (${ids.length})` : ''}
-        </button>
-      </Section>
-    </>
+    <Section label="Block">
+      <div className="insp-summary">{name}</div>
+    </Section>
   )
 }
 
 function MixedInspector({ sel }: { sel: Sel[] }) {
-  const ids = sel.map((s) => s.id)
   return (
     <>
       <Section label="Selection">
         <div className="insp-summary">{summarize(sel)}</div>
       </Section>
-      <Section label="Actions">
-        <button className="insp-btn" onClick={() => duplicate(ids)}>
-          Duplicate ({ids.length})
-        </button>
-        <button className="insp-btn danger" onClick={() => remove(ids)}>
-          Delete ({ids.length})
-        </button>
-      </Section>
-      <p className="insp-hint">Select blocks of one type to switch their layout together.</p>
+      <p className="insp-hint">Select blocks of one type to edit their fields together.</p>
     </>
   )
 }
@@ -510,6 +593,44 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
       <div className="insp-label">{label}</div>
       {children}
     </div>
+  )
+}
+
+/**
+ * A labelled editable field. Uncontrolled (defaultValue) so the caret never
+ * jumps when our debounced write re-renders the panel; it remounts only when
+ * the selection changes (the inspector body is keyed on selection id). Writes
+ * are debounced so typing makes one shape update per pause, not per keystroke.
+ */
+function Field({
+  label,
+  value,
+  onCommit,
+  multiline,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onCommit: (v: string) => void
+  multiline?: boolean
+  placeholder?: string
+}) {
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const v = e.target.value
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => onCommit(v), 300)
+  }
+  return (
+    <label className="insp-field">
+      <span className="insp-field-label">{label}</span>
+      {multiline ? (
+        <textarea className="insp-input insp-textarea" defaultValue={value} placeholder={placeholder} rows={4} onChange={onChange} />
+      ) : (
+        <input className="insp-input" defaultValue={value} placeholder={placeholder} onChange={onChange} />
+      )}
+    </label>
   )
 }
 
@@ -605,6 +726,35 @@ function CursorIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 3l6 16 2.5-6.5L20 10z" />
+    </svg>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+    </svg>
+  )
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}
+    >
+      <path d="M6 9l6 6 6-6" />
     </svg>
   )
 }

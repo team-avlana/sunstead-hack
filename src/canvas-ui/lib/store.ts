@@ -12,6 +12,8 @@ interface RainyState {
   commsStatus: CommsStatus
   selectedIds: string[]
   sidebarCollapsed: boolean
+  /** Right-side Claude Code panel (hosts the user's own `claude` CLI). */
+  claudePanelOpen: boolean
   /** Canvas dark mode — toggled from the bottom dock's sun button. */
   dark: boolean
   /** Open a project's canvas. Title is optional — the canvas load resolves it. */
@@ -23,6 +25,8 @@ interface RainyState {
   setSelectedIds: (ids: string[]) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
+  setClaudePanelOpen: (open: boolean) => void
+  toggleClaudePanel: () => void
   setDark: (dark: boolean) => void
   toggleDark: () => void
 }
@@ -43,6 +47,7 @@ export const useRainyStore = create<RainyState>((set) => ({
   commsStatus: 'idle',
   selectedIds: [],
   sidebarCollapsed: false,
+  claudePanelOpen: true,
   dark: initialDark(),
   openProject: (id, title) => set({ view: 'canvas', currentProjectId: id, currentProjectTitle: title ?? '' }),
   goHome: () => set({ view: 'home', currentProjectId: null }),
@@ -51,6 +56,8 @@ export const useRainyStore = create<RainyState>((set) => ({
   setSelectedIds: (selectedIds) => set({ selectedIds }),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setClaudePanelOpen: (claudePanelOpen) => set({ claudePanelOpen }),
+  toggleClaudePanel: () => set((s) => ({ claudePanelOpen: !s.claudePanelOpen })),
   setDark: (dark) => {
     if (typeof window !== 'undefined') window.localStorage.setItem(DARK_KEY, dark ? '1' : '0')
     set({ dark })

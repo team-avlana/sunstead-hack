@@ -22,6 +22,7 @@ from starlette.routing import Mount, WebSocketRoute
 
 import db
 import notify
+import pty_bridge
 from config import settings
 from routes_api import routes as api_routes
 from tools import analysis, artifacts, creators, memory, projects
@@ -73,6 +74,8 @@ _app = Starlette(
     routes=[
         # Order matters: specific routes before the catch-all MCP mount at "/".
         WebSocketRoute("/ws", notify.websocket_endpoint),
+        # Hosts the user's own `claude` CLI in a PTY for the canvas right panel.
+        WebSocketRoute("/pty", pty_bridge.terminal_endpoint),
         *api_routes,
         Mount("/", app=_mcp_asgi),
     ],

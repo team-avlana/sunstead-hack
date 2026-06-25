@@ -111,6 +111,53 @@ export function restructure(html: string, next: TextFormat): string {
   return head.join('') + body.join('')
 }
 
+/** Escape user text so it can be re-inserted into the block's HTML safely. */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Split a block's HTML into the editable slots the sidebar exposes.
+ *   - `title` / `subtitle`: plain text of the leading H1 / H2 (per the format).
+ *   - `body`: plain text of the remaining nodes, one line per node.
+ *   - `bodyHtml`: the original rich body markup, preserved so editing the title
+ *     or subtitle never flattens the body's formatting.
+ */
+export function getTextParts(html: string): { title: string; subtitle: string; body: string; bodyHtml: string } {
+  const nodes = topLevelNodes(html)
+  const slots = FORMAT_SLOTS[inferFormat(html)]
+  let i = 0
+  const title = slots.title ? (nodes[i++]?.textContent ?? '') : ''
+  const subtitle = slots.subtitle ? (nodes[i++]?.textContent ?? '') : ''
+  const bodyNodes = nodes.slice(i)
+  const body = bodyNodes.map((n) => n.textContent ?? '').join('\n')
+  const bodyHtml = bodyNodes.map((n) => n.outerHTML).join('') || '<p></p>'
+  return { title, subtitle, body, bodyHtml }
+}
+
+/** Build the heading markup for a format from plain title/subtitle text. */
+function headHtml(f: TextFormat, title: string, subtitle: string): string {
+  const slots = FORMAT_SLOTS[f]
+  let h = ''
+  if (slots.title) h += `<h1>${escapeHtml(title)}</h1>`
+  if (slots.subtitle) h += `<h2>${escapeHtml(subtitle)}</h2>`
+  return h
+}
+
+/**
+ * Write one slot back into the block's HTML, preserving the others. Editing the
+ * title/subtitle keeps the rich body untouched; editing the body re-paragraphs
+ * it (one <p> per line) — the canvas card remains the path for inline richness.
+ */
+export function setTextPart(html: string, part: 'title' | 'subtitle' | 'body', value: string): string {
+  const f = inferFormat(html)
+  const p = getTextParts(html)
+  if (part === 'title') return headHtml(f, value, p.subtitle) + p.bodyHtml
+  if (part === 'subtitle') return headHtml(f, p.title, value) + p.bodyHtml
+  const bodyHtml = value.split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('') || '<p></p>'
+  return headHtml(f, p.title, p.subtitle) + bodyHtml
+}
+
 // ===========================================================================
 // Video blocks
 // ===========================================================================

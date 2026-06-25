@@ -8,6 +8,9 @@ import TopBlur from './TopBlur'
 import Sidebar from './Sidebar'
 import { useRainyStore } from '@/lib/store'
 
+// xterm touches the DOM on load; keep it out of the prerendered bundle.
+const ClaudePanel = dynamic(() => import('./ClaudePanel'), { ssr: false })
+
 // ssr:false is legal here because this file is a Client Component (App Router rule).
 const CanvasWorkspace = dynamic(() => import('./CanvasWorkspace'), {
   ssr: false,
@@ -62,6 +65,9 @@ export default function CanvasClient() {
       <Sidebar />
       <TopBlur />
       <ProjectHeader />
+      {/* After TopBlur so the progressive top blur never veils the panel header,
+          while keeping the same z-index (5) as the left Sidebar. */}
+      <ClaudePanel />
     </div>
   )
 }
