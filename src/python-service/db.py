@@ -20,9 +20,18 @@ def get_pool() -> ConnectionPool:
             settings.db.connection_string,
             min_size=1,
             max_size=5,
+            open=True,  # explicit (implicit-open is deprecated in psycopg_pool 3.3)
             kwargs={"row_factory": dict_row},
         )
     return _pool
+
+
+def close_pool() -> None:
+    """Close the pool on shutdown (called from the server lifespan)."""
+    global _pool
+    if _pool is not None:
+        _pool.close()
+        _pool = None
 
 
 @contextmanager

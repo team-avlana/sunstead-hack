@@ -4,6 +4,7 @@ import asyncio
 from typing import Any, Optional
 
 from fastmcp import FastMCP
+from starlette.concurrency import run_in_threadpool
 
 import db
 import notify
@@ -33,12 +34,16 @@ def register(mcp: FastMCP) -> None:
         if not type:
             raise ValueError("type is required")
 
-        result = db.create_artifact(
-            project_id=project_id,
-            type_=type,
-            title=title,
-            payload=payload or {},
-            position=position,
+        # Run the blocking psycopg-pool call off the event loop so it never
+        # starves pg_listen / websocket delivery / the MCP transport.
+        result = await run_in_threadpool(
+            lambda: db.create_artifact(
+                project_id=project_id,
+                type_=type,
+                title=title,
+                payload=payload or {},
+                position=position,
+            )
         )
         await notify.broadcast(
             {
@@ -75,13 +80,15 @@ def register(mcp: FastMCP) -> None:
         if not artifact_id:
             raise ValueError("artifact_id is required")
 
-        result = db.update_artifact(
-            artifact_id=artifact_id,
-            payload=payload,
-            element_id=element_id,
-            element_patch=element_patch,
-            position=position,
-            title=title,
+        result = await run_in_threadpool(
+            lambda: db.update_artifact(
+                artifact_id=artifact_id,
+                payload=payload,
+                element_id=element_id,
+                element_patch=element_patch,
+                position=position,
+                title=title,
+            )
         )
         if result is None:
             raise ValueError(f"Artifact {artifact_id} not found")
@@ -121,7 +128,7 @@ def register(mcp: FastMCP) -> None:
         Soft-delete an artifact (sets deleted_at). Notifies the canvas.
         Returns {ok: true}.
         """
-        result = db.delete_artifact(artifact_id)
+        result = await run_in_threadpool(db.delete_artifact, artifact_id)
         if result is None:
             raise ValueError(f"Artifact {artifact_id} not found")
 

@@ -166,18 +166,17 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
             }
             continue
           }
-          // Patch content in place; keep the user's x/y/view.
+          // Patch content in place; keep the user's x/y + chosen disclosure level,
+          // but always refit w/h to that view + the latest content so growth (e.g.
+          // a storyboard arriving) never clips.
           if (d.type === VIDEO_BLOCK) {
-            const prev = (cur as any).props
-            const prevStatus = safeStatus(prev?.data)
-            const nextStatus = safeStatus(d.props.data as string)
-            const patch: Record<string, unknown> = { data: d.props.data }
-            if (prevStatus !== nextStatus) {
-              // content changed shape — refit height to the current view
-              const size = dims((prev?.view as View) || 'compact', JSON.parse(d.props.data as string))
-              patch.h = size.h
-            }
-            editor.updateShape({ id: d.id, type: VIDEO_BLOCK, props: patch } as any)
+            const view = ((cur as any).props?.view as View) || 'compact'
+            const size = dims(view, JSON.parse(d.props.data as string))
+            editor.updateShape({
+              id: d.id,
+              type: VIDEO_BLOCK,
+              props: { data: d.props.data, w: size.w, h: size.h },
+            } as any)
           } else if (d.type === RAINY_TEXT) {
             editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)
           }
@@ -191,12 +190,4 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
       { history: 'ignore' },
     )
   })
-}
-
-function safeStatus(dataJson: unknown): string {
-  try {
-    return (JSON.parse(String(dataJson)) as VideoData).status ?? ''
-  } catch {
-    return ''
-  }
 }

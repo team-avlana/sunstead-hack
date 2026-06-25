@@ -20,6 +20,7 @@ from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount, WebSocketRoute
 
+import db
 import notify
 from config import settings
 from routes_api import routes as api_routes
@@ -64,6 +65,7 @@ async def lifespan(app: Starlette):
                 await listener
             except asyncio.CancelledError:
                 pass
+            db.close_pool()
 
 
 _app = Starlette(
@@ -76,6 +78,11 @@ _app = Starlette(
     ],
 )
 
+# NOTE: wildcard CORS + no auth is intended for LOCAL use only — the server binds
+# 127.0.0.1. Before any non-local/exposed deployment, restrict allow_origins to the
+# known canvas origin(s), add an Origin check on the /ws handshake (CORS does not
+# cover websockets), and require a token on the write tools. A malicious local web
+# page can otherwise drive the MCP write surface via DNS-rebinding/cross-origin.
 app = CORSMiddleware(
     _app,
     allow_origins=["*"],

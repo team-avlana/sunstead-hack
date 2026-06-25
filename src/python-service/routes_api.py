@@ -54,8 +54,9 @@ async def health(_: Request) -> JSONResponse:
     try:
         await run_in_threadpool(db.list_projects)
         return JSONResponse({"ok": True, "db": True})
-    except Exception as exc:  # pragma: no cover
-        return JSONResponse({"ok": False, "db": False, "error": str(exc)[:200]}, status_code=503)
+    except Exception:  # pragma: no cover
+        # Don't echo the exception — it can contain the DB DSN/credentials.
+        return JSONResponse({"ok": False, "db": False}, status_code=503)
 
 
 async def list_projects(_: Request) -> JSONResponse:
