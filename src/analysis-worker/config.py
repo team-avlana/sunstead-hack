@@ -8,6 +8,9 @@ DB_CONNECTION_STRING = os.environ.get("DB_CONNECTION_STRING", "")
 # Required for style-profile builder
 CREATOR_ID = os.environ.get("CREATOR_ID", "")
 
+# ElevenLabs — Scribe speech-to-text
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
+
 # Anthropic API — direct key (preferred) or Azure AI Foundry
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 AZURE_ANTHROPIC_URL = os.environ.get("AZURE_ANTHROPIC_URL", "")

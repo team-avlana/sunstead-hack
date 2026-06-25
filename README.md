@@ -51,6 +51,18 @@ Start with `docs/architecture.md`, then `docs/FEASIBILITY.md` and `docs/DECISION
 
 ## How to run
 
+### Secrets
+
+Set up the .env file as follows and fill in all keys:
+```
+DB_CONNECTION_STRING=
+AZURE_ANTHROPIC_URL=
+AZURE_ANTHROPIC_KEY=
+ELEVENLABS_API_KEY=
+AZURE_OPENAI_URL=
+AZURE_OPENAI_KEY=
+```
+
 ### MCP server & analysis worker
 
 - Have Python >=3.12 installed

@@ -21,6 +21,8 @@ def _llm_env(base: dict[str, str]) -> dict[str, str]:
         base["AZURE_ANTHROPIC_URL"] = settings.llm.azure_anthropic_url
     if settings.llm.azure_anthropic_key:
         base["AZURE_ANTHROPIC_KEY"] = settings.llm.azure_anthropic_key
+    if settings.llm.elevenlabs_api_key:
+        base["ELEVENLABS_API_KEY"] = settings.llm.elevenlabs_api_key
     return base
 
 

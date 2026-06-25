@@ -46,6 +46,7 @@ class LlmConfig:
     anthropic_api_key: str = ""
     azure_anthropic_url: str = ""
     azure_anthropic_key: str = ""
+    elevenlabs_api_key: str = ""
 
 
 @dataclass
@@ -91,6 +92,9 @@ def load() -> Settings:
     azure_key = os.environ.get("AZURE_ANTHROPIC_KEY") or llm_raw.get(
         "azure_anthropic_key", ""
     )
+    elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY") or llm_raw.get(
+        "elevenlabs_api_key", ""
+    )
 
     openai_url = os.environ.get("AZURE_OPENAI_URL") or img_raw.get("azure_openai_url", "")
     openai_key = os.environ.get("AZURE_OPENAI_KEY") or img_raw.get("azure_openai_key", "")
@@ -122,6 +126,7 @@ def load() -> Settings:
             anthropic_api_key=anthropic_key,
             azure_anthropic_url=azure_url,
             azure_anthropic_key=azure_key,
+            elevenlabs_api_key=elevenlabs_key,
         ),
         image=ImageConfig(
             azure_openai_url=openai_url,

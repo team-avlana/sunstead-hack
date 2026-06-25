@@ -8,7 +8,7 @@ deterministic + LLM metrics, and writes everything to Postgres.
 | Dependency | How to install |
 |---|---|
 | **ffmpeg** | `brew install ffmpeg` / `apt install ffmpeg` / [ffmpeg.org](https://ffmpeg.org/download.html) |
-| **crispasr** | `pip install crispasr` or see [CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR) |
+| **ElevenLabs API key** | Set `ELEVENLABS_API_KEY` — get one at [elevenlabs.io](https://elevenlabs.io) |
 | Python 3.11+ | — |
 
 ## Install Python deps
@@ -56,15 +56,17 @@ pip install -r requirements.txt
 If no credentials are set, LLM metrics are skipped and the worker completes
 with deterministic metrics only.
 
-### CrispASR / transcription
+### ElevenLabs / transcription
 
-> CrispASR is invoked as:
-> ```
-> crispasr --backend cohere --force-aligner --output <transcript.json> audio.wav
-> ```
-> Verify the exact flag names against the
-> [CrispASR README](https://github.com/CrispStrobe/CrispASR) and use
-> `CRISPASR_EXTRA_ARGS` to patch them if needed.
+| Variable | Description |
+|---|---|
+| `ELEVENLABS_API_KEY` | ElevenLabs API key — used by the Scribe v1 speech-to-text model |
+
+> The worker extracts a mono 16 kHz WAV from the video and POSTs it to
+> `https://api.elevenlabs.io/v1/speech-to-text` with `model_id=scribe_v1`
+> and `timestamps_granularity=word`. If the key is missing or the request
+> fails, transcription is skipped and the pipeline continues with an empty
+> transcript.
 
 ### Optional
 
@@ -77,6 +79,7 @@ with deterministic metrics only.
 ```bash
 VIDEO_ID=<uuid> \
 DB_CONNECTION_STRING="postgresql://user:pass@localhost/db" \
+ELEVENLABS_API_KEY="sk_..." \
 ANTHROPIC_API_KEY="sk-ant-..." \
 python main.py
 ```
@@ -111,7 +114,7 @@ db.py                    # Postgres helpers
 download.py              # yt-dlp wrapper
 scenes.py                # PySceneDetect shot detection
 frames.py                # ffmpeg frame extraction
-transcribe.py            # CrispASR wrapper + per-shot slicing
+transcribe.py            # ElevenLabs Scribe wrapper + per-shot slicing
 metrics_deterministic.py # frame stats, pacing, speech aggregates
 analyze_llm.py           # Anthropic per-shot + video-level analysis
 requirements.txt
