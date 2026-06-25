@@ -19,8 +19,9 @@ import { attachOutboundSync } from '@/lib/remoteOps'
 import { useRainyStore } from '@/lib/store'
 import BottomDock from './BottomDock'
 import { RAINY_TEXT, RainyTextShapeUtil } from './RainyTextShape'
+import { VideoBlockShapeUtil } from './VideoBlockShape'
 
-const shapeUtils: TLShapeUtilConstructor<any>[] = [RainyTextShapeUtil]
+const shapeUtils: TLShapeUtilConstructor<any>[] = [RainyTextShapeUtil, VideoBlockShapeUtil]
 
 /**
  * Dotted background grid that tracks the camera (pan + zoom).

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createShapeId, useEditor, useValue, type Editor } from 'tldraw'
 import { RAINY_TEXT } from './RainyTextShape'
+import { VIDEO_BLOCK } from './VideoBlockShape'
 
 /**
  * Bottom dock — the primary way to add blocks to the canvas.
@@ -40,6 +41,25 @@ function createCentered(editor: Editor, type: string, w: number, h: number, prop
   const id = createShapeId()
   editor.run(() => {
     editor.createShape({ id, type, x: c.x - w / 2, y: c.y - h / 2, props } as any)
+    editor.select(id)
+  })
+}
+
+/** Drop a fresh, empty Video Block (ready-for-input) at the viewport centre. */
+function createVideoBlock(editor: Editor) {
+  const c = center(editor)
+  const id = createShapeId()
+  const data = JSON.stringify({ status: 'empty', title: '', tags: [], storyboard: [] })
+  const w = 360
+  const h = 178
+  editor.run(() => {
+    editor.createShape({
+      id,
+      type: VIDEO_BLOCK,
+      x: c.x - w / 2,
+      y: c.y - h / 2,
+      props: { w, h, view: 'expanded', data },
+    })
     editor.select(id)
   })
 }
@@ -111,8 +131,7 @@ export default function BottomDock() {
       <button className="rainy-tool" onClick={() => createTextCard(editor)} title="Text">
         <TextIcon />
       </button>
-      {/* Dummy — the video block is designed later; wire creation up then. */}
-      <button className="rainy-tool" onClick={() => {}} title="Video (coming soon)">
+      <button className="rainy-tool" onClick={() => createVideoBlock(editor)} title="Video block">
         <VideoIcon />
       </button>
       <button className="rainy-tool" onClick={() => createNote(editor)} title="Sticky note">
