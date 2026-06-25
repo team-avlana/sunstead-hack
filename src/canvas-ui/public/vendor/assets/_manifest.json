@@ -1,0 +1,12 @@
+[
+  {"id":"chair","file":"chair.glb","zone":"filming","slug":"iMNqRzPwwe","source":"https://poly.pizza/m/iMNqRzPwwe","author":"Quaternius","license":"CC0","title":"chair"},
+  {"id":"desk","file":"desk.glb","zone":"filming","slug":"V86Go2rlnq","source":"https://poly.pizza/m/V86Go2rlnq","author":"Quaternius","license":"CC0","title":"desk"},
+  {"id":"table-round","file":"table-round.glb","zone":"table","slug":"oEArSZykyi","source":"https://poly.pizza/m/oEArSZykyi","author":"Quaternius","license":"CC0","title":"table-round"},
+  {"id":"bookcase","file":"bookcase.glb","zone":"library","slug":"tACDGJ4CGW","source":"https://poly.pizza/m/tACDGJ4CGW","author":"Quaternius","license":"CC0","title":"bookcase"},
+  {"id":"cabinet-shelves","file":"cabinet-shelves.glb","zone":"library","slug":"u3A1t5DIMd","source":"https://poly.pizza/m/u3A1t5DIMd","author":"Quaternius","license":"CC0","title":"cabinet-shelves"},
+  {"id":"floor-lamp","file":"floor-lamp.glb","zone":"ambient","slug":"eBQtooeh43","source":"https://poly.pizza/m/eBQtooeh43","author":"Quaternius","license":"CC0","title":"floor-lamp"},
+  {"id":"table-lamp","file":"table-lamp.glb","zone":"ambient","slug":"9Mo3JruPHY","source":"https://poly.pizza/m/9Mo3JruPHY","author":"Quaternius","license":"CC0","title":"table-lamp"},
+  {"id":"plant","file":"plant.glb","zone":"library","slug":"bfLOqIV5uP","source":"https://poly.pizza/m/bfLOqIV5uP","author":"Quaternius","license":"CC0","title":"plant"},
+  {"id":"sofa","file":"sofa.glb","zone":"companions","slug":"X5kQPKzAWp","source":"https://poly.pizza/m/X5kQPKzAWp","author":"Quaternius","license":"CC0","title":"sofa"},
+  {"id":"couch","file":"couch.glb","zone":"companions","slug":"mWgQ94zhDZ","source":"https://poly.pizza/m/mWgQ94zhDZ","author":"Quaternius","license":"CC0","title":"couch"}
+]

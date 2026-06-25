@@ -1,9 +1,19 @@
 # Creator Room Kit — parameterized, hand‑authored 3D rooms
 
-**Status:** concept / plan, 2026‑06‑25. **Supersedes** the earlier "weather/Creative Climate" framing —
+**Status:** in progress, 2026‑06‑25. **Supersedes** the earlier "weather/Creative Climate" framing —
 the product is **Rainey** (a **reindeer** motif, *not* rain). **Time‑of‑day lighting is parked**
 (revisit later). Reads: `src/canvas-ui/lib/creatorRoom.ts`, `docs/CREATOR_ROOM_PLAN.md`,
 `docs/DECISIONS.md` (D27–D36).
+
+**Built so far:**
+- Procedural room gained an **avatar** (4 pickable looks), **Rainey the reindeer** mascot, and idle
+  animations (`creatorRoom.ts`). Browse: `public/room-demo.html`.
+- **10 CC0 Quaternius GLBs** fetched into `public/vendor/assets/` (+ `_manifest.json`) by
+  `scripts/fetch-assets.mjs`: chair, desk, round table, bookcase, cabinet/shelves, floor lamp, table
+  lamp, houseplant, sofa, couch.
+- `lib/roomKit.ts` — the typed asset registry (the catalog). Browse rendered: `public/asset-showroom.html`.
+- **Next:** wire GLTFLoader into `buildRoomDoc` (GLBs per zone, procedural fallback); then self‑host
+  three.js for offline.
 
 ---
 
@@ -154,12 +164,65 @@ per‑niche "secret‑location" room types. All compatible with this kit; revisi
 
 ---
 
-## 7. Open decisions (for Adrian)
+## 7. Decisions & open questions
 
-1. **Asset route** — A only for now, or A + start B (which tool: Meshy / Rodin / Luma / Tripo)?
-2. **Brand rename** — do we rename "Rainy" → "Rainey" repo‑wide (localStorage keys, postMessage
-   source, brand mark), or keep the code as‑is for now?
-3. **Base‑kit trim** — keep the current dense room and just add the avatar, or slim it to the clean
-   six‑asset base set?
-4. **Pick UX** — in‑room variant cycler (shipping a first version this session), or a React‑side
-   chooser in `CreatorRoom.tsx`?
+**Decided 2026‑06‑25:**
+- ✅ **Asset route = C, curated CC0 GLB packs** (Quaternius / Kenney / Poly Pizza) via `GLTFLoader`,
+  with procedural three.js as the **offline fallback**. (Not AI‑GLB, not procedural‑only.)
+- ✅ **Keep the dense room + add the avatar** additively — do *not* trim to the clean base set.
+
+**Still open:**
+1. **Brand rename** — rename "Rainy" → "Rainey" repo‑wide (localStorage keys, `'rainy-room'`
+   postMessage source, brand mark), or keep the code as‑is for now?
+2. **Attribution** — Quaternius/Kenney are CC0 (no attribution required); Poly Pizza is mixed
+   (much is CC‑BY). Do we restrict to **CC0‑only** to avoid a credits screen, or allow CC‑BY and add
+   an in‑app credits list?
+3. **Pick UX** — keep the in‑room avatar cycler (shipped), or move to a React‑side chooser in
+   `CreatorRoom.tsx` that also picks room type + prop variants?
+
+---
+
+## 8. CC0 GLB pipeline (the chosen route — build notes)
+
+**Self‑host first (prerequisite).** Vendor `three.module.js` + the addons we use (`OrbitControls`,
+`RoundedBoxGeometry`, `RoomEnvironment`, the post passes) **and** `GLTFLoader` (+ `DRACOLoader` if any
+pack ships Draco‑compressed meshes) into `public/vendor/three/`, and switch the doc's importmap from the
+jsDelivr CDN to relative `/vendor/three/...` URLs. Required for offline WKWebView; also removes the CDN
+runtime dependency.
+
+**Asset store.** Drop curated `.glb` files into `public/vendor/assets/<zone>/<id>.glb`. A registry
+(`roomKit.ts`) maps each `KitAsset.glb` → zone anchor + scale + license/author. Loader:
+
+```ts
+const loader = new GLTFLoader().setPath('/vendor/three/')   // + DRACOLoader if needed
+function placeGLB(url, anchor, scale, onClay) {
+  loader.load(url, (gltf) => {
+    const o = gltf.scene
+    o.position.set(...anchor); o.scale.setScalar(scale)
+    o.traverse((m) => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; onClay && onClay(m) } })
+    scene.add(o)
+  }, undefined, () => buildProceduralFallback(anchor)) // <- procedural stays the safety net
+}
+```
+
+**Tonal match.** CC0 low‑poly packs often use flat vertex colors; to sit them in the clay look, keep
+**AgX + GTAO + the warm IBL** (already in place) and, where a mesh reads too flat/plasticky, override to
+the clay `MeshStandardMaterial` (roughness ≈ 0.9, metalness 0) while preserving its base color.
+
+**Sourcing (CC0‑first):** **Kenney "Furniture Kit"** (116 models, CC0, ships glTF — covers chair,
+table, bookcase/shelf, lamp = our base set) and **Quaternius "Ultimate House Interior"** (120+, CC0,
+GLB) are the primary packs. **Poly Pizza** for one‑off props (filter to CC0/Quaternius).
+
+**Fetch recipe (validated 2026‑06‑25).** Poly Pizza model pages are `poly.pizza/m/<slug>`; the real
+asset lives at `https://static.poly.pizza/<uuid>.glb` where `<uuid>` is **not** the slug — scrape it
+from the page HTML (it appears as the only `static.poly.pizza/*.glb` URL). Proven: the Quaternius
+**"Chair"** (`/m/iMNqRzPwwe` → `84ecc6a3‑…glb`, CC0, 13 KB) fetched and rendered correctly **in our
+clay stack** (AgX + RoomEnvironment IBL + GTAO + bloom + SMAA), auto‑fit and casting a soft contact
+shadow — see `scratchpad/clay-chair.png`. So `scripts/fetch-assets.mjs` = for each curated slug, GET
+the `/m/` page → extract the `static.poly.pizza/*.glb` → save to `public/vendor/assets/<zone>/<id>.glb`
+and record `{id, file, source, author, license}` in the registry. (Kenney/Quaternius bundle zips are an
+alternative when we want a whole pack at once.)
+
+> **Tonal note from the proof:** the bare CC0 mesh reads a touch grey/desaturated under AgX — warm it
+> with the real‑GPU IBL and, where needed, override the mesh material to the clay `MeshStandardMaterial`
+> (keep base color, force roughness ≈ 0.9 / metalness 0).

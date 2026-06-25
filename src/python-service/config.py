@@ -51,9 +51,22 @@ class LlmConfig:
 
 @dataclass
 class ImageConfig:
-    azure_openai_url: str = ""        # e.g. https://<resource>.openai.azure.com
+    azure_openai_url: str = ""  # e.g. https://<resource>.openai.azure.com
     azure_openai_key: str = ""
     azure_openai_deployment: str = "gpt-image-1"
+
+
+@dataclass
+class TerminalConfig:
+    """The Claude Code CLI hosted in a PTY for the canvas's right-side panel.
+
+    `command` is the argv spawned in the pseudo-terminal (never user-controlled).
+    `cwd` is the working directory claude opens in (default: the user's home).
+    """
+
+    enabled: bool = True
+    command: list[str] = field(default_factory=lambda: ["claude"])
+    cwd: str = ""
 
 
 @dataclass
@@ -63,6 +76,7 @@ class Settings:
     worker: WorkerConfig = field(default_factory=WorkerConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     image: ImageConfig = field(default_factory=ImageConfig)
+    terminal: TerminalConfig = field(default_factory=TerminalConfig)
 
 
 def load() -> Settings:
@@ -78,6 +92,7 @@ def load() -> Settings:
     wkr_raw = raw.get("worker", {})
     llm_raw = raw.get("llm", {})
     img_raw = raw.get("image", {})
+    term_raw = raw.get("terminal", {})
 
     # Env vars override config.toml for credentials
     conn_str = os.environ.get("DB_CONNECTION_STRING") or db_raw.get(
@@ -96,11 +111,14 @@ def load() -> Settings:
         "elevenlabs_api_key", ""
     )
 
-    openai_url = os.environ.get("AZURE_OPENAI_URL") or img_raw.get("azure_openai_url", "")
-    openai_key = os.environ.get("AZURE_OPENAI_KEY") or img_raw.get("azure_openai_key", "")
-    openai_deployment = (
-        os.environ.get("AZURE_OPENAI_DEPLOYMENT")
-        or img_raw.get("azure_openai_deployment", ImageConfig.azure_openai_deployment)
+    openai_url = os.environ.get("AZURE_OPENAI_URL") or img_raw.get(
+        "azure_openai_url", ""
+    )
+    openai_key = os.environ.get("AZURE_OPENAI_KEY") or img_raw.get(
+        "azure_openai_key", ""
+    )
+    openai_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT") or img_raw.get(
+        "azure_openai_deployment", ImageConfig.azure_openai_deployment
     )
 
     return Settings(
@@ -132,6 +150,18 @@ def load() -> Settings:
             azure_openai_url=openai_url,
             azure_openai_key=openai_key,
             azure_openai_deployment=openai_deployment,
+        ),
+        terminal=TerminalConfig(
+            enabled=str(
+                os.environ.get("RAINY_TERMINAL_ENABLED", term_raw.get("enabled", True))
+            ).lower()
+            not in ("0", "false", "no"),
+            command=(
+                os.environ["RAINY_CLAUDE_COMMAND"].split()
+                if os.environ.get("RAINY_CLAUDE_COMMAND")
+                else term_raw.get("command", ["claude"])
+            ),
+            cwd=os.environ.get("RAINY_CLAUDE_CWD") or term_raw.get("cwd", ""),
         ),
     )
 

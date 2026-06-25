@@ -1,6 +1,5 @@
 import { createShapeId, type Editor } from 'tldraw'
-import { RAINY_TEXT } from '@/components/RainyTextShape'
-import { VIDEO_BLOCK } from '@/components/VideoBlockShape'
+import { RAINY_TEXT, VIDEO_BLOCK } from '@/lib/blockTypes'
 import { loadProject, saveProject, type Project, type RainyShape } from './projects'
 import { useRainyStore } from './store'
 

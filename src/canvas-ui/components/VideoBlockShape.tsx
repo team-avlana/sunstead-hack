@@ -13,7 +13,25 @@ import {
   useEditor,
   useValue,
 } from 'tldraw'
+import { useState } from 'react'
 import s from './VideoBlock.module.css'
+import {
+  VIDEO_BLOCK,
+  DEFAULT_DATA,
+  STATUS_LABEL,
+  dims,
+  fmtTime,
+  parse,
+  type Scene,
+  type VideoData,
+  type VideoStatus,
+  type VideoView,
+} from '@/lib/blockTypes'
+import { DeleteButton } from './ShapeChrome'
+
+// The video taxonomy (status lifecycle, detail levels, sizing, parsing) lives in
+// lib/blockTypes so the adaptive sidebar can read + drive it from outside <Tldraw>.
+type View = VideoView
 
 /**
  * Video Block — the fundamental interface for a video + its analysed data.
@@ -24,12 +42,13 @@ import s from './VideoBlock.module.css'
  *   **  transcript, description
  *   *** storyboard scenes
  * Three compactness levels — `compact`, `expanded`, `full` — are user-toggled
- * (chevron + storyboard toggle) and persisted on the shape.
+ * (chevron + storyboard toggle, or the sidebar inspector) and persisted on the
+ * shape.
  *
  * The content lives in the `data` prop (JSON) so the canvas can drive it from a
  * Postgres-backed artifact (see lib/api.ts) or from a static seed XML.
  */
-export const VIDEO_BLOCK = 'video-block' as const
+export { VIDEO_BLOCK } from '@/lib/blockTypes'
 
 declare module 'tldraw' {
   export interface TLGlobalShapePropsMap {
@@ -38,80 +57,6 @@ declare module 'tldraw' {
 }
 
 export type VideoBlockShape = TLShape<typeof VIDEO_BLOCK>
-
-export type VideoStatus = 'empty' | 'not_analysed' | 'analysing' | 'analysed' | 'error'
-
-export interface Scene {
-  idx?: number
-  label?: string
-  start_sec?: number
-  end_sec?: number
-  thumbnail?: string | null
-  tags?: string[]
-  description?: string
-}
-
-export interface VideoData {
-  video_id?: string | null
-  status?: VideoStatus
-  source_url?: string | null
-  title?: string | null
-  duration_sec?: number | null
-  thumbnail?: string | null
-  palette?: string[]
-  shot_count?: number
-  analysis_error?: string | null
-  transcript?: string | null
-  description?: string | null
-  tags?: string[]
-  hook?: { text?: string; format?: string; strength?: number } | null
-  storyboard?: Scene[]
-}
-
-type View = 'compact' | 'expanded' | 'full'
-
-const DEFAULT_DATA: VideoData = { status: 'empty', title: '', tags: [], storyboard: [] }
-
-function parse(json: string): VideoData {
-  if (!json) return DEFAULT_DATA
-  try {
-    const d = JSON.parse(json) as VideoData
-    return { ...DEFAULT_DATA, ...d }
-  } catch {
-    return DEFAULT_DATA
-  }
-}
-
-/** Target shape size per compactness level + status (clips overflow, so be generous). */
-export function dims(view: View, d: VideoData): { w: number; h: number } {
-  const status = d.status ?? 'empty'
-  if (view === 'compact') return { w: 360, h: 92 }
-  if (view === 'full') {
-    const n = Math.min(d.storyboard?.length ?? 0, 6)
-    return { w: 384, h: 372 + n * 56 }
-  }
-  // expanded — height depends on what the stage discloses
-  if (status === 'analysed') return { w: 360, h: 332 }
-  if (status === 'analysing') return { w: 360, h: 168 }
-  if (status === 'error') return { w: 360, h: 188 }
-  if (status === 'not_analysed') return { w: 360, h: 156 }
-  return { w: 360, h: 178 } // empty
-}
-
-const STATUS_LABEL: Record<VideoStatus, string> = {
-  empty: 'Ready for input',
-  not_analysed: 'Not analysed',
-  analysing: 'Analysing…',
-  analysed: 'Analysed',
-  error: 'Failed',
-}
-
-const fmtTime = (sec?: number | null) => {
-  if (sec == null || !isFinite(sec)) return ''
-  const m = Math.floor(sec / 60)
-  const s2 = Math.round(sec % 60)
-  return `${m}:${s2.toString().padStart(2, '0')}`
-}
 
 export class VideoBlockShapeUtil extends ShapeUtil<VideoBlockShape> {
   static override type = VIDEO_BLOCK
@@ -165,6 +110,12 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   const d = useValue('data', () => parse(shape.props.data), [shape.props.data])
   const status: VideoStatus = d.status ?? 'empty'
 
+  // Hover/selection drives the delete affordance. The button straddles the
+  // corner (outside geometry), so we OR in its own hover to keep it alive.
+  const isHovered = useValue('hovered', () => editor.getHoveredShapeId() === shape.id, [editor, shape.id])
+  const isSelected = useValue('selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
+  const [trashHover, setTrashHover] = useState(false)
+
   const setView = (next: View) => {
     const size = dims(next, d)
     editor.updateShape({ id: shape.id, type: VIDEO_BLOCK, props: { view: next, ...size } })
@@ -193,6 +144,14 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
         {expanded && status === 'not_analysed' && <NotAnalysed stop={stop} />}
         {expanded && status === 'empty' && <Empty d={d} stop={stop} />}
       </div>
+
+      <DeleteButton
+        editor={editor}
+        id={shape.id}
+        show={isHovered || isSelected || trashHover}
+        onHoverChange={setTrashHover}
+        className="vb-trash"
+      />
     </HTMLContainer>
   )
 }

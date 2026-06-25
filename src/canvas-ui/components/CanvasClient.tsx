@@ -8,6 +8,9 @@ import TopBlur from './TopBlur'
 import Sidebar from './Sidebar'
 import { useRainyStore } from '@/lib/store'
 
+// xterm touches the DOM on load; keep it out of the prerendered bundle.
+const ClaudePanel = dynamic(() => import('./ClaudePanel'), { ssr: false })
+
 // ssr:false is legal here because this file is a Client Component (App Router rule).
 const CanvasWorkspace = dynamic(() => import('./CanvasWorkspace'), {
   ssr: false,
@@ -24,6 +27,7 @@ export default function CanvasClient() {
   const view = useRainyStore((s) => s.view)
   const projectId = useRainyStore((s) => s.currentProjectId)
   const sidebarCollapsed = useRainyStore((s) => s.sidebarCollapsed)
+  const dark = useRainyStore((s) => s.dark)
 
   // Keep the URL hash and the navigation state in sync, both directions:
   // hash → state (deep links, refresh, back/forward) and state → hash.
@@ -55,12 +59,15 @@ export default function CanvasClient() {
   if (view !== 'canvas' || !projectId) return <Home />
 
   return (
-    <div className={`rainy-root${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+    <div className={`rainy-root${sidebarCollapsed ? ' sidebar-collapsed' : ''}${dark ? ' dark' : ''}`}>
       {/* key by project so switching projects fully remounts the canvas */}
       <CanvasWorkspace key={projectId} projectId={projectId} />
       <Sidebar />
       <TopBlur />
       <ProjectHeader />
+      {/* After TopBlur so the progressive top blur never veils the panel header,
+          while keeping the same z-index (5) as the left Sidebar. */}
+      <ClaudePanel />
     </div>
   )
 }

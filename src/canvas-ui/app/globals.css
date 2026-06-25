@@ -43,42 +43,111 @@ body {
 button, input { font-family: inherit; }
 
 /* ============================================================
-   Home screen — the project picker
+   Home screen — greeting · Creator Room · project list
    ============================================================ */
 .home {
   position: fixed; inset: 0; overflow: auto;
-  /* Full white so the 3D Creator Room reads cleanly against the page. */
-  background: #ffffff;
+  /* Warm off-white, matching the clay Creator Room artwork. */
+  background: #f6f4ef;
 }
-.home-inner { max-width: 1040px; margin: 0 auto; padding: 56px 28px 80px; }
 
-.home-head { margin-bottom: 30px; }
+/* Top bar: brand top-left, (hardcoded) account avatar top-right. */
+.home-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 34px 8px;
+  max-width: 1240px; margin: 0 auto;
+}
 .home-brand {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
-  margin-bottom: 18px;
+  font-size: 21px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink);
+}
+.home-avatar {
+  width: 42px; height: 42px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #3c3f47; color: #fff; font-size: 17px; font-weight: 700;
+  box-shadow: var(--shadow-sm); cursor: default; user-select: none;
 }
 
+/* Two-column body: Creator Room on the left, greeting + projects on the right. */
+.home-main {
+  display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
+  gap: 48px; align-items: center;
+  max-width: 1240px; margin: 0 auto; padding: 24px 40px 72px;
+}
+.home-room { min-width: 0; }
+
+.home-side { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+.home-greeting h1 {
+  margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.03em; color: var(--ink);
+}
+
+/* Golden hour + shoot-relevant weather under the greeting. */
+.home-conditions { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; }
+.home-conditions-loading { margin: 12px 0 0; font-size: 14px; color: var(--ink-dim); }
+.home-cond { font-size: 14px; font-weight: 600; color: var(--ink-dim); letter-spacing: -0.01em; }
+.home-cond strong { color: var(--ink); font-weight: 800; }
+.home-cond-golden { color: var(--ink); }
+.home-cond-ico { margin-right: 6px; }
+.home-cond-approx, .home-cond-dim { color: var(--ink-dim); font-weight: 500; }
+
+/* Project list — full-width pill rows. */
+.home-list { display: flex; flex-direction: column; gap: 12px; }
+.home-row {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 58px; padding: 0 22px;
+  border: 0; border-radius: 16px; cursor: pointer; font-family: inherit;
+  font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
+  background: #eceae4; box-shadow: var(--shadow-sm);
+  transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+}
+.home-row:hover { transform: translateY(-1px); background: #e6e3db; box-shadow: var(--shadow-md); }
+.home-row:active { transform: translateY(0); }
+.home-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.home-row-new {
+  background: #3c3f47; color: #fff; gap: 8px; box-shadow: var(--shadow-md);
+}
+.home-row-new:hover { background: #2e313a; }
+.home-row-plus { font-size: 22px; font-weight: 400; line-height: 1; }
+.home-row-del {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1; color: var(--ink-dim); background: rgba(18, 24, 48, 0.05);
+  opacity: 0; transition: opacity .14s ease, background .14s ease, color .14s ease;
+}
+.home-row:hover .home-row-del { opacity: 1; }
+.home-row-del:hover { background: rgba(229, 72, 77, 0.16); color: #e5484d; }
+
 /* ============================================================
-   Creator Room — the templated 3D diorama hero
+   Creator Room — the 2D clay-room hero (painted by the Python service)
    ============================================================ */
-.room { margin: 0 0 44px; }
+.room { margin: 0; }
 
 .room-stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  max-height: 60vh;
-  border-radius: 24px;
+  aspect-ratio: 1 / 1;
+  max-height: 72vh;
+  border-radius: 28px;
   overflow: hidden;
-  background: radial-gradient(120% 100% at 50% 0%, #ffffff 60%, #f4f6fb 100%);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
+  /* Floats borderless on the warm page background, like the reference art. */
+  background: transparent;
 }
-.room-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
 
-/* ---- image mode (default) ---- */
-.room-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ---- the painted room image (contain → the whole isometric room is visible) ---- */
+.room-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* subtle hover affordance once a room exists */
+.room-redesign {
+  position: absolute; right: 14px; bottom: 14px; z-index: 3;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: var(--shadow-sm); cursor: pointer; font-family: inherit;
+  height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--ink);
+  opacity: 0; transform: translateY(4px); transition: opacity .16s ease, transform .16s ease, background .14s ease;
+}
+.room-stage:hover .room-redesign { opacity: 1; transform: none; }
+.room-redesign:hover { background: #fff; }
 /* Until a real image is generated, the reference sample sits blurred + dimmed
    behind the CTA (the blur also hides the reference's annotation marks). */
 .room-img.sample { filter: blur(7px) saturate(1.05) brightness(0.94); transform: scale(1.06); }
@@ -92,28 +161,7 @@ button, input { font-family: inherit; }
 .room-cta-sub { font-size: 13.5px; font-weight: 500; color: var(--ink); max-width: 40ch; line-height: 1.5; text-shadow: 0 1px 10px rgba(255, 255, 255, 0.9); }
 .room-cta .room-btn { margin-top: 6px; height: 38px; padding: 0 18px; font-size: 14px; }
 
-/* ---- segmented Image / 3D toggle ---- */
-.room-seg {
-  pointer-events: auto; display: inline-flex; padding: 3px; gap: 2px;
-  background: rgba(255, 255, 255, 0.86); border: 1px solid var(--border); border-radius: 999px;
-  -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
-  box-shadow: var(--shadow-sm);
-}
-.room-seg button {
-  border: 0; background: none; cursor: pointer; font-family: inherit;
-  height: 28px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-dim);
-  transition: background .14s ease, color .14s ease;
-}
-.room-seg button:hover { color: var(--ink); }
-.room-seg button.on { background: var(--primary); color: #fff; }
-
-.room-loading {
-  position: absolute; inset: 0; z-index: 2;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  color: var(--ink-dim); font-size: 13px; font-weight: 500;
-  background: rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
-}
+/* Spinner — still used by the room-design wizard's "building" step. */
 .room-spinner {
   width: 26px; height: 26px; border-radius: 999px;
   border: 2.5px solid rgba(var(--primary-rgb), 0.18);
@@ -123,20 +171,7 @@ button, input { font-family: inherit; }
 @keyframes room-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .room-spinner { animation-duration: 2s; } }
 
-.room-overlay {
-  position: absolute; left: 18px; right: 18px; top: 16px; z-index: 3;
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-  pointer-events: none;
-}
-.room-meta { display: flex; flex-direction: column; gap: 2px; }
-.room-kicker {
-  font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink);
-  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.8);
-}
-.room-sub { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
-
-.room-actions { display: inline-flex; gap: 8px; pointer-events: auto; }
-.room-top-actions { display: inline-flex; align-items: center; gap: 8px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; }
+/* Button — shared by the room CTA and the design wizard. */
 .room-btn {
   font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
   height: 34px; padding: 0 14px; border-radius: 999px;
@@ -156,6 +191,7 @@ button, input { font-family: inherit; }
 }
 .room-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
 
+/* Saved-brief toast over the room hero. */
 .room-status {
   position: absolute; left: 18px; right: 18px; bottom: 16px; z-index: 3;
   padding: 9px 13px; border-radius: 12px; font-size: 12.5px; font-weight: 500;
@@ -163,39 +199,6 @@ button, input { font-family: inherit; }
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   border: 1px solid var(--border); box-shadow: var(--shadow-sm); color: var(--ink-dim);
 }
-.room-status.error { color: #b4413f; border-color: rgba(229, 72, 77, 0.28); }
-
-/* ---- intake form ---- */
-.room-form {
-  margin-top: 14px; padding: 18px;
-  border: 1px solid var(--border); border-radius: 18px;
-  background: rgba(250, 251, 253, 0.8); box-shadow: var(--shadow-sm);
-  display: flex; flex-direction: column; gap: 16px;
-}
-.room-fgroup { display: flex; flex-direction: column; gap: 9px; }
-.room-fgroup-title { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
-.room-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.room-field { display: flex; flex-direction: column; gap: 5px; }
-.room-field.wide { grid-column: 1 / -1; }
-.room-field > span { font-size: 11px; font-weight: 600; color: var(--ink-dim); }
-.room-field input, .room-field select {
-  height: 34px; padding: 0 10px; border-radius: 9px;
-  border: 1px solid var(--border); background: #fff; color: var(--ink);
-  font-family: inherit; font-size: 13px; outline: none;
-  transition: border-color .14s ease, box-shadow .14s ease;
-}
-.room-field input:focus, .room-field select:focus {
-  border-color: var(--primary-border);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10);
-}
-.room-form-foot { display: flex; justify-content: flex-end; gap: 8px; }
-
-.room-edit-toggle {
-  margin: 10px auto 0; display: block; border: 0; background: none; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ink-dim);
-  padding: 4px 8px; border-radius: 8px; transition: color .14s ease, background .14s ease;
-}
-.room-edit-toggle:hover { color: var(--ink); background: rgba(18, 24, 48, 0.04); }
 
 /* ============================================================
    Onboarding wizard — few-questions, one screen at a time
@@ -270,66 +273,84 @@ button, input { font-family: inherit; }
   text-align: center; min-height: 220px; padding: 20px;
 }
 
+/* ---- CreatorWizard (image-params) -------------------------------------- */
+.ob-card.wizard { max-width: 540px; max-height: 88vh; overflow-y: auto; }
+.ob-mt { margin-top: 14px; }
+.ob-flabel { display: block; margin: 18px 0 8px; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
+
+/* creator-type option cards */
+.ob-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.ob-opt {
+  display: grid; grid-template-columns: 30px 1fr; column-gap: 12px; row-gap: 2px; align-items: center;
+  text-align: left; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--border);
+  background: #fff; cursor: pointer; font-family: inherit; transition: all .14s ease;
+}
+.ob-opt:hover { border-color: rgba(var(--primary-rgb), 0.5); }
+.ob-opt.on { border-color: var(--primary); background: rgba(var(--primary-rgb), 0.06); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.10); }
+.ob-opt-emoji { grid-row: 1 / span 2; grid-column: 1; font-size: 24px; align-self: center; }
+.ob-opt-label { grid-column: 2; grid-row: 1; font-size: 15px; font-weight: 700; color: var(--ink); }
+.ob-opt-blurb { grid-column: 2; grid-row: 2; font-size: 12px; color: var(--ink-dim); line-height: 1.4; }
+
+/* segmented toggle (avatar mode) */
+.ob-seg { display: inline-flex; gap: 4px; padding: 4px; background: rgba(18, 24, 48, 0.05); border-radius: 12px; margin-bottom: 14px; }
+.ob-seg button {
+  border: 0; background: transparent; padding: 8px 16px; border-radius: 9px; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink-dim); transition: all .14s ease;
+}
+.ob-seg button.on { background: var(--primary); color: #fff; box-shadow: var(--primary-shadow); }
+
+/* avatar: textarea + photo upload */
+.ob-textarea {
+  width: 100%; padding: 12px 14px; border-radius: 13px; border: 1.5px solid var(--border);
+  background: #fff; color: var(--ink); font-family: inherit; font-size: 15px; line-height: 1.5;
+  resize: vertical; outline: none; transition: border-color .14s ease, box-shadow .14s ease;
+}
+.ob-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12); }
+.ob-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 26px 16px;
+  border-radius: 14px; border: 1.5px dashed rgba(var(--primary-rgb), 0.4); background: rgba(var(--primary-rgb), 0.04);
+  cursor: pointer; font-family: inherit; transition: background .14s ease;
+}
+.ob-drop:hover { background: rgba(var(--primary-rgb), 0.08); }
+.ob-drop-ico { font-size: 28px; }
+.ob-drop-main { font-size: 14px; font-weight: 700; color: var(--ink); }
+.ob-drop-hint { font-size: 12px; color: var(--ink-dim); }
+.ob-upload-prev { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; border: 1.5px solid var(--border); }
+.ob-upload-prev img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; }
+.ob-upload-name { flex: 1; font-size: 13px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-link { border: 0; background: none; color: var(--primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* shelf fields */
+.ob-fields { display: flex; flex-direction: column; gap: 12px; }
+.ob-fields label { display: flex; flex-direction: column; gap: 5px; }
+.ob-fields label > span { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.ob-fields .ob-input { margin-bottom: 0; height: 44px; font-size: 15px; }
+
+.ob-or { margin: 16px 0 10px; font-size: 12px; font-weight: 600; color: var(--ink-dim); text-align: center; }
+
+/* review step */
+.ob-review { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.ob-review-row { display: flex; gap: 12px; align-items: baseline; }
+.ob-review-k { flex: 0 0 92px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-dim); }
+.ob-review-v { flex: 1; font-size: 14px; color: var(--ink); }
+.ob-prompt-wrap > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--primary); }
+.ob-prompt {
+  margin-top: 10px; max-height: 200px; overflow: auto; padding: 14px; border-radius: 12px;
+  background: rgba(18, 24, 48, 0.04); color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap;
+}
+
+.home-empty { padding: 18px 4px; color: var(--ink-dim); font-size: 14px; }
+
+/* Stack the columns on narrow viewports. */
+@media (max-width: 860px) {
+  .home-main { grid-template-columns: 1fr; gap: 28px; padding: 16px 24px 56px; }
+  .home-greeting h1 { font-size: 34px; }
+  .home-room { max-width: 460px; margin: 0 auto; }
+}
 @media (max-width: 640px) {
-  .room-stage { aspect-ratio: 4 / 3; }
-  .room-overlay { flex-direction: column; }
   .ob-card { padding: 24px 20px 18px; }
 }
-.home-head h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-.home-head p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-dim); max-width: 56ch; }
-
-.home-grid {
-  display: grid; gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
-
-.home-card {
-  position: relative; text-align: left; cursor: pointer;
-  display: flex; flex-direction: column; gap: 10px;
-  min-height: 168px; padding: 18px;
-  font-family: inherit;
-  background: rgba(255, 255, 255, 0.7);
-  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
-  backdrop-filter: blur(var(--panel-blur)) saturate(140%);
-  border: 1px solid var(--primary-border);
-  border-radius: 16px;
-  box-shadow: var(--card-shadow);
-  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
-}
-.home-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: rgba(var(--primary-rgb), 0.28); }
-.home-card:active { transform: translateY(-1px); }
-
-.home-card-thumb {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 12px;
-  background: rgba(var(--primary-rgb), 0.10); color: var(--primary);
-}
-.home-card-title { font-size: 15px; font-weight: 650; line-height: 1.3; color: var(--ink); }
-.home-card-meta { margin-top: auto; font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
-
-.home-card-del {
-  position: absolute; top: 10px; right: 10px;
-  width: 24px; height: 24px; border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 17px; line-height: 1; color: var(--ink-dim);
-  background: rgba(18, 24, 48, 0.04);
-  opacity: 0; transition: opacity .14s ease, background .14s ease, color .14s ease;
-}
-.home-card:hover .home-card-del { opacity: 1; }
-.home-card-del:hover { background: rgba(229, 72, 77, 0.14); color: #e5484d; }
-
-/* "New project" card — dashed, brand-tinted call to action */
-.home-new {
-  align-items: center; justify-content: center; gap: 8px; text-align: center;
-  background: rgba(var(--primary-rgb), 0.04);
-  border: 1.5px dashed rgba(var(--primary-rgb), 0.35);
-  color: var(--primary); box-shadow: none;
-}
-.home-new:hover { background: rgba(var(--primary-rgb), 0.08); border-color: var(--primary); box-shadow: var(--shadow-md); }
-.home-new-plus { font-size: 30px; font-weight: 300; line-height: 1; }
-.home-new-label { font-size: 14px; font-weight: 600; }
-
-.home-empty { grid-column: 1 / -1; padding: 28px; color: var(--ink-dim); font-size: 14px; }
 
 /* ============================================================
    Project header — floating chevron-back + editable title
@@ -371,6 +392,12 @@ button, input { font-family: inherit; }
   font-family: inherit; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
   color: var(--ink); outline: none;
   transition: background .14s ease, border-color .14s ease;
+}
+/* Off-screen sizing mirror — must match .rph-title typography/metrics exactly so
+   the input auto-grows to fit the title (clamped by the input's max-width). */
+.rph-title-mirror {
+  position: absolute; left: -9999px; top: 0; visibility: hidden;
+  pointer-events: none; white-space: pre; max-width: none; min-width: 0;
 }
 .rph-title:hover { background: rgba(255, 255, 255, 0.6); }
 .rph-title:focus { background: #fff; border-color: var(--primary-border); box-shadow: var(--shadow-sm); }
@@ -463,9 +490,66 @@ button, input { font-family: inherit; }
 .rainy-sidebar-show:hover { background: #fff; }
 .rainy-sidebar-show:active { transform: scale(0.94); }
 
-/* ---------- Canvas insights (left panel contents) ---------- */
-.ci { display: flex; flex-direction: column; gap: 14px; padding: 16px 14px; height: 100%; }
-.ci-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* ---------- Claude Code panel (right-anchored glass card, hosts the CLI) ----------
+   Mirrors .rainy-sidebar but on the right and wider (a TUI needs the columns).
+   Slightly more opaque than the sidebar so terminal text stays crisp over the
+   moving canvas. The collapse slide is GSAP-driven (inline transform), so — as
+   with the sidebar — we deliberately set no CSS transform/transition here. */
+.rainy-claude {
+  position: absolute; top: 12px; right: 12px; bottom: 12px; width: 420px;
+  background: rgba(245, 245, 247, 0.52);
+  -webkit-backdrop-filter: blur(calc(var(--panel-blur) * 1.4)) saturate(180%);
+  backdrop-filter: blur(calc(var(--panel-blur) * 1.4)) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(18, 24, 48, 0.14), 0 1px 3px rgba(18, 24, 48, 0.08);
+  overflow: hidden;
+  z-index: 5;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+.cc { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.cc-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex: none; padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cc-title { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.cc-collapse {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-dim); cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.cc-collapse:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+/* The terminal host. xterm sizes itself to this box via the fit addon. */
+.cc-term { flex: 1; min-height: 0; padding: 8px 6px 8px 12px; }
+.cc-term .xterm { height: 100%; }
+.cc-term .xterm-viewport { background: transparent !important; }
+/* Thin, unobtrusive scrollbar over the glass. */
+.cc-term .xterm-viewport::-webkit-scrollbar { width: 8px; }
+.cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(18, 24, 48, 0.18); border-radius: 8px; }
+
+/* Floating "show Claude" button — mirror of .rainy-sidebar-show, on the right. */
+.rainy-claude-show {
+  position: absolute; top: 14px; right: 14px; z-index: 6;
+  width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  color: var(--ink); cursor: pointer; box-shadow: var(--shadow-md);
+  opacity: 0; transform: translateX(8px) scale(0.96); pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease, background .14s ease;
+}
+.rainy-claude-show.show { opacity: 1; transform: none; pointer-events: auto; }
+.rainy-claude-show:hover { background: #fff; }
+.rainy-claude-show:active { transform: scale(0.94); }
+
+/* ---------- Sidebar shell (header + adaptive body) ---------- */
+.ci { display: flex; flex-direction: column; gap: 12px; padding: 16px 14px; height: 100%; min-height: 0; }
+.ci-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
 .ci-title { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
 .ci-collapse {
   flex: none; width: 26px; height: 26px; border-radius: 8px;
@@ -475,32 +559,194 @@ button, input { font-family: inherit; }
   transition: background .14s ease, color .14s ease;
 }
 .ci-collapse:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
-.ci-block {
-  display: flex; flex-direction: column; gap: 2px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--border);
-  border-radius: 12px; padding: 8px 10px;
+
+/* ---------- Adaptive inspector (selection-aware panel body) ----------
+   Replaces the old zoom/reset controls: the panel now reflects the selected
+   block and offers its variants + next steps. */
+.insp {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  animation: inspIn .26s ease both;
+}
+@keyframes inspIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+.insp-section { display: flex; flex-direction: column; gap: 8px; }
+.insp-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+
+/* Variant switcher — the format / detail-level rows */
+.insp-variants { display: flex; flex-direction: column; gap: 6px; }
+.insp-variant {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 11px;
+  background: rgba(255, 255, 255, 0.6); color: var(--ink); cursor: pointer;
   box-shadow: var(--shadow-sm);
+  transition: background .14s ease, border-color .14s ease, transform .06s ease;
 }
-.ci-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; font-size: 12px; }
-.ci-k { color: var(--ink-dim); }
-.ci-v { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
-.ci-zoom { display: flex; align-items: center; gap: 4px; }
-.ci-zoom button {
-  flex: 1; height: 30px; border: 1px solid var(--border); border-radius: 9px;
-  background: #fff; color: var(--ink); cursor: pointer; font-size: 14px;
-  box-shadow: var(--shadow-sm); transition: background .15s;
+.insp-variant:hover { background: #fff; }
+.insp-variant:active { transform: scale(0.985); }
+.insp-variant.on { border-color: rgba(70, 110, 255, 0.55); background: rgba(70, 110, 255, 0.08); }
+.insp-variant:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.insp-variant-label { flex: 1; font-size: 12.5px; font-weight: 500; }
+.insp-variant-hint { font-size: 10px; color: var(--ink-dim); }
+.insp-check { display: inline-flex; color: rgb(70, 110, 255); }
+
+/* Tiny structural preview inside a variant row */
+.insp-pv {
+  display: flex; flex-direction: column; gap: 2.5px; align-items: flex-start;
+  width: 26px; flex: none; color: var(--ink);
 }
-.ci-zoom button:hover { background: rgba(18, 24, 48, 0.04); }
-.ci-zoom .ci-zoom-pct { flex: 1.5; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.ci-actions { display: flex; flex-direction: column; gap: 6px; }
-.ci-actions button {
-  height: 32px; border: 1px solid var(--border); border-radius: 10px;
-  background: #fff; color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 500;
-  box-shadow: var(--shadow-sm); transition: background .15s;
+.insp-pv .ln { height: 2.5px; border-radius: 2px; background: currentColor; opacity: 0.5; }
+.insp-pv .ln.t { width: 100%; height: 4px; opacity: 0.85; }
+.insp-pv .ln.s { width: 68%; height: 3px; opacity: 0.7; }
+.insp-pv .ln.b { width: 88%; }
+.insp-pv .bk { width: 100%; height: 11px; border-radius: 3px; background: currentColor; opacity: 0.28; }
+.insp-pv .bk.sm { height: 7px; }
+
+/* Action buttons (next steps + duplicate/delete) */
+.insp-btn {
+  width: 100%; height: 34px; border: 1px solid var(--border); border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6); color: var(--ink); cursor: pointer;
+  font-size: 12.5px; font-weight: 500; box-shadow: var(--shadow-sm);
+  transition: background .14s ease, transform .06s ease, filter .14s ease;
 }
-.ci-actions button:hover { background: rgba(18, 24, 48, 0.04); }
-.ci-hint { margin-top: auto; font-size: 11px; line-height: 1.4; color: var(--ink-dim); }
+.insp-btn:hover { background: #fff; }
+.insp-btn:active { transform: scale(0.985); }
+.insp-btn.primary { background: var(--ink); color: var(--canvas); border-color: transparent; }
+.insp-btn.primary:hover { background: var(--ink); filter: brightness(1.08); }
+.insp-btn.danger { color: #d23b3b; }
+.insp-btn.danger:hover { background: rgba(210, 59, 59, 0.08); }
+
+/* Status row (video lifecycle) */
+.insp-status {
+  display: flex; align-items: center; gap: 8px; padding: 6px 2px;
+  font-size: 12px; font-weight: 600; color: var(--ink);
+}
+.insp-status-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ink-dim); flex: none; }
+.insp-status-meta { margin-left: auto; font-weight: 500; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.insp-status.s_analysed .insp-status-dot { background: #2bb673; }
+.insp-status.s_analysing .insp-status-dot { background: #3b82f6; animation: inspPulse 1.1s ease-in-out infinite; }
+.insp-status.s_error .insp-status-dot { background: #e5484d; }
+.insp-status.s_not_analysed .insp-status-dot { background: #e3a008; }
+@keyframes inspPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Hints, summaries, empty state */
+.insp-hint { margin: 2px 0 0; font-size: 11px; line-height: 1.45; color: var(--ink-dim); }
+.insp-summary { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.insp-empty {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 6px; margin: auto 0; padding: 18px 8px; color: var(--ink-dim);
+}
+.insp-empty-icon {
+  width: 38px; height: 38px; border-radius: 11px; margin-bottom: 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(18, 24, 48, 0.05); color: var(--ink-dim);
+}
+.insp-empty-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+.insp-empty-text { margin: 0; max-width: 200px; font-size: 11.5px; line-height: 1.5; }
+
+/* ---------- Header icon actions (duplicate / delete) ---------- */
+.ci-head-actions { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.ci-act {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-dim); cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.ci-act:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+.ci-act:active { transform: scale(0.92); }
+.ci-act.danger:hover { background: rgba(210, 59, 59, 0.10); color: #d23b3b; }
+.ci-act-sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+
+/* ---------- Editable fields (Figma-style properties) ----------
+   Each field is its own self-contained card: an uppercase label + a borderless
+   input inside. The card is the visual container; focus lights the whole card. */
+.insp-field {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: var(--shadow-sm);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.insp-field:focus-within {
+  border-color: var(--primary-border);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+.insp-field-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.insp-input {
+  width: 100%; font-family: inherit; font-size: 12.5px; color: var(--ink);
+  background: transparent; border: 0; padding: 0; outline: none;
+}
+.insp-input::placeholder { color: var(--ink-dim); opacity: 0.7; }
+.insp-textarea { resize: vertical; min-height: 56px; line-height: 1.45; }
+
+/* ---------- Read-only analysis fields ---------- */
+.insp-metrics { display: flex; gap: 6px; }
+.insp-metric {
+  flex: 1; display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+  padding: 7px 9px; border: 1px solid var(--border); border-radius: 9px;
+  background: rgba(255, 255, 255, 0.5);
+}
+.insp-metric-v { font-size: 13px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+.insp-metric-k { font-size: 10px; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.insp-disclose {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+  border: 0; background: none; padding: 2px 0; cursor: pointer;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-dim);
+  transition: color .14s ease;
+}
+.insp-disclose:hover { color: var(--ink); }
+
+.insp-readonly { display: flex; flex-direction: column; gap: 10px; }
+.insp-ro-row { display: flex; flex-direction: column; gap: 4px; }
+.insp-ro-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dim); }
+.insp-ro-text {
+  margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink);
+  background: rgba(18, 24, 48, 0.035); border-radius: 9px; padding: 8px 10px;
+}
+.insp-ro-scroll { max-height: 140px; overflow-y: auto; white-space: pre-wrap; }
+.insp-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.insp-chip {
+  font-size: 11px; font-weight: 550; color: var(--ink);
+  background: rgba(18, 24, 48, 0.05); border-radius: 999px; padding: 3px 9px; white-space: nowrap;
+}
+
+/* ============================================================
+   Canvas frames (tldraw frame shape, reskinned — see FrameShape.tsx)
+   ============================================================ */
+/* Hide tldraw's stock body rect; RainyFrameShapeUtil paints a squircle instead.
+   (`:not(.tl-frame__creating)` keeps the live drag-out outline while drawing.) */
+.tl-frame__body:not(.tl-frame__creating) { display: none; }
+
+/* The squircle body: clean off-white surface, brand-tinted hairline + soft drop
+   shadow.
+
+   PERF: the shadow is a SINGLE drop-shadow with a FIXED blur — deliberately NOT
+   scaled by --tl-scale. Three stacked shadows tied to --tl-scale forced a gaussian
+   re-raster of every frame on every zoom frame (cost scaled with frame count and
+   tanked panning/zooming). With constant filter params the rasterised layer is
+   just GPU-transformed by tldraw's camera instead of re-blurred each frame. It
+   grows/shrinks naturally with zoom — same as a box-shadow would — which is fine. */
+.rainy-frame-svg {
+  filter: drop-shadow(0 6px 16px rgba(20, 28, 60, 0.16));
+}
+.rainy-frame-body {
+  fill: #fcfdff;
+  stroke: var(--primary-border);
+  stroke-width: calc(1px * var(--tl-scale));
+}
+
+/* Frame heading (title above the frame): quieter, app-matched type. */
+.tl-frame-heading { color: var(--ink-dim); font-weight: 600; letter-spacing: -0.01em; }
+.tl-frame-label { color: var(--ink-dim); }
 
 /* ============================================================
    Rainy text block (custom tldraw shape)
@@ -617,6 +863,17 @@ button, input { font-family: inherit; }
 .rainy-text-prose pre code { background: none; padding: 0; }
 .rainy-text-prose a { color: var(--accent); }
 
+/* empty-node placeholders (Title / Subtitle / Write something…) — the float/height:0
+   trick lets the hint sit in place without taking up layout or blocking the caret. */
+.rainy-text-prose .is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-dim);
+  opacity: 0.55;
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+
 /* ---- progressive-disclosure chrome (above the card) ---- */
 .rt-actions {
   position: absolute;
@@ -635,32 +892,50 @@ button, input { font-family: inherit; }
 }
 .rt-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-.rt-format,
 .rt-main { display: inline-flex; align-items: center; gap: 2px; }
 
-/* the B/I/U/code bar sits above the Aa row and discloses on its own */
-.rt-format {
+/* the format picker sits above the Aa row and discloses on its own */
+.rt-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
-  padding: 3px;
+  padding: 5px;
+  min-width: 196px;
   opacity: 0;
   transform: translateY(4px) scale(0.98);
+  transform-origin: bottom center;
   transition: opacity 110ms ease, transform 110ms ease;
   pointer-events: none;
 }
-.rt-format.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.rt-menu.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
 
-.rt-format button {
-  border: 0; background: none; cursor: pointer;
-  width: 30px; height: 28px; border-radius: 8px;
-  color: var(--ink); font-size: 14px; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center;
+.rt-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; border: 0; background: none; cursor: pointer;
+  padding: 7px 9px; border-radius: 8px; text-align: left;
+  font-family: inherit; font-size: 13.5px; color: var(--ink);
 }
-.rt-format button:hover { background: rgba(18, 24, 48, 0.06); }
-.rt-format button.on { background: rgba(59, 110, 246, 0.12); color: var(--accent); }
-.rt-format .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.rt-menu-item:hover { background: rgba(18, 24, 48, 0.05); }
+.rt-menu-item.on { background: rgba(59, 110, 246, 0.10); }
+.rt-menu-label { flex: 1; font-weight: 600; white-space: nowrap; }
+.rt-menu-check { display: inline-flex; color: var(--accent); }
+
+/* tiny stacked-line preview of each format */
+.rt-menu-preview {
+  flex: none; width: 28px; height: 28px;
+  border-radius: 7px; background: rgba(18, 24, 48, 0.05);
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 0 6px;
+}
+.rt-menu-preview i { display: block; height: 2px; border-radius: 2px; background: var(--ink-dim); }
+.rt-menu-preview i.t { height: 4px; width: 75%; background: var(--ink); }
+.rt-menu-preview i.s { height: 3px; width: 90%; background: rgba(18, 24, 48, 0.5); }
+.rt-menu-preview i.b { width: 100%; }
+.rt-menu-preview i.b2 { width: 70%; }
 
 .rt-main {
   background: #fff;
@@ -688,6 +963,52 @@ button, input { font-family: inherit; }
 .rt-icon:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
 
 /* ============================================================
+   Shared block chrome — the circular "delete" button
+   Every block (text / video / frame) gets the same affordance: a white circle
+   straddling the top-left corner that turns red on hover. Visibility is driven
+   per-block (`.show`); position is tuned per-block below.
+   ============================================================ */
+.shape-trash {
+  position: absolute;
+  z-index: 6;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-dim);
+  box-shadow: var(--card-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 120ms ease, transform 120ms ease, background 130ms ease, color 130ms ease, box-shadow 130ms ease;
+  pointer-events: none;
+}
+.shape-trash.show { opacity: 1; transform: scale(1); pointer-events: auto; }
+.shape-trash:hover {
+  background: #ef4444;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.42);
+}
+.shape-trash:active { transform: scale(0.94); }
+
+/* Text — inside the hover dome, straddling the card's top-left corner. */
+.rt-zone .shape-trash { top: calc(var(--zt) - 16px); left: calc(var(--zx) - 16px); }
+/* Video — straddling the card's top-left corner. */
+.vb-trash { top: -15px; left: -15px; }
+/* Frame — the name heading lives above the top edge, so tuck the button just
+   inside the top-left, straddling the left edge below the heading band. */
+.frame-chrome { pointer-events: none; }
+.frame-trash { top: 14px; left: -15px; }
+
+.rainy-root.dark .shape-trash { background: #232a39; color: #c2c9d8; }
+.rainy-root.dark .shape-trash:hover { background: #ef4444; color: #fff; }
+
+/* ============================================================
    Bottom dock — add Text / Video blocks
    ============================================================ */
 .rainy-dock {
@@ -706,7 +1027,7 @@ button, input { font-family: inherit; }
   border: 1px solid var(--primary-border);
   /* fully rounded pill to match the design system */
   border-radius: 999px;
-  box-shadow: var(--primary-shadow);
+  box-shadow: var(--shadow-md);
   pointer-events: auto;
 }
 .rainy-dock-sep { width: 1px; height: 22px; background: var(--primary-border); margin: 0 2px; flex: none; }
@@ -727,29 +1048,85 @@ button, input { font-family: inherit; }
 .rainy-tool.on { background: rgba(var(--primary-rgb), 0.12); }
 .rainy-tool.on svg { color: var(--primary); }
 
-/* Shapes flyout (every built-in geo shape) */
-.rainy-dock-popwrap { position: relative; display: inline-flex; }
-.rainy-dock-pop {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(5, 34px);
-  gap: 4px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid var(--primary-border);
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.06), 0 16px 40px rgba(var(--primary-rgb), 0.18);
-  animation: rainy-pop 140ms cubic-bezier(0.34, 1.56, 0.64, 1);
+/* ============================================================
+   Dark mode — toggled by the dock's sun button (`.rainy-root.dark`).
+   We re-point the design tokens to a dark palette; everything built on
+   var(--canvas/--bg/--ink/--panel/...) follows automatically. A few surfaces
+   hardcode white (the dock glass, sidebar, video block), so they're overridden
+   explicitly below.
+   tldraw itself is switched to its own dark colorScheme in CanvasWorkspace.
+   ============================================================ */
+.rainy-root.dark {
+  --bg: #0b0e15;
+  --canvas: #0e1219;
+  --panel: rgba(28, 33, 46, 0.62);
+  --panel-hairline: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.10);
+  --ink: #e8ebf3;
+  --ink-dim: #8b93a7;
+  --primary-border: rgba(var(--primary-rgb), 0.30);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.40), 0 12px 30px rgba(0, 0, 0, 0.50);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 54px rgba(0, 0, 0, 0.60), 0 4px 12px rgba(0, 0, 0, 0.40);
 }
-@keyframes rainy-pop {
-  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.96); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+/* Glass surfaces that hardcode a light tint → dark glass. */
+.rainy-root.dark .rainy-dock { background: rgba(24, 28, 40, 0.82); }
+.rainy-root.dark .rainy-tool { color: var(--ink); }
+.rainy-root.dark .rainy-tool svg { color: var(--ink-dim); }
+
+/* --- Sidebar (floating glass card + its adaptive inspector) --- */
+.rainy-root.dark .rainy-sidebar {
+  background: rgba(22, 26, 38, 0.46);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
 }
-@media (prefers-reduced-motion: reduce) {
-  .rainy-dock-pop { animation: none; }
+.rainy-root.dark .rainy-sidebar-show { background: rgba(34, 40, 54, 0.92); }
+.rainy-root.dark .rainy-sidebar-show:hover { background: rgba(44, 51, 68, 0.96); }
+
+/* --- Claude Code panel on dark glass --- */
+.rainy-root.dark .rainy-claude {
+  background: rgba(22, 26, 38, 0.62);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+.rainy-root.dark .cc-collapse:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
+.rainy-root.dark .rainy-claude-show { background: rgba(34, 40, 54, 0.92); }
+.rainy-root.dark .rainy-claude-show:hover { background: rgba(44, 51, 68, 0.96); }
+
+.rainy-root.dark .ci-collapse:hover { background: rgba(255, 255, 255, 0.08); }
+/* Inspector variant rows + action pills on dark glass. */
+.rainy-root.dark .insp-variant,
+.rainy-root.dark .insp-btn { background: rgba(255, 255, 255, 0.06); }
+.rainy-root.dark .insp-variant:hover,
+.rainy-root.dark .insp-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.rainy-root.dark .insp-variant.on { background: rgba(90, 130, 255, 0.16); border-color: rgba(90, 130, 255, 0.5); }
+.rainy-root.dark .insp-check { color: rgb(120, 150, 255); }
+.rainy-root.dark .insp-btn.primary { background: var(--ink); color: #14182e; }
+.rainy-root.dark .insp-btn.danger { color: #ff6b6b; }
+.rainy-root.dark .insp-btn.danger:hover { background: rgba(255, 107, 107, 0.12); }
+.rainy-root.dark .insp-empty-icon { background: rgba(255, 255, 255, 0.07); }
+
+/* Header icon actions + editable/read-only fields in dark */
+.rainy-root.dark .ci-act:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .ci-act.danger:hover { background: rgba(255, 107, 107, 0.14); color: #ff6b6b; }
+.rainy-root.dark .insp-field { background: rgba(255, 255, 255, 0.05); }
+.rainy-root.dark .insp-metric { background: rgba(255, 255, 255, 0.05); }
+.rainy-root.dark .insp-ro-text { background: rgba(255, 255, 255, 0.05); }
+.rainy-root.dark .insp-chip { background: rgba(255, 255, 255, 0.08); }
+
+/* --- Project header (back button + editable title) --- */
+.rainy-root.dark .rph-back { background: rgba(34, 40, 54, 0.92); }
+.rainy-root.dark .rph-back:hover { background: rgba(44, 51, 68, 0.96); }
+.rainy-root.dark .rph-title:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rph-title:focus { background: rgba(255, 255, 255, 0.10); }
+
+/* --- Canvas blocks (text card + frame + their inline chrome) --- */
+.rainy-root.dark .rainy-text-card { background: #1a1f2c; }
+.rainy-root.dark .rainy-text-prose code,
+.rainy-root.dark .rainy-text-prose pre { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rainy-frame-body { fill: #161b26; }
+.rainy-root.dark .rt-menu { background: #1a1f2c; }
+.rainy-root.dark .rt-menu-item:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-root.dark .rt-menu-item.on { background: rgba(59, 110, 246, 0.18); }
+.rainy-root.dark .rt-menu-preview { background: rgba(255, 255, 255, 0.06); }

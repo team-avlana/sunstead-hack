@@ -1,10 +1,8 @@
 'use client'
 
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import {
   Tldraw,
-  useEditor,
-  useValue,
   type Editor,
   type TLComponents,
   type TLEventInfo,
@@ -13,6 +11,7 @@ import {
 } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { hasBackend, isBackendId } from '@/lib/api'
+import { RAINY_TEXT } from '@/lib/blockTypes'
 import { loadBackendProject } from '@/lib/backendCanvas'
 import { installBridge } from '@/lib/bridge'
 import { attachProjectAutosave, loadProjectIntoEditor } from '@/lib/projectCanvas'
@@ -20,60 +19,58 @@ import { connectRealtime } from '@/lib/realtime'
 import { attachOutboundSync } from '@/lib/remoteOps'
 import { useRainyStore } from '@/lib/store'
 import BottomDock from './BottomDock'
-import { RAINY_TEXT, RainyTextShapeUtil } from './RainyTextShape'
+import { RainyFrameShapeUtil } from './FrameShape'
+import { RainyTextShapeUtil } from './RainyTextShape'
 import { VideoBlockShapeUtil } from './VideoBlockShape'
 
-const shapeUtils: TLShapeUtilConstructor<any>[] = [RainyTextShapeUtil, VideoBlockShapeUtil]
+const shapeUtils: TLShapeUtilConstructor<any>[] = [
+  RainyFrameShapeUtil,
+  RainyTextShapeUtil,
+  VideoBlockShapeUtil,
+]
 
 /**
  * Dotted background grid that tracks the camera (pan + zoom).
- * Canvas-based so it stays cheap; see knowledge-base/canvas/tldraw-nextjs-integration.md §7.
+ *
+ * Rendered as a single CSS radial-gradient tile rather than thousands of
+ * per-frame canvas `arc()` fills: panning only updates `background-position`
+ * (a GPU compositor transform — no repaint, no main-thread work), and zoom
+ * only updates `background-size`. tldraw re-invokes this on each camera frame,
+ * but all it does now is write a couple of style strings. See knowledge-base/
+ * canvas/tldraw-nextjs-integration.md §7.
  */
 const DotGrid: NonNullable<TLComponents['Grid']> = ({ size, x, y, z }) => {
-  const editor = useEditor()
-  const screenBounds = useValue('screenBounds', () => editor.getViewportScreenBounds(), [editor])
-  const dpr = useValue('dpr', () => editor.getInstanceState().devicePixelRatio, [editor])
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const dark = useRainyStore((s) => s.dark)
 
-  useLayoutEffect(() => {
-    const cv = canvasRef.current
-    if (!cv) return
-    const w = Math.ceil(screenBounds.w * dpr)
-    const h = Math.ceil(screenBounds.h * dpr)
-    cv.width = w
-    cv.height = h
-    const ctx = cv.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, w, h)
+  // Figma-style adaptive spacing: keep dots ~22px+ apart on screen no matter
+  // the zoom by drawing only every Nth grid line (N grows as you zoom out).
+  const MIN_SCREEN_GAP = 22
+  let step = 1
+  while (size * step * z < MIN_SCREEN_GAP) step *= 2
+  const screenGap = size * step * z
 
-    // Figma-style adaptive spacing: keep dots ~22px+ apart on screen no matter
-    // the zoom by drawing only every Nth grid line (N grows as you zoom out).
-    const MIN_SCREEN_GAP = 22
-    let step = 1
-    while (size * step * z < MIN_SCREEN_GAP) step *= 2
-    const gap = size * step
+  const radius = Math.max(0.6, Math.min(1.4, 1.1 * z))
+  // Light mode: dark ink dots on a light canvas. Dark mode: light dots on a
+  // dark canvas (slightly brighter so they stay legible against the deep bg).
+  const alpha = Math.min(0.16, 0.07 + z * 0.05)
+  const dot = dark
+    ? `rgba(150, 165, 210, ${Math.min(0.22, alpha + 0.05)})`
+    : `rgba(18, 24, 48, ${alpha})`
 
-    const pb = editor.getViewportPageBounds()
-    const startX = Math.ceil(pb.minX / gap) * gap
-    const startY = Math.ceil(pb.minY / gap) * gap
-    const endX = Math.floor(pb.maxX / gap) * gap
-    const endY = Math.floor(pb.maxY / gap) * gap
-
-    const radius = Math.max(0.6, Math.min(1.4, 1.1 * z)) * dpr
-    ctx.fillStyle = `rgba(18, 24, 48, ${Math.min(0.16, 0.07 + z * 0.05)})`
-
-    for (let py = startY; py <= endY; py += gap) {
-      for (let px = startX; px <= endX; px += gap) {
-        const cx = (px + x) * z * dpr
-        const cy = (py + y) * z * dpr
-        ctx.beginPath()
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-  }, [screenBounds, x, y, z, size, dpr, editor])
-
-  return <canvas className="tl-grid rainy-grid" ref={canvasRef} />
+  return (
+    <div
+      className="rainy-grid"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        // One dot per tile; `+0.6` gives a soft 0.6px antialiased edge.
+        backgroundImage: `radial-gradient(circle at center, ${dot} ${radius}px, transparent ${radius + 0.6}px)`,
+        backgroundSize: `${screenGap}px ${screenGap}px`,
+        // Anchor the tiling to the page origin so dots track content while panning.
+        backgroundPosition: `${x * z}px ${y * z}px`,
+      }}
+    />
+  )
 }
 
 // Clean canvas: hide all stock tldraw chrome — Rainy provides its own.
@@ -101,6 +98,7 @@ const components: TLComponents = {
 }
 
 export default function CanvasWorkspace({ projectId }: { projectId: string }) {
+  const dark = useRainyStore((s) => s.dark)
   const handleMount = useCallback((editor: Editor) => {
     ;(window as any).__rainyEditor = editor
 
@@ -162,8 +160,16 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
       // Local autosave only for XML/localStorage projects — backend projects are
       // sourced from Postgres and reconciled by realtime, never saved locally.
       ...(isBackend ? [] : [attachProjectAutosave(editor, projectId)]),
+      // Mirror selection into the app store for the adaptive sidebar. Session
+      // scope also fires on every camera frame, so bail unless the ids actually
+      // changed — otherwise the sidebar re-derives on each pan/zoom.
       editor.store.listen(
-        () => useRainyStore.getState().setSelectedIds(editor.getSelectedShapeIds().map(String)),
+        () => {
+          const ids = editor.getSelectedShapeIds().map(String)
+          const prev = useRainyStore.getState().selectedIds
+          if (ids.length === prev.length && ids.every((id, i) => id === prev[i])) return
+          useRainyStore.getState().setSelectedIds(ids)
+        },
         { scope: 'session' }
       ),
     ]
@@ -183,7 +189,12 @@ export default function CanvasWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="rainy-canvas">
-      <Tldraw colorScheme="light" components={components} shapeUtils={shapeUtils} onMount={handleMount} />
+      <Tldraw
+        colorScheme={dark ? 'dark' : 'light'}
+        components={components}
+        shapeUtils={shapeUtils}
+        onMount={handleMount}
+      />
     </div>
   )
 }
