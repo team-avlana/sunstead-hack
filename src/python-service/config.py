@@ -33,12 +33,14 @@ class ServerConfig:
 @dataclass
 class WorkerConfig:
     python: str = "python"
-    entrypoint: str = "../analysis-worker/main.py"
+    analyzer_entrypoint: str = "../analysis-worker/main.py"
+    profile_entrypoint: str = "../analysis-worker/build_profile.py"
     max_channel_videos: int = 5
 
 
 @dataclass
 class LlmConfig:
+    anthropic_api_key: str = ""
     azure_anthropic_url: str = ""
     azure_anthropic_key: str = ""
 
@@ -80,17 +82,17 @@ def load() -> Settings:
     term_raw = raw.get("terminal", {})
 
     # Env vars override config.toml for credentials
-    conn_str = (
-        os.environ.get("DB_CONNECTION_STRING")
-        or db_raw.get("connection_string", DbConfig.connection_string)
+    conn_str = os.environ.get("DB_CONNECTION_STRING") or db_raw.get(
+        "connection_string", DbConfig.connection_string
     )
-    azure_url = (
-        os.environ.get("AZURE_ANTHROPIC_URL")
-        or llm_raw.get("azure_anthropic_url", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY") or llm_raw.get(
+        "anthropic_api_key", ""
     )
-    azure_key = (
-        os.environ.get("AZURE_ANTHROPIC_KEY")
-        or llm_raw.get("azure_anthropic_key", "")
+    azure_url = os.environ.get("AZURE_ANTHROPIC_URL") or llm_raw.get(
+        "azure_anthropic_url", ""
+    )
+    azure_key = os.environ.get("AZURE_ANTHROPIC_KEY") or llm_raw.get(
+        "azure_anthropic_key", ""
     )
 
     return Settings(
@@ -101,10 +103,21 @@ def load() -> Settings:
         ),
         worker=WorkerConfig(
             python=wkr_raw.get("python", WorkerConfig.python),
-            entrypoint=wkr_raw.get("entrypoint", WorkerConfig.entrypoint),
-            max_channel_videos=wkr_raw.get("max_channel_videos", WorkerConfig.max_channel_videos),
+            analyzer_entrypoint=wkr_raw.get(
+                "analyzer_entrypoint", WorkerConfig.analyzer_entrypoint
+            ),
+            profile_entrypoint=wkr_raw.get(
+                "profile_entrypoint", WorkerConfig.profile_entrypoint
+            ),
+            max_channel_videos=wkr_raw.get(
+                "max_channel_videos", WorkerConfig.max_channel_videos
+            ),
         ),
-        llm=LlmConfig(azure_anthropic_url=azure_url, azure_anthropic_key=azure_key),
+        llm=LlmConfig(
+            anthropic_api_key=anthropic_key,
+            azure_anthropic_url=azure_url,
+            azure_anthropic_key=azure_key,
+        ),
         terminal=TerminalConfig(
             enabled=str(os.environ.get("RAINY_TERMINAL_ENABLED", term_raw.get("enabled", True))).lower()
             not in ("0", "false", "no"),

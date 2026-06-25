@@ -87,6 +87,7 @@ CREATE TABLE videos (
     deleted_at      timestamptz
 );
 
+CREATE UNIQUE INDEX idx_videos_url ON videos (creator_id, source_url) WHERE deleted_at IS NULL;
 CREATE INDEX idx_videos_creator ON videos (creator_id) WHERE deleted_at IS NULL;
 
 CREATE TRIGGER trg_videos_touch
@@ -103,7 +104,6 @@ CREATE TABLE shots (
     idx         int NOT NULL,          -- shot order within the video
     start_sec   numeric NOT NULL,
     end_sec     numeric NOT NULL,
-    frame_path  text,                  -- single representative frame
     analysis    jsonb,                 -- vision output: shot_type, composition,
                                        -- subjects, palette, camera_movement, ...
 
@@ -119,6 +119,27 @@ CREATE INDEX idx_shots_video ON shots (video_id, idx) WHERE deleted_at IS NULL;
 CREATE TRIGGER trg_shots_touch
     BEFORE UPDATE ON shots
     FOR EACH ROW EXECUTE FUNCTION touch_timestamps();
+
+-- ============================================================================
+--  FRAMES — one representative JPEG frame per shot, stored as raw bytes.
+--  Keyed by shot; cascade-deletes when the shot is deleted.
+--  The canvas fetches frames via GET /frames/{id}.
+-- ============================================================================
+CREATE TABLE frames (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    shot_id       uuid NOT NULL REFERENCES shots(id) ON DELETE CASCADE,
+    video_id      uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    timestamp_sec float NOT NULL,      -- position in the video this frame was taken from
+    data          bytea NOT NULL,      -- raw JPEG bytes
+    mime_type     text NOT NULL DEFAULT 'image/jpeg',
+    width         integer,
+    height        integer,
+
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_frames_shot    ON frames (shot_id);
+CREATE INDEX idx_frames_video   ON frames (video_id);
 
 -- ============================================================================
 --  STYLE_PROFILES — PROFILE layer. Compact, context-ready. Versioned:

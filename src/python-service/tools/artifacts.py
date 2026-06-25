@@ -31,9 +31,14 @@ def register(mcp: FastMCP) -> None:
           "role": str (optional),     # e.g. "ideation" | "storyboard"
           "elements": [               # the blocks inside this frame
             {"id": "el-1", "type": "text",  "content": "<p>…</p>", "x": 24, "y": 64, "w": 320, "h": 200},
-            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64}
+            {"id": "el-2", "type": "video", "video_id": "…", "view": "compact", "x": 360, "y": 64},
+            {"id": "el-3", "type": "image", "src": "/frames/{frame_id}", "frame_id": "…",
+             "caption": str (optional), "x": 0, "y": 0, "w": 320, "h": 180}
           ]
         }
+        For storyboards: use get_video_analysis to get shots_summary (each shot has a
+        frame_id), then create one image element per scene using src="/frames/{frame_id}".
+        Pair each image element with a text element for the scene label/description.
         Each element needs a stable "id"; x/y are RELATIVE to the frame's top-left.
         Address one block later with update_artifact(id, element_id=<el.id>, element_patch={...}).
         position: {x, y, w, h} = the frame box on the canvas.

@@ -1,5 +1,6 @@
 """Analysis tools: trigger video/channel analysis and query progress."""
 
+import base64
 import json
 import subprocess
 import sys
@@ -29,9 +30,11 @@ def register(mcp: FastMCP) -> None:
             raise ValueError("creator_id is required")
 
         video_id = db.insert_video(creator_id, source_url)
-        worker.spawn(video_id)
+        worker.spawn_analysis_worker(video_id)
         # Signal the canvas (a block referencing this video flips to "analysing").
-        db.pg_notify_change({"type": "video", "action": "created", "video_id": video_id})
+        db.pg_notify_change(
+            {"type": "video", "action": "created", "video_id": video_id}
+        )
         return {"video_id": video_id}
 
     @mcp.tool()
@@ -65,8 +68,10 @@ def register(mcp: FastMCP) -> None:
         for url in urls:
             vid_id = db.insert_video(creator_id, url)
             video_ids.append(vid_id)
-            worker.spawn(vid_id)
-            db.pg_notify_change({"type": "video", "action": "created", "video_id": vid_id})
+            worker.spawn_analysis_worker(vid_id)
+            db.pg_notify_change(
+                {"type": "video", "action": "created", "video_id": vid_id}
+            )
 
         return {"creator_id": creator_id, "video_ids": video_ids}
 
@@ -77,7 +82,9 @@ def register(mcp: FastMCP) -> None:
 
         status is one of: 'running', 'done', 'failed'.
         When done, video.metrics contains the derived style data.
-        shots_summary lists shot boundaries (no frame images).
+        shots_summary lists every shot with idx, start_sec, end_sec, and frame_id.
+        frame_id is a UUID; the representative frame image is served at /frames/{frame_id}.
+        Use frame_id when building storyboard artifacts that reference shot thumbnails.
         """
         result = db.get_video_analysis(video_id)
         if result is None:
@@ -95,6 +102,59 @@ def register(mcp: FastMCP) -> None:
         done = sum(1 for v in videos if v["status"] == "done")
         return {"videos": videos, "done": done, "total": len(videos)}
 
+    @mcp.tool()
+    def get_video_shots(video_id: str) -> dict:
+        """
+        Return the full shot and frame list for a video, including per-shot analysis.
+
+        Each shot includes idx, start_sec, end_sec, frame_id, and the complete
+        analysis data:
+          - analysis.deterministic: duration_sec, frame metrics, speech metrics
+          - analysis.llm: shot_type, composition, subjects, palette, camera_movement,
+            roll, subject — the vision model output per shot
+
+        frame_id is a UUID; fetch the JPEG thumbnail with get_frame or at
+        /frames/{frame_id}. Use get_video_analysis to check status first — shots
+        are empty while analysis is still running.
+        """
+        full = db.get_video_full(video_id)
+        if full is None:
+            raise ValueError(f"No video found with id {video_id}")
+        shots = [
+            {
+                "idx": s["idx"],
+                "start_sec": float(s["start_sec"]),
+                "end_sec": float(s["end_sec"]),
+                "frame_id": str(s["frame_id"]) if s.get("frame_id") else None,
+                "analysis": s.get("analysis"),
+            }
+            for s in full["shots"]
+        ]
+        return {"video_id": video_id, "shot_count": len(shots), "shots": shots}
+
+    @mcp.tool()
+    def get_frame(frame_id: str) -> dict:
+        """
+        Fetch a shot frame image as a base64 data URL.
+
+        Returns {frame_id, mime_type, data_url, url}.
+        data_url is a data:image/jpeg;base64,... string you can embed directly in
+        image elements or HTML artifacts on the canvas.
+        url is the /frames/{frame_id} path relative to the API base URL.
+
+        Obtain frame_id values from get_video_shots or get_video_analysis shots_summary.
+        """
+        frame = db.get_frame(frame_id)
+        if frame is None:
+            raise ValueError(f"No frame found with id {frame_id}")
+        data_b64 = base64.b64encode(frame["data"]).decode("ascii")
+        return {
+            "frame_id": frame_id,
+            "mime_type": frame["mime_type"],
+            "data_url": f"data:{frame['mime_type']};base64,{data_b64}",
+            "url": f"/frames/{frame_id}",
+        }
+
 
 def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:
     """Use yt-dlp --flat-playlist to list the newest N video URLs.
@@ -105,10 +165,14 @@ def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:
     try:
         result = subprocess.run(
             [
-                sys.executable, "-m", "yt_dlp",
+                sys.executable,
+                "-m",
+                "yt_dlp",
                 "--flat-playlist",
-                "--print", "url",
-                "--playlist-end", str(max_videos),
+                "--print",
+                "url",
+                "--playlist-end",
+                str(max_videos),
                 channel_url,
             ],
             capture_output=True,

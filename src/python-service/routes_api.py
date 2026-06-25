@@ -1,12 +1,16 @@
-"""Read-only HTTP API for the canvas-ui (a static export that cannot open Postgres
-directly). Mounted alongside the MCP server in server.py.
+"""HTTP API for the canvas-ui (a static export that cannot open Postgres directly).
+Mounted alongside the MCP server in server.py.
 
-    GET /api/health
-    GET /api/projects
-    GET /api/projects/{project_id}     -> {project, artifacts:[enriched]}
-    GET /api/artifacts/{artifact_id}   -> enriched artifact (re-pull on WS signal)
-    GET /api/videos/{video_id}         -> {video, shots_summary}
-    GET /frames/{video_id}/{name}      -> a shot frame image if present (else 404)
+    GET    /api/health
+    GET    /api/projects
+    GET    /api/projects/{project_id}        -> {project, artifacts:[enriched]}
+    GET    /api/artifacts/{artifact_id}      -> enriched artifact
+    PUT    /api/artifacts/{artifact_id}      -> update; broadcasts WS change signal
+    DELETE /api/artifacts/{artifact_id}      -> soft-delete; broadcasts WS change signal
+    GET    /api/videos/{video_id}            -> {video, shots_summary}
+    GET    /api/videos/{video_id}/status     -> lightweight status poll
+    GET    /api/creators/{creator_id}/videos -> video list with status + metadata
+    GET    /frames/{frame_id}               -> JPEG image served from the frames table
 
 "Enriched" = a `type:'video'` artifact gets a live `video` view-model attached,
 joined from the videos table via payload.video_id (see video_view.derive_video).
@@ -14,19 +18,14 @@ joined from the videos table via payload.video_id (see video_view.derive_video).
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 import db
+import notify
 import video_view
-
-# Where the analysis-worker writes frames (best-effort serving; missing -> 404).
-_FRAMES_ROOT = Path(os.environ.get("FRAMES_DIR", "../analysis-worker/workdir")).resolve()
 
 
 def _video_view(src: dict) -> dict:
@@ -105,21 +104,91 @@ async def get_video(request: Request) -> JSONResponse:
     return JSONResponse({"video": view, "shots_summary": shots_summary})
 
 
-async def get_frame(request: Request):
+async def update_artifact(request: Request) -> JSONResponse:
+    aid = request.path_params["artifact_id"]
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    result = await run_in_threadpool(
+        lambda: db.update_artifact(
+            artifact_id=aid,
+            payload=body.get("payload"),
+            element_id=body.get("element_id"),
+            element_patch=body.get("element_patch"),
+            position=body.get("position"),
+            title=body.get("title"),
+        )
+    )
+    if result is None:
+        return JSONResponse({"error": "artifact not found"}, status_code=404)
+
+    await notify.broadcast(
+        {
+            "type": "artifact",
+            "action": "updated",
+            "artifact_id": aid,
+            "project_id": result["project_id"],
+            "version": result["version"],
+        },
+        project_id=result["project_id"],
+    )
+    return JSONResponse({"artifact_id": aid, "version": result["version"]})
+
+
+async def delete_artifact(request: Request) -> JSONResponse:
+    aid = request.path_params["artifact_id"]
+    result = await run_in_threadpool(db.delete_artifact, aid)
+    if result is None:
+        return JSONResponse({"error": "artifact not found"}, status_code=404)
+
+    await notify.broadcast(
+        {
+            "type": "artifact",
+            "action": "deleted",
+            "artifact_id": aid,
+            "project_id": result["project_id"],
+            "version": 0,
+        },
+        project_id=result["project_id"],
+    )
+    return JSONResponse({"ok": True})
+
+
+async def get_video_status(request: Request) -> JSONResponse:
     vid = request.path_params["video_id"]
-    name = os.path.basename(request.path_params["name"])  # prevent traversal
-    candidate = (_FRAMES_ROOT / vid / "frames" / name).resolve()
-    # Stay within the frames root.
-    if _FRAMES_ROOT in candidate.parents and candidate.is_file():
-        return FileResponse(str(candidate))
-    return JSONResponse({"error": "frame not found"}, status_code=404)
+    status = await run_in_threadpool(db.get_video_status, vid)
+    if status is None:
+        return JSONResponse({"error": "video not found"}, status_code=404)
+    return JSONResponse(status)
+
+
+async def list_creator_videos(request: Request) -> JSONResponse:
+    cid = request.path_params["creator_id"]
+    videos = await run_in_threadpool(db.get_creator_videos, cid)
+    if videos is None:
+        return JSONResponse({"error": "creator not found"}, status_code=404)
+    return JSONResponse({"creator_id": cid, "videos": videos})
+
+
+async def get_frame(request: Request):
+    frame_id = request.path_params["frame_id"]
+    frame = await run_in_threadpool(db.get_frame, frame_id)
+    if frame is None:
+        return JSONResponse({"error": "frame not found"}, status_code=404)
+    return Response(content=frame["data"], media_type=frame["mime_type"])
 
 
 routes = [
     Route("/api/health", health),
     Route("/api/projects", list_projects),
     Route("/api/projects/{project_id}", get_project),
-    Route("/api/artifacts/{artifact_id}", get_artifact),
+    Route("/api/artifacts/{artifact_id}", get_artifact, methods=["GET", "HEAD"]),
+    Route("/api/artifacts/{artifact_id}", update_artifact, methods=["PUT"]),
+    Route("/api/artifacts/{artifact_id}", delete_artifact, methods=["DELETE"]),
+    Route("/api/videos/{video_id}/status", get_video_status),
     Route("/api/videos/{video_id}", get_video),
-    Route("/frames/{video_id}/{name}", get_frame),
+    Route("/api/creators/{creator_id}/videos", list_creator_videos),
+    Route("/frames/{frame_id}", get_frame),
 ]

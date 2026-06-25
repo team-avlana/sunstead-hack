@@ -146,8 +146,11 @@ def get_video_analysis(video_id: str) -> dict | None:
             return None
 
         shots = conn.execute(
-            "SELECT idx, start_sec, end_sec FROM shots "
-            "WHERE video_id = %s AND deleted_at IS NULL ORDER BY idx",
+            """SELECT s.idx, s.start_sec, s.end_sec, f.id AS frame_id
+               FROM shots s
+               LEFT JOIN frames f ON f.shot_id = s.id
+               WHERE s.video_id = %s AND s.deleted_at IS NULL
+               ORDER BY s.idx""",
             (video_id,),
         ).fetchall()
 
@@ -159,7 +162,12 @@ def get_video_analysis(video_id: str) -> dict | None:
         status = "running"
 
     shots_summary = [
-        {"idx": s["idx"], "start_sec": float(s["start_sec"]), "end_sec": float(s["end_sec"])}
+        {
+            "idx": s["idx"],
+            "start_sec": float(s["start_sec"]),
+            "end_sec": float(s["end_sec"]),
+            "frame_id": str(s["frame_id"]) if s["frame_id"] else None,
+        }
         for s in shots
     ]
 
@@ -416,11 +424,98 @@ def get_video_full(video_id: str) -> dict | None:
         if not row:
             return None
         shots = conn.execute(
-            "SELECT idx, start_sec, end_sec, frame_path, analysis FROM shots "
-            "WHERE video_id = %s AND deleted_at IS NULL ORDER BY idx",
+            """SELECT s.idx, s.start_sec, s.end_sec, s.analysis,
+                      f.id AS frame_id
+               FROM shots s
+               LEFT JOIN frames f ON f.shot_id = s.id
+               WHERE s.video_id = %s AND s.deleted_at IS NULL
+               ORDER BY s.idx""",
             (video_id,),
         ).fetchall()
     return {"video": dict(row), "shots": [dict(s) for s in shots]}
+
+
+def get_frame(frame_id: str) -> dict | None:
+    """Return the raw bytes and mime_type for a frame row."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT data, mime_type FROM frames WHERE id = %s",
+            (frame_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"data": bytes(row["data"]), "mime_type": row["mime_type"]}
+
+
+def get_video_status(video_id: str) -> dict | None:
+    """Lightweight status check — no shot join, suitable for polling."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, title, duration_sec, analyzed_at, analysis_error "
+            "FROM videos WHERE id = %s AND deleted_at IS NULL",
+            (video_id,),
+        ).fetchone()
+    if not row:
+        return None
+    if row["analysis_error"]:
+        status = "error"
+    elif row["analyzed_at"]:
+        status = "analysed"
+    else:
+        status = "analysing"
+    return {
+        "video_id": str(row["id"]),
+        "status": status,
+        "title": row["title"],
+        "duration_sec": float(row["duration_sec"]) if row["duration_sec"] else None,
+        "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None,
+        "analysis_error": row["analysis_error"],
+    }
+
+
+def get_creator_videos(creator_id: str) -> list[dict] | None:
+    """All videos for a creator with status + display metadata.
+
+    Returns None if the creator doesn't exist (vs. [] for a creator with no videos).
+    """
+    with get_conn() as conn:
+        creator = conn.execute(
+            "SELECT 1 FROM creators WHERE id = %s AND deleted_at IS NULL",
+            (creator_id,),
+        ).fetchone()
+        if not creator:
+            return None
+        rows = conn.execute(
+            """SELECT v.id, v.title, v.source_url, v.duration_sec,
+                      v.analyzed_at, v.analysis_error,
+                      (SELECT f.id FROM frames f
+                       JOIN shots s ON f.shot_id = s.id
+                       WHERE s.video_id = v.id AND s.deleted_at IS NULL
+                       ORDER BY s.idx LIMIT 1) AS frame_id
+               FROM videos v
+               WHERE v.creator_id = %s AND v.deleted_at IS NULL
+               ORDER BY v.created_at DESC""",
+            (creator_id,),
+        ).fetchall()
+
+    result = []
+    for r in rows:
+        if r["analysis_error"]:
+            status = "error"
+        elif r["analyzed_at"]:
+            status = "analysed"
+        else:
+            status = "analysing"
+        frame_id = str(r["frame_id"]) if r["frame_id"] else None
+        result.append({
+            "video_id": str(r["id"]),
+            "status": status,
+            "title": r["title"],
+            "source_url": r["source_url"],
+            "duration_sec": float(r["duration_sec"]) if r["duration_sec"] else None,
+            "thumbnail": f"/frames/{frame_id}" if frame_id else None,
+        })
+    return result
 
 
 def project_ids_for_video(video_id: str) -> list[str]:

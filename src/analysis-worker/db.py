@@ -1,6 +1,14 @@
 import json
 import psycopg
+from decimal import Decimal
 from psycopg.rows import dict_row
+
+
+def _dumps(obj) -> str:
+    """json.dumps that coerces Decimal (psycopg numeric) to float."""
+    return json.dumps(
+        obj, default=lambda o: float(o) if isinstance(o, Decimal) else str(o)
+    )
 
 
 def get_connection(dsn: str):
@@ -57,27 +65,50 @@ def insert_shot(
     idx: int,
     start_sec: float,
     end_sec: float,
-    frame_path: str | None,
     analysis: dict,
-) -> None:
+) -> str:
+    """Insert (or upsert) a shot row. Returns the shot UUID."""
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO shots (video_id, idx, start_sec, end_sec, frame_path, analysis)
-               VALUES (%s, %s, %s, %s, %s, %s)
+            """INSERT INTO shots (video_id, idx, start_sec, end_sec, analysis)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT (video_id, idx) DO UPDATE SET
                  start_sec = EXCLUDED.start_sec,
                  end_sec   = EXCLUDED.end_sec,
-                 frame_path = EXCLUDED.frame_path,
-                 analysis  = EXCLUDED.analysis""",
-            (video_id, idx, start_sec, end_sec, frame_path, json.dumps(analysis)),
+                 analysis  = EXCLUDED.analysis
+               RETURNING id""",
+            (video_id, idx, start_sec, end_sec, _dumps(analysis)),
         )
+        row = cur.fetchone()
+    return str(row["id"])
+
+
+def insert_frame(
+    conn,
+    shot_id: str,
+    video_id: str,
+    timestamp_sec: float,
+    data: bytes,
+    width: int | None = None,
+    height: int | None = None,
+) -> str:
+    """Insert a frame row. Returns the frame UUID."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO frames (shot_id, video_id, timestamp_sec, data, width, height)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (shot_id, video_id, timestamp_sec, data, width, height),
+        )
+        row = cur.fetchone()
+    return str(row["id"])
 
 
 def write_video_metrics(conn, video_id: str, metrics: dict) -> None:
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE videos SET metrics=%s WHERE id=%s",
-            (json.dumps(metrics), video_id),
+            (_dumps(metrics), video_id),
         )
 
 
@@ -96,6 +127,49 @@ def set_analysis_error(conn, video_id: str, error: str) -> None:
     conn.commit()
 
 
+def load_creator(conn, creator_id: str) -> dict:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, platform, channel_url, kind FROM creators WHERE id = %s",
+            (creator_id,),
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"No creator row found for id={creator_id}")
+    return dict(row)
+
+
+def load_completed_videos(conn, creator_id: str) -> list[dict]:
+    """Return all analyzed (not failed, not deleted) videos for this creator."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT id, title, duration_sec, source_url, published_at, metrics
+               FROM videos
+               WHERE creator_id = %s
+                 AND analyzed_at IS NOT NULL
+                 AND analysis_error IS NULL
+                 AND deleted_at IS NULL
+               ORDER BY published_at ASC NULLS LAST, created_at ASC""",
+            (creator_id,),
+        )
+        rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def insert_style_profile(conn, creator_id: str, summary: str, profile: dict) -> str:
+    """Insert a new versioned style_profiles row. Returns the new row's id."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO style_profiles (creator_id, summary, profile)
+               VALUES (%s, %s, %s)
+               RETURNING id""",
+            (creator_id, summary, _dumps(profile)),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    return str(row["id"])
+
+
 def notify_change(conn, video_id: str, action: str) -> None:
     """Emit a Postgres NOTIFY the python-service forwards to the canvas over WS.
     Best-effort: a failure here must never fail the analysis run."""
@@ -103,7 +177,11 @@ def notify_change(conn, video_id: str, action: str) -> None:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT pg_notify('rainy_change', %s)",
-                (json.dumps({"type": "video", "action": action, "video_id": video_id}),),
+                (
+                    json.dumps(
+                        {"type": "video", "action": action, "video_id": video_id}
+                    ),
+                ),
             )
         conn.commit()
     except Exception:
