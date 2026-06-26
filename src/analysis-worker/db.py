@@ -101,6 +101,10 @@ def set_analysis_stage(conn, video_id: str, stage: str) -> None:
             "UPDATE videos SET analysis_stage=%s WHERE id=%s", (stage, video_id)
         )
     conn.commit()
+    # Push the stage change so the canvas updates live over the websocket instead
+    # of polling GET /api/videos/{id} every couple of seconds (notify.py forwards
+    # this to video-scoped + project subscribers). Best-effort.
+    notify_change(conn, video_id, "stage", stage)
 
 
 def delete_existing_shots(conn, video_id: str) -> None:
@@ -223,19 +227,16 @@ def insert_style_profile(conn, creator_id: str, summary: str, profile: dict) -> 
     return str(row["id"])
 
 
-def notify_change(conn, video_id: str, action: str) -> None:
+def notify_change(conn, video_id: str, action: str, stage: str | None = None) -> None:
     """Emit a Postgres NOTIFY the python-service forwards to the canvas over WS.
+    `stage` is carried for action='stage' so the canvas can show live progress.
     Best-effort: a failure here must never fail the analysis run."""
+    payload = {"type": "video", "action": action, "video_id": video_id}
+    if stage is not None:
+        payload["stage"] = stage
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT pg_notify('rainy_change', %s)",
-                (
-                    json.dumps(
-                        {"type": "video", "action": action, "video_id": video_id}
-                    ),
-                ),
-            )
+            cur.execute("SELECT pg_notify('rainy_change', %s)", (json.dumps(payload),))
         conn.commit()
     except Exception:
         pass

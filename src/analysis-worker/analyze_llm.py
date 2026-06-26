@@ -148,6 +148,13 @@ def _client():
 
     if azure_url and azure_key:
         from anthropic import AnthropicFoundry
+        # AnthropicFoundry also auto-reads ANTHROPIC_FOUNDRY_RESOURCE / _BASE_URL from
+        # the environment. The server's agent bridge sets ANTHROPIC_FOUNDRY_RESOURCE,
+        # which this worker inherits; combined with the explicit base_url below the SDK
+        # raises "base_url and resource are mutually exclusive". We pass base_url
+        # ourselves, so drop the inherited foundry vars first.
+        os.environ.pop("ANTHROPIC_FOUNDRY_RESOURCE", None)
+        os.environ.pop("ANTHROPIC_FOUNDRY_BASE_URL", None)
         return AnthropicFoundry(base_url=azure_url, api_key=azure_key)
     if anthropic_key:
         import anthropic
