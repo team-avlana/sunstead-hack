@@ -2,6 +2,7 @@
 
 import base64
 import json
+import os
 import subprocess
 import sys
 from typing import Optional
@@ -16,7 +17,11 @@ from config import MAX_CHANNEL_VIDEOS, settings
 def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
-    def analyze_video(source_url: str, creator_id: str) -> dict:
+    def analyze_video(
+        source_url: str,
+        creator_id: str,
+        instructions: Optional[str] = None,
+    ) -> dict:
         """
         Start analysis for a single video URL.
 
@@ -24,6 +29,11 @@ def register(mcp: FastMCP) -> None:
         analysis-worker subprocess in the background, and returns immediately
         with the video_id. Re-analysing the same URL for a creator reuses the
         existing video (re-runs idempotently). Poll get_video_analysis to track.
+
+        instructions — optional free-text focus directive forwarded to the LLM
+        analysis phase (e.g. "pay special attention to product placement and
+        brand safety", or "evaluate pacing against a 60s TikTok brief"). Has no
+        effect on the deterministic metrics phase.
         """
         if not source_url:
             raise ValueError("source_url is required")
@@ -31,9 +41,40 @@ def register(mcp: FastMCP) -> None:
             raise ValueError("creator_id is required")
 
         video_id, created = db.get_or_create_video(creator_id, source_url)
-        worker.spawn_analysis_worker(video_id)
+        worker.spawn_analysis_worker(video_id, instructions=instructions)
         db.pg_notify_change(
             {"type": "video", "action": "created" if created else "updated", "video_id": video_id}
+        )
+        return {"video_id": video_id}
+
+    @mcp.tool()
+    def reanalyze_video(
+        video_id: str,
+        instructions: Optional[str] = None,
+    ) -> dict:
+        """
+        Re-run the full analysis pipeline for a video that has already been analyzed.
+
+        Clears the prior analysis (shots, frames, metrics) and starts a fresh
+        worker run. Useful when:
+        - You want to re-analyze with different focus instructions.
+        - The pipeline has been updated and you want fresh results.
+        - The previous run completed but produced poor results.
+
+        Returns immediately with {video_id}. Poll get_video_analysis to track.
+
+        instructions — optional focus directive for the LLM phase (same as
+        analyze_video). Omit to re-run with default analysis behavior.
+        """
+        if not video_id:
+            raise ValueError("video_id is required")
+        video = db.get_video_analysis(video_id)
+        if video is None:
+            raise ValueError(f"No video found with id {video_id}")
+        db.reset_video_for_reanalysis(video_id)
+        worker.spawn_analysis_worker(video_id, instructions=instructions)
+        db.pg_notify_change(
+            {"type": "video", "action": "updated", "video_id": video_id}
         )
         return {"video_id": video_id}
 
@@ -215,33 +256,55 @@ def start_channel_analysis(
     return {"creator_id": creator_id, "video_ids": video_ids}
 
 
+def _ytdlp_cookie_args() -> list[str]:
+    """Same yt-dlp auth env as the worker's download step (analysis-worker/
+    download.py): YTDLP_COOKIES_FILE or YTDLP_COOKIES_FROM_BROWSER. Needed to list
+    walled accounts (e.g. Instagram). Returns [] when unset."""
+    f = os.environ.get("YTDLP_COOKIES_FILE", "").strip()
+    if f:
+        return ["--cookies", f]
+    b = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "").strip()
+    if b:
+        return ["--cookies-from-browser", b]
+    return []
+
+
 def _enumerate_channel(channel_url: str, max_videos: int) -> list[str]:
-    """Use yt-dlp --flat-playlist to list the newest N video URLs.
+    """List the newest N video URLs from a channel via yt-dlp.
 
     Invoked as `sys.executable -m yt_dlp` so it always resolves to the
     venv-installed yt-dlp regardless of PATH.
+
+    --lazy-playlist makes yt-dlp STOP once --playlist-end is reached instead of
+    paginating the whole account first — that is what kept TikTok/Instagram
+    listings from blowing the timeout (they're slow to fully enumerate). The
+    timeout is just a backstop now; raise it with YTDLP_ENUM_TIMEOUT if needed.
     """
+    timeout = int(os.environ.get("YTDLP_ENUM_TIMEOUT", "180"))
+    cmd = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--flat-playlist",
+        "--lazy-playlist",
+        "--playlist-end",
+        str(max_videos),
+        "--print",
+        "url",
+        *_ytdlp_cookie_args(),
+        channel_url,
+    ]
     try:
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "yt_dlp",
-                "--flat-playlist",
-                "--print",
-                "url",
-                "--playlist-end",
-                str(max_videos),
-                channel_url,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         urls = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         if not urls and result.stderr:
             raise RuntimeError(result.stderr.strip()[:500])
         return urls[:max_videos]
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            f"Listing this channel timed out after {timeout}s — TikTok/Instagram can be "
+            f"slow. Raise YTDLP_ENUM_TIMEOUT or lower max_videos."
+        )
     except RuntimeError:
         raise
     except Exception as exc:

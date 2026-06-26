@@ -59,6 +59,12 @@ def _palette(metrics: dict | None, limit: int = 6) -> list[str]:
     return out
 
 
+_JUNK_PREFIXES = (
+    "unknown", "undetermined", "indeterminate", "n/a", "none",
+    "unclear", "not applicable", "not determined", "unclassified",
+)
+
+
 def _short(text: str, limit: int = 28) -> str:
     """Trim to <= limit chars on a word boundary (no mid-word cut)."""
     text = " ".join(text.split())
@@ -68,12 +74,19 @@ def _short(text: str, limit: int = 28) -> str:
     return (cut or text[:limit]).rstrip(" ,;-")
 
 
+def _is_junk(tag: str) -> bool:
+    t = tag.lower().strip(" ,;-—")
+    return not t or any(t.startswith(p) for p in _JUNK_PREFIXES)
+
+
 def _tags(llm: dict) -> list[str]:
     """Punchy chips for the block header — clean nouns, not full sentences."""
     tags: list[str] = []
     topic = llm.get("topic")
     if isinstance(topic, str) and topic:
-        tags.append(_short(topic.split(",")[0].split("—")[0], 24))
+        t = _short(topic.split(",")[0].split("—")[0], 24)
+        if not _is_junk(t):
+            tags.append(t)
     hf = _HOOK_FORMAT_LABEL.get(llm.get("hook_format", ""))
     if hf:
         tags.append(hf)
@@ -82,13 +95,15 @@ def _tags(llm: dict) -> list[str]:
         if ct:
             tags.append(ct)
     scr = llm.get("scriptedness")
-    if isinstance(scr, str) and scr:
+    if isinstance(scr, str) and scr and not _is_junk(scr):
         tags.append(scr.replace("_", "-"))
     tone = llm.get("tone_voice")
     if isinstance(tone, str) and tone:
-        tags.append(_short(tone.split(",")[0], 20))
+        t = _short(tone.split(",")[0], 20)
+        if not _is_junk(t):
+            tags.append(t)
     lang = llm.get("language")
-    if isinstance(lang, str) and lang and lang.lower() != "english":
+    if isinstance(lang, str) and lang and lang.lower() != "english" and not _is_junk(lang):
         tags.append(lang)
     # de-dupe (case-insensitive), keep order
     seen, uniq = set(), []
@@ -126,7 +141,7 @@ def _scene_tags(shot: dict | None) -> list[str]:
     out = []
     for key in ("shot_type", "roll", "composition"):
         v = llm.get(key)
-        if isinstance(v, str) and v and v != "other":
+        if isinstance(v, str) and v and v != "other" and not _is_junk(v):
             out.append(v.replace("_", " "))
     return out
 

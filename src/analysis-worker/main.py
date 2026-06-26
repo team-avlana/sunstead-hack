@@ -13,6 +13,7 @@ Optional:
 
 import sys
 import traceback
+from pathlib import Path
 
 import config
 import db
@@ -38,13 +39,23 @@ def run(video_id: str, dsn: str) -> None:
             db.set_analysis_stage(conn, video_id, "downloading")
         source_url = video["source_url"]
 
-        # ── 2. Download ──────────────────────────────────────────────────────
-        # No DB connection held during the download (can take minutes).
-        print(f"[{video_id}] Downloading {source_url} ...")
-        dl = download.download_video(source_url, workdir)
+        # ── 2. Acquire the file ───────────────────────────────────────────────
+        # Uploaded deliveries already have the file on disk (local_path set by the
+        # agency ingestion route) — probe it instead of running yt-dlp. Otherwise
+        # download from the URL. No DB connection held (either can take minutes).
+        existing_local = video.get("local_path")
+        is_upload = str(source_url).startswith("upload://")
+        if is_upload and existing_local and Path(existing_local).exists():
+            print(f"[{video_id}] Using uploaded file {existing_local}")
+            dl = download.probe_local(existing_local)
+            # Prefer the original filename the uploader gave over the ffprobe stem.
+            dl["title"] = video.get("title") or dl["title"]
+        else:
+            print(f"[{video_id}] Downloading {source_url} ...")
+            dl = download.download_video(source_url, workdir)
         local_path = dl["local_path"]
         duration_sec = dl["duration_sec"]
-        print(f"[{video_id}] Downloaded → {local_path} ({duration_sec:.1f}s)")
+        print(f"[{video_id}] Ready → {local_path} ({duration_sec:.1f}s)")
 
         # ── Phase B: post-download ───────────────────────────────────────────
         with db.connect(dsn) as conn:

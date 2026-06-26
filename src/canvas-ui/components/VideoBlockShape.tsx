@@ -436,20 +436,10 @@ function Body({
 }
 
 function Hook({ hook }: { hook: NonNullable<VideoData['hook']> }) {
-  const strength = Math.max(0, Math.min(10, hook.strength ?? 0))
   return (
     <div className={s.hook}>
-      <div className={s.hookHead}>
-        <div className={s.sectionLabel}>Hook{hook.format ? ` · ${hook.format.replace(/_/g, ' ')}` : ''}</div>
-        {hook.strength ? (
-          <div className={s.strengthBar} title={`Hook strength ${hook.strength}/10`}>
-            {Array.from({ length: 10 }, (_, i) => (
-              <i key={i} className={i < strength ? s.on : ''} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-      <div className={s.hookText}>“{hook.text}”</div>
+      <div className={s.sectionLabel}>Hook{hook.format ? ` · ${hook.format.replace(/_/g, ' ')}` : ''}</div>
+      <div className={s.hookText}>”{hook.text}”</div>
     </div>
   )
 }

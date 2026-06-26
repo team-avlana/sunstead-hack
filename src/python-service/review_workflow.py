@@ -74,6 +74,10 @@ delivery — ask the user if it's ambiguous.
 
 ## 3. REVIEW  (a frame, payload.role = "review") — the contract
 Procedure:
+  FAST PATH: call compare_components(source_video_id, target) — it returns the source
+  video's compact analysis + on-screen OCR and the target (a brief frame's text blocks
+  + its reference analysis, or another video's analysis) in one shot. Reason over that,
+  then build the review frame. (You can also gather manually with the calls below.)
   a. get_video_analysis(delivery_video_id) and, if there is one, the reference.
      The returned video.metrics carries:
        metrics.llm.hook_text / hook_format / hook_strength / hook_opening_words
@@ -128,6 +132,18 @@ hand off cleanly.
 IMPROVEMENT OVER TIME: if the same creator has earlier review frames in the project
 (list_artifacts, role:"review"), compare scores and call out the trend in one line
 ("hook timing 0:04 -> 0:01 across three, improving"). Keep it as text for now.
+
+## COMPARE ANY TWO COMPONENTS (video vs X)
+The review frame is also how you compare a video against anything, not only a brief.
+Trigger: the user picks a video and something to compare it to (a brief frame, or
+another video), or asks to "compare / contrast these".
+  • video vs a brief frame  -> the review above (does the delivery meet the brief).
+  • video vs another video   -> a diff: compare hook, structure/segments, tone, pacing;
+       lead with what DIFFERS and what one has that the other is MISSING. Same review
+       frame shape (the header line becomes a one-line "how they differ").
+compare_components(source_video_id, target) gathers both sides in one call; then build
+the single review frame and place it next to what was compared so the canvas reads as a
+flow.
 
 ## OUTPUT CRITERIA — every review frame must have
   payload.role = "review"; the header block with verdict + score; the Visual hook,

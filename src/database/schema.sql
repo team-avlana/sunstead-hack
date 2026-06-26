@@ -49,7 +49,10 @@ CREATE TRIGGER trg_projects_touch
 -- ============================================================================
 CREATE TABLE creators (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    kind            text NOT NULL CHECK (kind IN ('self', 'reference')),
+    -- self      = the user's own channel (solo-creator product)
+    -- reference = competitors / role models / reference videos
+    -- talent    = a UGC creator on the agency roster (agency dashboard)
+    kind            text NOT NULL CHECK (kind IN ('self', 'reference', 'talent')),
     name            text NOT NULL,
     platform        text,                 -- youtube / tiktok / instagram / ...
     channel_url     text,
@@ -226,6 +229,30 @@ CREATE TRIGGER trg_memory_touch
     FOR EACH ROW EXECUTE FUNCTION touch_timestamps();
 
 -- ============================================================================
+--  CONVERSATIONS — persistent agent chat threads (one per browser session).
+--  The client generates a UUID and stores it in localStorage; the server uses
+--  it as the PK here so the same thread survives page refreshes.
+-- ============================================================================
+CREATE TABLE conversations (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  uuid REFERENCES projects(id) ON DELETE SET NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+    deleted_at  timestamptz
+);
+
+CREATE TABLE conversation_messages (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role            text NOT NULL CHECK (role IN ('user', 'assistant')),
+    content         text NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_conv_messages
+    ON conversation_messages (conversation_id, created_at);
+
+-- ============================================================================
 --  STORYBOARD_FRAMES — AI-generated images for future video ideas.
 --  Each row is one panel: a concept/scene description → gpt-image-1.5 PNG.
 --  The image is served via GET /api/storyboard/{id} and embedded in canvas
@@ -246,3 +273,50 @@ CREATE TABLE storyboard_frames (
 
 CREATE INDEX idx_storyboard_frames_project ON storyboard_frames (project_id)
     WHERE deleted_at IS NULL;
+
+-- ============================================================================
+--  REVIEWS — the agency UGC coaching loop's operational record. One row per
+--  delivery reviewed against a brief (and/or a reference video). This is the
+--  surface the agency dashboard renders: a queue of deliveries, each producing
+--  a verdict + per-dimension scores + a Slack-ready coaching note. Scores
+--  persist here so improvement-over-time (the retention hook) can trend a
+--  creator across deliveries.
+--
+--  Lifecycle (status):
+--    analyzing -> the delivery (and reference) are still being analysed
+--    ready     -> the agent has written the verdict + scores + note
+--    failed    -> analysis or generation failed (error carries the reason)
+-- ============================================================================
+CREATE TABLE reviews (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    creator_id          uuid NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+    delivery_video_id   uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    reference_video_id  uuid REFERENCES videos(id) ON DELETE SET NULL,
+
+    brief_title         text,
+    brief               text,                  -- pasted brief / instructions
+
+    status              text NOT NULL DEFAULT 'analyzing'
+                            CHECK (status IN ('analyzing', 'ready', 'failed')),
+    verdict             text CHECK (verdict IN ('approve', 'revise', 'reshoot')),
+    overall_score       int,                   -- 0..100, convenience headline
+    scores              jsonb,                 -- {hook, tone, pacing, reference, ...} 0..100
+    dimensions          jsonb,                 -- [{key, label, score, comment}]
+    strengths           jsonb,                 -- ["..."]
+    missing             jsonb,                 -- ["..."]  what the brief asked for but is absent
+    note                text,                  -- the Slack-ready coaching note
+    error               text,                  -- non-NULL => status='failed'
+
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+    deleted_at          timestamptz
+);
+
+CREATE INDEX idx_reviews_creator ON reviews (creator_id, created_at DESC)
+    WHERE deleted_at IS NULL;
+CREATE INDEX idx_reviews_delivery ON reviews (delivery_video_id)
+    WHERE deleted_at IS NULL;
+
+CREATE TRIGGER trg_reviews_touch
+    BEFORE UPDATE ON reviews
+    FOR EACH ROW EXECUTE FUNCTION touch_timestamps();

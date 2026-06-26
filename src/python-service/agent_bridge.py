@@ -37,10 +37,12 @@ which is safe here because every MCP tool is local CRUD against our own Postgres
 import json
 import logging
 import os
+import uuid as _uuid_mod
 from typing import Any
 
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+import db
 from config import settings
 
 log = logging.getLogger("rainy.agent")
@@ -128,10 +130,25 @@ def _apply_provider_env() -> None:
 _apply_provider_env()
 
 
-def _build_options(model: str) -> "ClaudeAgentOptions":
+def _build_system_prompt(history: list[dict]) -> str:
+    if not history:
+        return _SYSTEM_PROMPT
+    lines: list[str] = []
+    for m in history[-40:]:
+        label = "User" if m["role"] == "user" else "Assistant"
+        lines.append(f"{label}: {m['content'][:3000]}")
+    return (
+        f"{_SYSTEM_PROMPT}\n\n"
+        "[PRIOR CONVERSATION — restored from transcript]\n"
+        + "\n".join(lines)
+        + "\n[END PRIOR CONVERSATION]"
+    )
+
+
+def _build_options(model: str, history: list[dict] | None = None) -> "ClaudeAgentOptions":
     opts: dict[str, Any] = dict(
         model=model,
-        system_prompt=_SYSTEM_PROMPT,
+        system_prompt=_build_system_prompt(history or []),
         mcp_servers={_MCP_ALIAS: {"type": "http", "url": _MCP_URL}},
         allowed_tools=_ALLOWED_TOOLS,
         # Non-interactive: there is no human at a terminal to approve tool calls,
@@ -236,8 +253,14 @@ async def _emit_mcp_status(ws: WebSocket, data: dict) -> None:
     await _emit(ws, {"type": "mcp", "status": status, "tools": tool_count})
 
 
-async def _stream_turn(ws: WebSocket, client: "ClaudeSDKClient") -> None:
-    """Relay one assistant turn from the SDK to the websocket as JSON events."""
+async def _stream_turn(ws: WebSocket, client: "ClaudeSDKClient") -> str:
+    """Relay one assistant turn from the SDK to the websocket.
+
+    Returns the full accumulated assistant text so the caller can persist it.
+    The AssistantMessage (consolidated, always present) is used for capture
+    regardless of streaming mode; it's only *emitted* in block-fallback mode.
+    """
+    parts: list[str] = []
     async for message in client.receive_response():
         if _PARTIAL and isinstance(message, StreamEvent):
             await _stream_partial(ws, message.event)
@@ -246,8 +269,11 @@ async def _stream_turn(ws: WebSocket, client: "ClaudeSDKClient") -> None:
             if getattr(message, "subtype", None) == "init":
                 await _emit_mcp_status(ws, getattr(message, "data", {}) or {})
         elif isinstance(message, AssistantMessage):
-            # With token streaming on, the consolidated message duplicates the
-            # deltas we already sent — only render it in block-fallback mode.
+            # Capture full text for persistence (always present, even in partial mode).
+            for block in message.content:
+                if isinstance(block, TextBlock) and block.text:
+                    parts.append(block.text)
+            # Only emit in block-fallback mode; partial mode already sent the deltas.
             if not _PARTIAL:
                 await _stream_blocks(ws, message)
         elif isinstance(message, ResultMessage):
@@ -263,9 +289,20 @@ async def _stream_turn(ws: WebSocket, client: "ClaudeSDKClient") -> None:
                 "usage": getattr(message, "usage", None),
                 "subtype": subtype,
             })
-            return
+            return "".join(parts)
     # Stream ended without a ResultMessage (interrupt / error) — still release the UI.
     await _emit(ws, {"type": "turn_end", "usage": None})
+    return "".join(parts)
+
+
+def _valid_uuid(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        _uuid_mod.UUID(value)
+        return value
+    except (ValueError, AttributeError):
+        return None
 
 
 async def agent_endpoint(ws: WebSocket) -> None:
@@ -277,10 +314,25 @@ async def agent_endpoint(ws: WebSocket) -> None:
         return
 
     model = ws.query_params.get("model") or settings.agent.model
+    thread_id = _valid_uuid(ws.query_params.get("thread_id"))
+
+    # Load prior history before accepting so we can emit it immediately on open.
+    history: list[dict] = []
+    if thread_id:
+        try:
+            db.get_or_create_conversation(thread_id)
+            history = db.load_conversation_messages(thread_id)
+        except Exception as exc:
+            log.warning("failed to load conversation history: %r", exc)
+
     await ws.accept()
 
+    # Send transcript before 'ready' so the UI restores messages before the
+    # panel shows as connected (empty list for a fresh thread is fine).
+    await _emit(ws, {"type": "history", "messages": history})
+
     try:
-        async with ClaudeSDKClient(options=_build_options(model)) as client:
+        async with ClaudeSDKClient(options=_build_options(model, history)) as client:
             await _emit(ws, {"type": "ready", "model": model})
             # Confirm the MCP tool surface up front so the panel's pill shows the
             # real count immediately instead of waiting for the first message.
@@ -298,7 +350,15 @@ async def agent_endpoint(ws: WebSocket) -> None:
                     continue
                 try:
                     await client.query(text)
-                    await _stream_turn(ws, client)
+                    assistant_text = await _stream_turn(ws, client)
+                    if thread_id and assistant_text:
+                        try:
+                            db.append_conversation_messages(thread_id, [
+                                {"role": "user", "content": text},
+                                {"role": "assistant", "content": assistant_text},
+                            ])
+                        except Exception as exc:
+                            log.warning("failed to persist conversation turn: %r", exc)
                 except WebSocketDisconnect:
                     raise
                 except Exception as exc:  # one bad turn shouldn't kill the session

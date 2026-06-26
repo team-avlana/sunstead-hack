@@ -34,9 +34,10 @@ import notify
 import pty_bridge
 from block_normalize import BLOCK_TAXONOMY_GUIDE, WRITING_STYLE_GUIDE
 from config import settings
+from agency_routes import routes as agency_routes
 from review_workflow import UGC_REVIEW_GUIDE
 from routes_api import routes as api_routes
-from tools import analysis, artifacts, creators, memory, projects, storyboard
+from tools import analysis, artifacts, creators, memory, projects, review, storyboard
 
 # ── FastMCP instance ──────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ artifacts.register(mcp)
 memory.register(mcp)
 creators.register(mcp)
 storyboard.register(mcp)
+review.register(mcp)
 
 # ── Combined ASGI app ─────────────────────────────────────────────────────────
 
@@ -180,6 +182,7 @@ _app = Starlette(
         Route("/api/dev/events", dev_events.events_snapshot),
         Route("/api/dev/status", dev_events.status_endpoint),
         *api_routes,
+        *agency_routes,
         Mount("/", app=_mcp_asgi),
     ],
 )

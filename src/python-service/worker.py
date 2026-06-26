@@ -70,11 +70,13 @@ def _llm_env(base: dict[str, str]) -> dict[str, str]:
     return base
 
 
-def _worker_env(video_id: str) -> dict[str, str]:
+def _worker_env(video_id: str, instructions: str | None = None) -> dict[str, str]:
     env = {**os.environ}
     env["VIDEO_ID"] = video_id
     env["DB_CONNECTION_STRING"] = settings.db.connection_string
     env["PATH"] = _augmented_path(env.get("PATH", ""))
+    if instructions:
+        env["ANALYSIS_INSTRUCTIONS"] = instructions
     return _llm_env(env)
 
 
@@ -229,7 +231,7 @@ def _monitor_worker(
         pass
 
 
-def spawn_analysis_worker(video_id: str) -> None:
+def spawn_analysis_worker(video_id: str, instructions: str | None = None) -> None:
     """Fire-and-forget: launch the analysis-worker for one video.
 
     Uses subprocess.Popen (returns immediately after spawning) instead of
@@ -240,10 +242,14 @@ def spawn_analysis_worker(video_id: str) -> None:
 
     A daemon monitor thread watches for unexpected process death (OOM, SIGKILL)
     and marks the video failed if the worker's own error handler didn't run.
+
+    Pass instructions to steer the LLM analysis phase (e.g. "focus on UGC brief
+    compliance"). Forwarded to the worker as ANALYSIS_INSTRUCTIONS env var.
     """
     entrypoint = _resolve_entrypoint(settings.worker.analyzer_entrypoint)
     log = _open_log(video_id)
     dsn = settings.db.connection_string
+    env = _worker_env(video_id, instructions)
 
     if dev_events.ENABLED:
         # Dev: pipe stdout/stderr through a pump thread so the worker's live
@@ -251,7 +257,7 @@ def spawn_analysis_worker(video_id: str) -> None:
         # file). A span tracks the whole run's duration. The pump owns/closes `log`.
         proc = subprocess.Popen(
             [sys.executable, str(entrypoint)],
-            env=_worker_env(video_id),
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -275,7 +281,7 @@ def spawn_analysis_worker(video_id: str) -> None:
     try:
         proc = subprocess.Popen(
             [sys.executable, str(entrypoint)],
-            env=_worker_env(video_id),
+            env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
         )

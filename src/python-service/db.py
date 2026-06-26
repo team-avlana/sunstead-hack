@@ -892,8 +892,335 @@ def list_storyboard_frames(project_id: str) -> list[dict]:
     ]
 
 
+# ── Conversations ─────────────────────────────────────────────────────────────
+
+def get_or_create_conversation(thread_id: str) -> None:
+    """Upsert a conversation row by its client-assigned UUID."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO conversations (id) VALUES (%s) ON CONFLICT (id) DO NOTHING",
+            (thread_id,),
+        )
+
+
+def load_conversation_messages(thread_id: str, limit: int = 60) -> list[dict]:
+    """Return the last `limit` messages for a thread, ordered oldest-first."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT role, content FROM conversation_messages "
+            "WHERE conversation_id = %s "
+            "ORDER BY created_at DESC LIMIT %s",
+            (thread_id, limit),
+        ).fetchall()
+    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+
+
+def append_conversation_messages(thread_id: str, messages: list[dict]) -> None:
+    """Persist a list of {role, content} dicts for a thread."""
+    if not messages:
+        return
+    with get_conn() as conn:
+        for m in messages:
+            conn.execute(
+                "INSERT INTO conversation_messages (conversation_id, role, content) "
+                "VALUES (%s, %s, %s)",
+                (thread_id, m["role"], m["content"]),
+            )
+        conn.execute(
+            "UPDATE conversations SET updated_at = now() WHERE id = %s",
+            (thread_id,),
+        )
+
+
+def reset_video_for_reanalysis(video_id: str) -> None:
+    """Clear analysis state so the worker can re-run from scratch.
+    Deletes existing shots (cascades to frames) and resets status columns."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM shots WHERE video_id = %s", (video_id,))
+        conn.execute(
+            "UPDATE videos SET analyzed_at = NULL, analysis_error = NULL, "
+            "analysis_stage = NULL, metrics = NULL WHERE id = %s",
+            (video_id,),
+        )
+
+
 def pg_notify_change(payload: dict) -> None:
     """Emit a Postgres NOTIFY on 'rainy_change'. The server's listener forwards it
     to websocket subscribers. Used for cross-process signals (e.g. analyze_video)."""
     with get_conn() as conn:
         conn.execute("SELECT pg_notify('rainy_change', %s)", (json.dumps(payload),))
+
+
+# ── Agency UGC review loop ──────────────────────────────────────────────────────
+# The dashboard surface (src/canvas-ui/app/agency): a roster of UGC creators
+# ('talent'), each with a queue of deliveries reviewed against a brief/reference.
+# Scores persist on reviews so improvement-over-time can trend a creator.
+
+# Singleton reference-owner: reference videos aren't a talent's content, so they
+# ride a dedicated creator instead of polluting any talent's delivery list.
+REFERENCES_CHANNEL = "rainy:references"
+
+
+def find_or_create_references_creator() -> str:
+    """creator_id that owns reference videos pasted into the review flow."""
+    return find_or_create_creator("reference", "References", REFERENCES_CHANNEL)["creator_id"]
+
+
+def create_talent_creator(name: str, platform: str | None = None,
+                          channel_url: str | None = None) -> dict:
+    """Add a UGC creator to the agency roster (kind='talent')."""
+    return find_or_create_creator("talent", name, channel_url) if channel_url else (
+        _insert_creator("talent", name, platform)
+    )
+
+
+def _insert_creator(kind: str, name: str, platform: str | None = None) -> dict:
+    with get_conn() as conn:
+        row = conn.execute(
+            "INSERT INTO creators (kind, name, platform) VALUES (%s, %s, %s) RETURNING id",
+            (kind, name, platform),
+        ).fetchone()
+    return {"creator_id": str(row["id"]), "created": True}
+
+
+def get_creator(creator_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, kind, name, platform, channel_url, created_at FROM creators "
+            "WHERE id = %s AND deleted_at IS NULL",
+            (creator_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "creator_id": str(row["id"]),
+        "kind": row["kind"],
+        "name": row["name"],
+        "platform": row["platform"],
+        "channel_url": row["channel_url"],
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+def create_delivery_video(creator_id: str, source_url: str,
+                          local_path: str | None = None,
+                          title: str | None = None) -> str:
+    """Insert a videos row for a delivery. With local_path set (an upload), the
+    worker skips yt-dlp and analyses the file in place. Returns the video_id.
+    Reuses an existing row for the same (creator, url) so re-submits are idempotent."""
+    with get_conn() as conn:
+        existing = conn.execute(
+            "SELECT id FROM videos WHERE creator_id = %s AND source_url = %s "
+            "AND deleted_at IS NULL",
+            (creator_id, source_url),
+        ).fetchone()
+        if existing:
+            return str(existing["id"])
+        row = conn.execute(
+            "INSERT INTO videos (creator_id, source_url, local_path, title) "
+            "VALUES (%s, %s, %s, %s) RETURNING id",
+            (creator_id, source_url, local_path, title),
+        ).fetchone()
+    return str(row["id"])
+
+
+def create_review(creator_id: str, delivery_video_id: str,
+                  reference_video_id: str | None = None,
+                  brief_title: str | None = None,
+                  brief: str | None = None) -> str:
+    with get_conn() as conn:
+        row = conn.execute(
+            "INSERT INTO reviews (creator_id, delivery_video_id, reference_video_id, "
+            "brief_title, brief) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (creator_id, delivery_video_id, reference_video_id, brief_title, brief),
+        ).fetchone()
+    return str(row["id"])
+
+
+def get_review(review_id: str) -> dict | None:
+    with get_conn() as conn:
+        r = conn.execute(
+            "SELECT id, creator_id, delivery_video_id, reference_video_id, brief_title, "
+            "brief, status, verdict, overall_score, scores, dimensions, strengths, "
+            "missing, note, error, created_at, updated_at "
+            "FROM reviews WHERE id = %s AND deleted_at IS NULL",
+            (review_id,),
+        ).fetchone()
+    if not r:
+        return None
+    return _review_row(r)
+
+
+def _review_row(r: dict) -> dict:
+    return {
+        "review_id": str(r["id"]),
+        "creator_id": str(r["creator_id"]),
+        "delivery_video_id": str(r["delivery_video_id"]),
+        "reference_video_id": str(r["reference_video_id"]) if r.get("reference_video_id") else None,
+        "brief_title": r.get("brief_title"),
+        "brief": r.get("brief"),
+        "status": r["status"],
+        "verdict": r.get("verdict"),
+        "overall_score": r.get("overall_score"),
+        "scores": r.get("scores"),
+        "dimensions": r.get("dimensions"),
+        "strengths": r.get("strengths"),
+        "missing": r.get("missing"),
+        "note": r.get("note"),
+        "error": r.get("error"),
+        "created_at": r["created_at"].isoformat(),
+        "updated_at": r["updated_at"].isoformat(),
+    }
+
+
+_REVIEW_JSONB = {"scores", "dimensions", "strengths", "missing"}
+
+
+def update_review(review_id: str, **fields: Any) -> dict | None:
+    """Patch review result fields (status, verdict, overall_score, scores,
+    dimensions, strengths, missing, note, error). jsonb fields are dumped."""
+    allowed = {"status", "verdict", "overall_score", "scores", "dimensions",
+               "strengths", "missing", "note", "error"}
+    sets: list[str] = []
+    params: list = []
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        sets.append(f"{k} = %s")
+        params.append(json.dumps(v) if k in _REVIEW_JSONB and v is not None else v)
+    if not sets:
+        return get_review(review_id)
+    params.append(review_id)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE reviews SET {', '.join(sets)} WHERE id = %s AND deleted_at IS NULL "
+            "RETURNING creator_id",
+            tuple(params),
+        ).fetchone()
+    if not row:
+        return None
+    return {"review_id": review_id, "creator_id": str(row["creator_id"])}
+
+
+def delete_review(review_id: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "UPDATE reviews SET deleted_at = now() WHERE id = %s AND deleted_at IS NULL "
+            "RETURNING id",
+            (review_id,),
+        ).fetchone()
+    return row is not None
+
+
+def _video_display(conn, video_id: str | None) -> dict | None:
+    """Compact display info for a delivery/reference video (status + thumbnail)."""
+    if not video_id:
+        return None
+    v = conn.execute(
+        "SELECT id, title, source_url, duration_sec, analyzed_at, analysis_error, "
+        "analysis_stage, "
+        "(SELECT f.id FROM frames f JOIN shots s ON f.shot_id = s.id "
+        " WHERE s.video_id = videos.id AND s.deleted_at IS NULL ORDER BY s.idx LIMIT 1) "
+        "AS frame_id FROM videos WHERE id = %s AND deleted_at IS NULL",
+        (video_id,),
+    ).fetchone()
+    if not v:
+        return None
+    if v["analysis_error"]:
+        status = "error"
+    elif v["analyzed_at"]:
+        status = "analysed"
+    else:
+        status = "analysing"
+    fid = str(v["frame_id"]) if v["frame_id"] else None
+    return {
+        "video_id": str(v["id"]),
+        "title": v["title"],
+        "source_url": v["source_url"],
+        "duration_sec": float(v["duration_sec"]) if v["duration_sec"] else None,
+        "status": status,
+        "analysis_stage": v["analysis_stage"],
+        "analysis_error": v["analysis_error"],
+        "thumbnail": f"/frames/{fid}" if fid else None,
+    }
+
+
+def list_reviews_for_creator(creator_id: str) -> list[dict]:
+    """Every review for a creator, newest first, each with its delivery video's
+    display info — the creator's delivery queue."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, delivery_video_id, reference_video_id, brief_title, status, "
+            "verdict, overall_score, scores, note, created_at "
+            "FROM reviews WHERE creator_id = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC",
+            (creator_id,),
+        ).fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "review_id": str(r["id"]),
+                "brief_title": r["brief_title"],
+                "status": r["status"],
+                "verdict": r["verdict"],
+                "overall_score": r["overall_score"],
+                "scores": r["scores"],
+                "note": r["note"],
+                "created_at": r["created_at"].isoformat(),
+                "delivery": _video_display(conn, str(r["delivery_video_id"])),
+            })
+    return out
+
+
+# Score dimensions tracked for the improvement-over-time trend.
+TREND_DIMENSIONS = ("hook", "tone", "pacing", "reference", "overall")
+
+
+def agency_roster() -> list[dict]:
+    """The roster table: every talent creator (and any creator with reviews), with
+    delivery counts, latest verdict/scores, and a per-dimension score trend
+    (oldest→newest from ready reviews) for the sparklines."""
+    with get_conn() as conn:
+        creators = conn.execute(
+            "SELECT id, name, kind, platform FROM creators "
+            "WHERE deleted_at IS NULL AND (kind = 'talent' OR id IN "
+            "(SELECT creator_id FROM reviews WHERE deleted_at IS NULL)) "
+            "ORDER BY name",
+        ).fetchall()
+        reviews = conn.execute(
+            "SELECT creator_id, status, verdict, overall_score, scores, created_at "
+            "FROM reviews WHERE deleted_at IS NULL ORDER BY created_at ASC",
+        ).fetchall()
+
+    by_creator: dict[str, list[dict]] = {}
+    for r in reviews:
+        by_creator.setdefault(str(r["creator_id"]), []).append(r)
+
+    out = []
+    for c in creators:
+        cid = str(c["id"])
+        rs = by_creator.get(cid, [])
+        ready = [r for r in rs if r["status"] == "ready"]
+        pending = sum(1 for r in rs if r["status"] == "analyzing")
+        latest_ready = ready[-1] if ready else None
+        trend: dict[str, list] = {d: [] for d in TREND_DIMENSIONS}
+        for r in ready:
+            scores = r["scores"] or {}
+            for d in TREND_DIMENSIONS:
+                val = r["overall_score"] if d == "overall" else scores.get(d)
+                if isinstance(val, (int, float)):
+                    trend[d].append(val)
+        out.append({
+            "creator_id": cid,
+            "name": c["name"],
+            "kind": c["kind"],
+            "platform": c["platform"],
+            "delivery_count": len(rs),
+            "pending_count": pending,
+            "last_activity": rs[-1]["created_at"].isoformat() if rs else None,
+            "latest_verdict": latest_ready["verdict"] if latest_ready else None,
+            "latest_scores": latest_ready["scores"] if latest_ready else None,
+            "latest_overall": latest_ready["overall_score"] if latest_ready else None,
+            "trend": trend,
+        })
+    return out

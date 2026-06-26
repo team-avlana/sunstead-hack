@@ -18,14 +18,8 @@ try:
 except Exception:
     pass
 
-_ocr_reader = None
-_HAS_EASYOCR = False
-try:
-    import easyocr
-    _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-    _HAS_EASYOCR = True
-except Exception:
-    pass
+import easyocr
+_ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
 
 _haar_cascade: Optional[cv2.CascadeClassifier] = None
 
@@ -137,21 +131,15 @@ def compute_frame_metrics(frame_bytes: Optional[bytes]) -> dict:
     has_onscreen_text = False
     text_area_ratio = 0.0
     ocr_text = ""
-    if _HAS_EASYOCR and _ocr_reader is not None:
-        try:
-            ocr_results = _ocr_reader.readtext(img_rgb)
-            if ocr_results:
-                has_onscreen_text = True
-                ocr_text = " ".join(r[1] for r in ocr_results)
-                total_text_area = sum(
-                    abs(
-                        (r[0][2][0] - r[0][0][0]) * (r[0][2][1] - r[0][0][1])
-                    )
-                    for r in ocr_results
-                )
-                text_area_ratio = float(total_text_area / (w * h))
-        except Exception:
-            pass
+    ocr_results = _ocr_reader.readtext(img_rgb)
+    if ocr_results:
+        has_onscreen_text = True
+        ocr_text = " ".join(r[1] for r in ocr_results)
+        total_text_area = sum(
+            abs((r[0][2][0] - r[0][0][0]) * (r[0][2][1] - r[0][0][1]))
+            for r in ocr_results
+        )
+        text_area_ratio = float(total_text_area / (w * h))
 
     return {
         "width": w,

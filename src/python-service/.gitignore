@@ -1,0 +1,5 @@
+# Runtime artifacts — never commit
+uploads/          # uploaded delivery videos (agency dashboard ingestion)
+worker-logs/      # per-run analysis-worker logs
+workdir/          # downloaded/extracted video working files
+.env

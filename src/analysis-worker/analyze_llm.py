@@ -167,6 +167,10 @@ def _client():
 
 # ─── per-shot analysis ───────────────────────────────────────────────────────
 
+def _analysis_instructions() -> str | None:
+    return os.environ.get("ANALYSIS_INSTRUCTIONS", "").strip() or None
+
+
 def analyze_shot(frame_bytes: bytes | None, transcript_slice: dict, idx: int) -> dict:
     """Vision + text analysis for one shot. Returns raw LLM JSON."""
     client = _client()
@@ -183,7 +187,7 @@ def analyze_shot(frame_bytes: bytes | None, transcript_slice: dict, idx: int) ->
             },
         })
 
-    content.append({"type": "text", "text": _shot_prompt(idx, transcript_text)})
+    content.append({"type": "text", "text": _shot_prompt(idx, transcript_text, _analysis_instructions())})
 
     response = client.messages.create(
         model=config.LLM_PER_SHOT_MODEL,
@@ -203,15 +207,21 @@ def analyze_shot(frame_bytes: bytes | None, transcript_slice: dict, idx: int) ->
     return {}
 
 
-def _shot_prompt(idx: int, transcript_text: str) -> str:
+def _shot_prompt(idx: int, transcript_text: str, instructions: str | None = None) -> str:
     speech_line = (
         f'Spoken words in this shot: "{transcript_text}"'
         if transcript_text
         else "No speech in this shot (silent or B-roll)."
     )
+    instructions_block = (
+        f"\nFOCUS INSTRUCTIONS (apply to every field below):\n{instructions}\n"
+        if instructions
+        else ""
+    )
     return (
         f"You are analyzing shot #{idx} from a video for a content creator style profile.\n\n"
-        f"{speech_line}\n\n"
+        f"{speech_line}\n"
+        f"{instructions_block}\n"
         "Classify this shot carefully:\n"
         "• shot_type — camera framing: extreme_wide/wide/medium/close_up/"
         "extreme_close_up/insert/screen_recording/other\n"
@@ -266,7 +276,9 @@ def analyze_video_level(transcript: dict, shots: list[dict], duration_sec: float
             "input_schema": _VIDEO_LEVEL_SCHEMA,
         }],
         tool_choice={"type": "tool", "name": "analyze_video"},
-        messages=[{"role": "user", "content": _video_level_prompt(full_text, shot_summary, duration_sec)}],
+        messages=[{"role": "user", "content": _video_level_prompt(
+            full_text, shot_summary, duration_sec, _analysis_instructions()
+        )}],
     )
 
     for block in response.content:
@@ -275,14 +287,19 @@ def analyze_video_level(transcript: dict, shots: list[dict], duration_sec: float
     return {}
 
 
-def _video_level_prompt(full_text: str, shot_summary: list[dict], duration_sec: float) -> str:
+def _video_level_prompt(full_text: str, shot_summary: list[dict], duration_sec: float, instructions: str | None = None) -> str:
     n_shots = len(shot_summary)
+    instructions_block = (
+        f"\nFOCUS INSTRUCTIONS — apply this lens throughout your entire analysis:\n{instructions}\n"
+        if instructions
+        else ""
+    )
 
     return f"""You are building a creator style profile from a single video. \
 Your goal is to extract the narrative "fingerprint" — the patterns that would let \
 a human recognize this creator across multiple videos. \
 Prioritize depth over brevity; be specific, not generic.
-
+{instructions_block}
 Total duration: {duration_sec:.1f}s | {n_shots} shots
 
 FULL TRANSCRIPT:

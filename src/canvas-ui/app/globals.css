@@ -677,6 +677,14 @@ button, input { font-family: inherit; }
   transition: background .14s ease, color .14s ease;
 }
 .cc-collapse:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
+.cc-new-chat {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-dim); cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.cc-new-chat:hover { background: rgba(18, 24, 48, 0.06); color: var(--ink); }
 /* The terminal host. xterm sizes itself to this box via the fit addon. */
 .cc-term { flex: 1; min-height: 0; padding: 8px 6px 8px 12px; }
 .cc-term .xterm { height: 100%; }
@@ -1822,6 +1830,7 @@ button, input { font-family: inherit; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 .rainy-app.dark .cc-collapse:hover { background: rgba(255, 255, 255, 0.08); }
+.rainy-app.dark .cc-new-chat:hover { background: rgba(255, 255, 255, 0.08); }
 .rainy-app.dark .cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
 .rainy-app.dark .rainy-claude-show { background: rgba(34, 40, 54, 0.92); }
 .rainy-app.dark .rainy-claude-show:hover { background: rgba(44, 51, 68, 0.96); }

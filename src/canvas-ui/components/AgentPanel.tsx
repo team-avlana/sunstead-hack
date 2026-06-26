@@ -26,6 +26,16 @@ const MODELS: { id: string; label: string }[] = [
   { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
 ]
 const MODEL_KEY = 'rainy:agentModel'
+const THREAD_KEY = 'rainy:threadId'
+
+function initialThreadId(): string {
+  if (typeof window === 'undefined') return crypto.randomUUID()
+  const saved = window.localStorage.getItem(THREAD_KEY)
+  if (saved) return saved
+  const fresh = crypto.randomUUID()
+  window.localStorage.setItem(THREAD_KEY, fresh)
+  return fresh
+}
 
 // What the agent is doing right now — drives the status line + micro-states.
 type Phase = 'idle' | 'waiting' | 'thinking' | 'tool' | 'writing'
@@ -53,6 +63,7 @@ type Action =
   | { t: 'tool'; name: string }
   | { t: 'error'; text: string }
   | { t: 'turn_end' }
+  | { t: 'history'; entries: Entry[] }
 
 const INITIAL: ChatState = { entries: [], live: -1, liveKind: null, phase: 'idle', activeTool: -1, toolName: null }
 
@@ -82,6 +93,8 @@ function reduce(s: ChatState, a: Action): ChatState {
     }
     case 'turn_end':
       return { ...s, live: -1, liveKind: null, phase: 'idle', activeTool: -1, toolName: null }
+    case 'history':
+      return { ...INITIAL, entries: a.entries }
     default:
       return s
   }
@@ -99,6 +112,7 @@ export default function AgentPanel() {
   const toggle = useRainyStore((s) => s.toggleClaudePanel)
 
   const [model, setModel] = useState(initialModel)
+  const [threadId, setThreadId] = useState(initialThreadId)
   const [chat, dispatch] = useReducer(reduce, INITIAL)
   const [draft, setDraft] = useState('')
   const [connected, setConnected] = useState(false)
@@ -115,7 +129,7 @@ export default function AgentPanel() {
 
   const busy = chat.phase !== 'idle'
 
-  // ---- websocket lifecycle (re-runs when the model changes) ----------------
+  // ---- websocket lifecycle (re-runs when the model or threadId changes) -----
   useEffect(() => {
     const base = wsBase()
     if (!base) return
@@ -126,7 +140,7 @@ export default function AgentPanel() {
     const connect = () => {
       if (disposed) return
       try {
-        ws = new WebSocket(`${base}/agent?model=${encodeURIComponent(model)}`)
+        ws = new WebSocket(`${base}/agent?model=${encodeURIComponent(model)}&thread_id=${encodeURIComponent(threadId)}`)
       } catch {
         return scheduleReconnect()
       }
@@ -143,6 +157,15 @@ export default function AgentPanel() {
           return
         }
         switch (msg.type) {
+          case 'history': {
+            const raw = (msg.messages as Array<{ role: string; content: string }> | undefined) ?? []
+            const entries: Entry[] = raw.map((m) => ({
+              kind: m.role === 'user' ? 'user' : 'assistant',
+              text: m.content,
+            } as Entry))
+            dispatch({ t: 'history', entries })
+            break
+          }
           case 'mcp':
             setMcp({
               status: (msg.status as 'connected' | 'error') ?? 'error',
@@ -202,7 +225,7 @@ export default function AgentPanel() {
       }
       wsRef.current = null
     }
-  }, [model])
+  }, [model, threadId])
 
   // Keep the transcript pinned to the latest content as it streams in.
   useEffect(() => {
@@ -222,6 +245,12 @@ export default function AgentPanel() {
     if (id === model) return
     if (typeof window !== 'undefined') window.localStorage.setItem(MODEL_KEY, id)
     setModel(id) // re-runs the ws effect → reconnect with the new model
+  }
+
+  const newChat = () => {
+    const fresh = crypto.randomUUID()
+    if (typeof window !== 'undefined') window.localStorage.setItem(THREAD_KEY, fresh)
+    setThreadId(fresh) // triggers ws reconnect with a blank thread
   }
 
   const send = () => {
@@ -298,6 +327,9 @@ export default function AgentPanel() {
                   </option>
                 ))}
               </select>
+              <button type="button" className="cc-new-chat" title="New conversation" aria-label="New conversation" onClick={newChat}>
+                <NewChatIcon size={16} />
+              </button>
               <button type="button" className="cc-collapse" title="Hide Rainey" aria-label="Hide Rainey" onClick={toggle}>
                 <PanelIcon size={18} />
               </button>
@@ -422,6 +454,15 @@ function prettyTool(name: string): string {
 }
 
 // ---- icons -----------------------------------------------------------------
+
+function NewChatIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+    </svg>
+  )
+}
 
 function PanelIcon({ size = 19 }: { size?: number }) {
   return (
