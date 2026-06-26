@@ -77,6 +77,28 @@ function deriveName(shape: TLShape): string {
   }
 }
 
+/** Does this store change-batch affect the outline (membership, order, or a
+ * displayed name)? Skips pure-geometry churn (w/h-only relayout, camera frames)
+ * that the outline doesn't reflect. The serialized-key diff in recompute() is the
+ * backstop, so being conservative here only costs an occasional extra rebuild. */
+function isOutlineRelevant(entry: any): boolean {
+  const added = Object.values(entry.changes.added) as any[]
+  if (added.some((r) => r.typeName === 'shape')) return true
+  const removed = Object.values(entry.changes.removed) as any[]
+  if (removed.some((r) => r.typeName === 'shape')) return true
+  for (const pair of Object.values(entry.changes.updated) as any[]) {
+    const [from, to] = pair
+    if (to?.typeName !== 'shape') continue
+    if (from.parentId !== to.parentId || from.index !== to.index || from.type !== to.type) return true
+    if (from.x !== to.x || from.y !== to.y) return true // siblings are y/x-sorted
+    const pf = from.props ?? {}
+    const pt = to.props ?? {}
+    if (pf.name !== pt.name || pf.html !== pt.html || pf.data !== pt.data) return true
+    if (pf.caption !== pt.caption || pf.shotType !== pt.shotType) return true
+  }
+  return false
+}
+
 /** Walk the page's shape tree into an ordered, nested outline.
  * Siblings are sorted top-to-bottom then left-to-right so the list reads in the
  * same order the eye scans the canvas (child coords share a parent space, so a
@@ -138,7 +160,12 @@ function useOutline(): { tree: OutlineNode[]; hoveredId: string | null } {
       }
     }
 
-    const schedule = () => {
+    const schedule = (entry?: any) => {
+      // Skip batches that can't change the outline (e.g. relayout's frame w/h-only
+      // update, video/image size patches, pure camera frames) — only rebuild +
+      // re-stringify the whole tree when an outline-visible field actually moved.
+      // Keeps the heavy walk off the hot path during agent streaming / reflow.
+      if (entry && !isOutlineRelevant(entry)) return
       if (scheduled) return
       scheduled = requestAnimationFrame(() => {
         scheduled = 0

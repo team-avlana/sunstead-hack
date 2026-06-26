@@ -75,7 +75,7 @@ export class ImageBlockShapeUtil extends ShapeUtil<ImageBlockShape> {
   }
 
   override onResize(shape: ImageBlockShape, info: TLResizeInfo<ImageBlockShape>) {
-    return resizeBox(shape, info)
+    return resizeBox(shape, info, { minWidth: 200, minHeight: 120 })
   }
 
   component(shape: ImageBlockShape) {

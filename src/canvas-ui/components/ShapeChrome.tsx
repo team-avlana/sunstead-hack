@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Editor, TLShapeId } from 'tldraw'
+import { Vec, type Editor, type TLShapeId } from 'tldraw'
 
 /**
  * The circular "delete this block" affordance shared by every canvas block
@@ -62,6 +62,11 @@ export function DeleteButton({
  * overlay and routes through the same move pipeline as any other move — the
  * outbound sync persists the new position and a moved frame-child gets pinned out
  * of auto-layout. A single history mark makes the whole drag one undo step.
+ *
+ * Magnetic snapping matches dragging by the body: each move asks tldraw's snap
+ * manager for the alignment nudge and lets it paint the same guide lines, gated on
+ * the exact same snap-mode/accel-key rule the native translate tool uses (see
+ * tldraw's Translating.moveShapesToPoint) — so the grip and the body feel identical.
  */
 export function DragHandle({
   editor,
@@ -92,12 +97,34 @@ export function DragHandle({
     const start = editor.screenToPage({ x: e.clientX, y: e.clientY })
     const ox = shape.x
     const oy = shape.y
+    // Snap inputs captured once at drag start (page space), mirroring tldraw's own
+    // translate snapshot: the shape's starting page bounds and its snap points.
+    // Frames are translation-only, so a page-space nudge maps straight onto the
+    // shape's (possibly frame-local) x/y — same reasoning as the raw delta above.
+    const initialPageBounds = editor.getShapePageBounds(id)
+    const initialSnapPoints = editor.snaps.shapeBounds.getSnapPoints(id)
     const el = e.currentTarget as HTMLElement
     el.setPointerCapture(e.pointerId)
     setDragging(true)
     const move = (ev: PointerEvent) => {
       const p = editor.screenToPage({ x: ev.clientX, y: ev.clientY })
-      editor.updateShape({ id, type: shape.type, x: ox + (p.x - start.x), y: oy + (p.y - start.y) })
+      const delta = new Vec(p.x - start.x, p.y - start.y)
+      // Recomputed each move: clear last frame's guides, then (when snapping is
+      // active) ask the snap manager for the nudge that aligns this shape with its
+      // neighbours. snapTranslateShapes paints the guide lines as a side effect.
+      editor.snaps.clearIndicators()
+      const accel = editor.inputs.getAccelKey()
+      const isSnapping = editor.user.getIsSnapMode() ? !accel : accel
+      if (isSnapping && initialPageBounds) {
+        const { nudge } = editor.snaps.shapeBounds.snapTranslateShapes({
+          dragDelta: delta,
+          initialSelectionPageBounds: initialPageBounds,
+          lockedAxis: null,
+          initialSelectionSnapPoints: initialSnapPoints,
+        })
+        delta.add(nudge)
+      }
+      editor.updateShape({ id, type: shape.type, x: ox + delta.x, y: oy + delta.y })
     }
     const end = () => {
       try {
@@ -105,6 +132,7 @@ export function DragHandle({
       } catch {
         /* pointer already released */
       }
+      editor.snaps.clearIndicators() // drop any guide lines still showing
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', end)
       el.removeEventListener('pointercancel', end)

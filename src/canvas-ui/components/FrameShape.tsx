@@ -1,16 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   FrameShapeUtil,
   HTMLContainer,
   SVGContainer,
   useEditor,
   useValue,
-  type Editor,
   type TLFrameShape,
   type TLShape,
-  type TLShapeId,
 } from 'tldraw'
 import { tidyFrame } from '@/lib/backendSync'
 import { getSquirclePath } from '@/lib/squircle'
@@ -42,14 +40,22 @@ export class RainyFrameShapeUtil extends FrameShapeUtil {
     return false
   }
 
+  // Both of tldraw's overlay selection visuals are drawn ABOVE the shape layer, so
+  // they painted on top of the frame's own chrome (the trash button) — which looked
+  // broken. We drop the rectangular bounds stroke (hideSelectionBoundsFg) AND the
+  // overlay indicator squircle (empty `indicator`), and instead paint the
+  // selection/hover outline on the frame BODY itself (see FrameBody → the squircle
+  // stroke recolours), which sits in the shape layer BENEATH the chrome. Resize
+  // handles still render (gated separately by canResize/hideResizeHandles). Mirrors
+  // the text card.
+  override hideSelectionBoundsFg() {
+    return true
+  }
+
   override component(shape: TLFrameShape) {
-    const { w, h } = shape.props
-    const d = getSquirclePath(w, h, FRAME_RADIUS, FRAME_SMOOTHING)
     return (
       <>
-        <SVGContainer className="rainy-frame-svg">
-          <path className="rainy-frame-body" d={d} />
-        </SVGContainer>
+        <FrameBody shape={shape} />
         {/* Inherited body rect (hidden) + the editable frame heading. */}
         {super.component(shape)}
         <FrameChrome shape={shape} />
@@ -57,84 +63,113 @@ export class RainyFrameShapeUtil extends FrameShapeUtil {
     )
   }
 
-  override indicator(shape: TLFrameShape) {
-    const { w, h } = shape.props
-    return <path d={getSquirclePath(w, h, FRAME_RADIUS, FRAME_SMOOTHING)} />
+  override indicator() {
+    return <g />
   }
 }
 
-/**
- * The frame's hover chrome: the delete button + drag grip on the left, and a
- * "tidy" button on the right that re-arranges every block into a clean,
- * non-overlapping grid. The delete/grip sit at the top-left, tucked below the
- * frame's name heading (which lives above the top edge), so they never collide.
- */
-function FrameChrome({ shape }: { shape: TLFrameShape }) {
+/** The frame's painted body (the iOS squircle) plus its selection/hover outline,
+ * drawn on the body in the shape layer so the outline never paints over the
+ * chrome. Reactive to selection/hover via the editor signals. */
+function FrameBody({ shape }: { shape: TLFrameShape }) {
   const editor = useEditor()
-  const isHovered = useValue('frame-hovered', () => editor.getHoveredShapeId() === shape.id, [editor, shape.id])
-  const isSelected = useValue('frame-selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
-  // Each affordance lives slightly outside the frame box, so any one of them being
-  // hovered must keep the whole set visible (tldraw's own hover signal can drop).
-  const [chromeHover, setChromeHover] = useState(false)
-  const show = isHovered || isSelected || chromeHover
-
+  const { w, h } = shape.props
+  const d = getSquirclePath(w, h, FRAME_RADIUS, FRAME_SMOOTHING)
+  const state = useValue(
+    'frame-body-state',
+    () => {
+      if (editor.getSelectedShapeIds().includes(shape.id)) return 'is-selected'
+      if (editor.getHoveredShapeId() === shape.id) return 'is-hovered'
+      return ''
+    },
+    [editor, shape.id],
+  )
   return (
-    <HTMLContainer className="frame-chrome">
-      <DeleteButton editor={editor} id={shape.id} show={show} onHoverChange={setChromeHover} className="frame-trash" />
-
-      <DragHandle editor={editor} id={shape.id} show={show} onHoverChange={setChromeHover} className="frame-grip" />
-
-      <TidyButton editor={editor} id={shape.id} show={show} onHoverChange={setChromeHover} className="frame-tidy" />
-    </HTMLContainer>
+    <SVGContainer className={`rainy-frame-svg ${state}`}>
+      <path className="rainy-frame-body" d={d} />
+    </SVGContainer>
   )
 }
 
 /**
- * The frame's "tidy layout" affordance — same circular chrome as the delete
- * button (neutral hover, not red), tucked against the top-right edge. Clicking it
- * re-flows every block in the frame into a clean, non-overlapping column grid and
- * persists the new positions, so the AI's stacked-up cards snap apart and stay
- * that way across reloads. See backendSync.tidyFrame.
+ * The frame's hover chrome:
+ *   - the delete button at the **top-left corner** (Apple's convention: destructive
+ *     action lives top-left), and the drag grip on the left edge, and
+ *   - a single floating **Auto-arrange button above the frame** — so the tidy
+ *     action reads as a clear button on top of the frame instead of a stray icon at
+ *     the corner.
+ *
+ * The Auto-arrange button floats outside the frame's top edge (clear of the name
+ * heading on the left + the selection handles at the corners). All of it reveals
+ * when the frame OR any of its contents is hovered, when the frame is selected, or
+ * while the pointer is on the chrome — with a short linger so moving from the frame
+ * up to the button never drops it (the same "hover area that extends beyond the
+ * element" the text card uses).
  */
-function TidyButton({
-  editor,
-  id,
-  show,
-  onHoverChange,
-  className,
-}: {
-  editor: Editor
-  id: TLShapeId
-  show: boolean
-  onHoverChange?: (hovering: boolean) => void
-  className?: string
-}) {
+function FrameChrome({ shape }: { shape: TLFrameShape }) {
+  const editor = useEditor()
+  // Hover counts for the frame itself AND any block inside it, so the panel stays
+  // up while the pointer is anywhere over the frame's region/contents.
+  const isHovered = useValue(
+    'frame-hovered',
+    () => {
+      const h = editor.getHoveredShapeId()
+      if (!h) return false
+      return h === shape.id || editor.getShape(h)?.parentId === shape.id
+    },
+    [editor, shape.id],
+  )
+  const isSelected = useValue('frame-selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
+  // The panel/grip live outside the frame box, so keep them alive while hovered
+  // (tldraw's own hover signal drops once the pointer leaves the geometry).
+  const [chromeHover, setChromeHover] = useState(false)
+  const [show, setShow] = useState(false)
+  const want = isHovered || isSelected || chromeHover
+  useEffect(() => {
+    if (want) {
+      setShow(true)
+      return
+    }
+    const t = window.setTimeout(() => setShow(false), 160)
+    return () => window.clearTimeout(t)
+  }, [want])
+
+  const stop = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   return (
-    <button
-      className={`shape-tidy${show ? ' show' : ''}${className ? ` ${className}` : ''}`}
-      title="Tidy layout — arrange blocks so they don't overlap"
-      aria-label="Tidy layout"
-      // Don't let the press start a canvas drag/select on the frame underneath.
-      onPointerDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      }}
-      onMouseEnter={() => onHoverChange?.(true)}
-      onMouseLeave={() => onHoverChange?.(false)}
-      onClick={(e) => {
-        e.stopPropagation()
-        tidyFrame(editor, id)
-      }}
-    >
-      <TidyIcon />
-    </button>
+    <HTMLContainer className="frame-chrome">
+      {/* Delete: top-left corner (Apple convention for destructive actions). */}
+      <DeleteButton editor={editor} id={shape.id} show={show} onHoverChange={setChromeHover} className="frame-trash" />
+
+      <DragHandle editor={editor} id={shape.id} show={show} onHoverChange={setChromeHover} className="frame-grip" />
+
+      {/* Auto-arrange: a single floating button above the frame's top edge. */}
+      <button
+        className={`frame-arrange${show ? ' show' : ''}`}
+        title="Auto-arrange — tidy the blocks so they don't overlap"
+        aria-label="Auto-arrange blocks"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={stop}
+        onMouseEnter={() => setChromeHover(true)}
+        onMouseLeave={() => setChromeHover(false)}
+        onClick={(e) => {
+          e.stopPropagation()
+          tidyFrame(editor, shape.id)
+        }}
+      >
+        <TidyIcon />
+        <span className="frame-arrange-label">Auto-arrange</span>
+      </button>
+    </HTMLContainer>
   )
 }
 
 function TidyIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="3" width="7" height="7" rx="1.5" />
       <rect x="14" y="3" width="7" height="11" rx="1.5" />
       <rect x="3" y="13" width="7" height="8" rx="1.5" />
@@ -142,3 +177,4 @@ function TidyIcon() {
     </svg>
   )
 }
+

@@ -41,13 +41,9 @@ export async function loadProjectIntoEditor(editor: Editor, id: string): Promise
     )
   })
 
-  if (project.shapes.length) {
-    try {
-      editor.zoomToFit()
-    } catch {
-      /* no-op */
-    }
-  }
+  // Framing is owned by the caller's settle-then-fit (camera.settleAndReveal),
+  // which fits into the visible region on the settled layout (or restores the
+  // saved viewport) — so we deliberately don't move the camera here.
 }
 
 function snapshotShapes(editor: Editor): RainyShape[] {

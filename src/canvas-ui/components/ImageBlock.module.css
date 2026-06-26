@@ -78,7 +78,10 @@
 .img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* `contain` (not `cover`) so a square/portrait storyboard or frame panel is
+     never silently cropped inside the card's box — it letterboxes onto the
+     neutral .media background instead, preserving shot framing. */
+  object-fit: contain;
   display: block;
 }
 

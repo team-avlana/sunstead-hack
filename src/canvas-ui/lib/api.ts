@@ -97,37 +97,57 @@ export function hasBackend(): boolean {
   return apiBase() != null
 }
 
-async function getJson<T>(path: string): Promise<T | null> {
-  const base = apiBase()
-  if (!base) return null
-  try {
-    const res = await fetch(`${base}${path}`, { cache: 'no-store' })
-    if (!res.ok) return null
-    return (await res.json()) as T
-  } catch {
-    return null
-  }
+/**
+ * Discriminated request outcome so callers can distinguish a real transport
+ * failure (retry) from a definitive HTTP status (e.g. 404 = already gone) from a
+ * "no backend configured" no-op. The thin getJson/mutateJson wrappers below
+ * collapse this back to `T | null` for callers that don't care, but the sync
+ * layer (backendSync / backendCanvas) branches on it to retry, suppress
+ * resurrection, and surface offline/not-found states. See INTEGRATION_NOTES.
+ */
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; kind: 'http'; status: number }
+  | { ok: false; kind: 'network' }
+  | { ok: false; kind: 'no-backend' }
+
+/** True for a 4xx other than 429 — a definitive client error that won't change
+ * on retry (404 gone / 409 conflict / 410 deleted). 429 + 5xx are transient. */
+export function isTerminalHttp(r: ApiResult<unknown>): boolean {
+  return r.ok === false && r.kind === 'http' && r.status >= 400 && r.status < 500 && r.status !== 429
 }
 
-async function mutateJson<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T | null> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<ApiResult<T>> {
   const base = apiBase()
-  if (!base) return null
+  if (!base) return { ok: false, kind: 'no-backend' }
+  let res: Response
   try {
-    const res = await fetch(`${base}${path}`, {
+    res = await fetch(`${base}${path}`, {
       method,
       headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
       body: body !== undefined ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     })
-    if (!res.ok) return null
-    return (await res.json()) as T
   } catch {
-    return null
+    return { ok: false, kind: 'network' } // offline / DNS / connection refused / CORS
   }
+  if (!res.ok) return { ok: false, kind: 'http', status: res.status }
+  // Some mutations (DELETE/restore) may return an empty body; tolerate it.
+  try {
+    return { ok: true, data: (await res.json()) as T }
+  } catch {
+    return { ok: true, data: {} as T }
+  }
+}
+
+async function getJson<T>(path: string): Promise<T | null> {
+  const r = await request<T>('GET', path)
+  return r.ok ? r.data : null
+}
+
+async function mutateJson<T>(method: string, path: string, body?: unknown): Promise<T | null> {
+  const r = await request<T>(method, path, body)
+  return r.ok ? r.data : null
 }
 
 /**
@@ -152,6 +172,22 @@ export async function fetchProjectState(projectId: string): Promise<ProjectState
   return getJson<ProjectState>(`/api/projects/${encodeURIComponent(projectId)}`)
 }
 
+/** Project load outcome the canvas can branch on: render, "doesn't exist"
+ * (don't keep retrying / offer Home), or "can't reach the service" (retry). */
+export type ProjectLoad =
+  | { kind: 'ok'; state: ProjectState }
+  | { kind: 'notfound' }
+  | { kind: 'unreachable' }
+  | { kind: 'no-backend' }
+
+export async function fetchProjectStateResult(projectId: string): Promise<ProjectLoad> {
+  const r = await request<ProjectState>('GET', `/api/projects/${encodeURIComponent(projectId)}`)
+  if (r.ok) return { kind: 'ok', state: r.data }
+  if (r.kind === 'no-backend') return { kind: 'no-backend' }
+  if (r.kind === 'http' && r.status === 404) return { kind: 'notfound' }
+  return { kind: 'unreachable' } // network, 5xx, or other transient
+}
+
 export async function fetchArtifact(artifactId: string): Promise<EnrichedArtifact | null> {
   const data = await getJson<{ artifact: EnrichedArtifact }>(
     `/api/artifacts/${encodeURIComponent(artifactId)}`,
@@ -159,22 +195,55 @@ export async function fetchArtifact(artifactId: string): Promise<EnrichedArtifac
   return data?.artifact ?? null
 }
 
+/** A client-generated artifact id (UUID) the canvas can register up-front, so a
+ * create that has to be retried (lost response / transient backend) is
+ * idempotent — the backend upserts on this id instead of inserting a duplicate. */
+export type CreateArtifactBody = NewArtifact & { client_id?: string }
+
+export async function createArtifactResult(
+  projectId: string,
+  artifact: CreateArtifactBody,
+): Promise<ApiResult<{ artifact_id: string; version: number }>> {
+  return request('POST', `/api/projects/${encodeURIComponent(projectId)}/artifacts`, artifact)
+}
+
+export async function updateArtifactResult(
+  artifactId: string,
+  patch: ArtifactPatch,
+): Promise<ApiResult<{ artifact_id: string; version: number }>> {
+  return request('PUT', `/api/artifacts/${encodeURIComponent(artifactId)}`, patch)
+}
+
+export async function deleteArtifactResult(artifactId: string): Promise<ApiResult<{ ok: boolean }>> {
+  return request('DELETE', `/api/artifacts/${encodeURIComponent(artifactId)}`)
+}
+
+/** Undo of a delete: clear the soft-delete (deleted_at) so the SAME artifact id
+ * comes back — no id drift, no duplicate. Idempotent server-side. */
+export async function restoreArtifactResult(artifactId: string): Promise<ApiResult<{ artifact_id: string }>> {
+  return request('POST', `/api/artifacts/${encodeURIComponent(artifactId)}/restore`)
+}
+
+// Back-compat T|null wrappers (used by tidyFrame + any non-retrying callers).
 export async function createArtifact(
   projectId: string,
-  artifact: NewArtifact,
+  artifact: CreateArtifactBody,
 ): Promise<{ artifact_id: string; version: number } | null> {
-  return mutateJson('POST', `/api/projects/${encodeURIComponent(projectId)}/artifacts`, artifact)
+  const r = await createArtifactResult(projectId, artifact)
+  return r.ok ? r.data : null
 }
 
 export async function updateArtifact(
   artifactId: string,
   patch: ArtifactPatch,
 ): Promise<{ artifact_id: string; version: number } | null> {
-  return mutateJson('PUT', `/api/artifacts/${encodeURIComponent(artifactId)}`, patch)
+  const r = await updateArtifactResult(artifactId, patch)
+  return r.ok ? r.data : null
 }
 
 export async function deleteArtifact(artifactId: string): Promise<{ ok: boolean } | null> {
-  return mutateJson('DELETE', `/api/artifacts/${encodeURIComponent(artifactId)}`)
+  const r = await deleteArtifactResult(artifactId)
+  return r.ok ? r.data : null
 }
 
 export async function fetchVideoStatus(videoId: string): Promise<VideoStatus | null> {

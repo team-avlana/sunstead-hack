@@ -2,6 +2,7 @@
 
 import { createShapeId, useEditor, useValue, type Editor } from 'tldraw'
 import { RAINY_TEXT, VIDEO_BLOCK, getDefaultTextFormat, templateHtml } from '@/lib/blockTypes'
+import { fitOrRecenter, formatZoom, resetZoom, zoomInStep, zoomOutStep } from '@/lib/camera'
 import { useRainyStore } from '@/lib/store'
 
 /**
@@ -82,38 +83,85 @@ const NAV: Tool[] = [
 export default function BottomDock() {
   const editor = useEditor()
   const tool = useValue('currentTool', () => editor.getCurrentToolId(), [editor])
+  const zoom = useValue('zoom', () => editor.getZoomLevel(), [editor])
+  const empty = useValue('empty', () => editor.getCurrentPageShapeIds().size === 0, [editor])
   const dark = useRainyStore((s) => s.dark)
   const toggleDark = useRainyStore((s) => s.toggleDark)
+  const loaded = useRainyStore((s) => s.loadState === 'ok')
 
   return (
-    <div className="rainy-dock" onPointerDown={(e) => e.stopPropagation()}>
-      {/* navigation */}
-      {NAV.map((t) => (
-        <ToolButton key={t.id} editor={editor} def={t} active={tool === t.id} />
-      ))}
-      <span className="rainy-dock-sep" />
+    <>
+      {/* First-run empty-state hint — only once the project has loaded with no
+          blocks (so it never flashes during load and hides the instant a block
+          appears). The backdrop is click-through; only the CTAs are interactive. */}
+      {loaded && empty && (
+        <div className="rainy-empty">
+          <div className="rainy-empty-card" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="rainy-empty-title">Your canvas is ready</div>
+            <div className="rainy-empty-sub">Add a block to start, or ask Rainy to bring in a video.</div>
+            <div className="rainy-empty-cta">
+              <button onClick={() => createTextCard(editor)}>
+                <TextIcon /> Text
+              </button>
+              <button onClick={() => createVideoBlock(editor)}>
+                <VideoIcon /> Video
+              </button>
+              <button onClick={() => createFrame(editor)}>
+                <FrameIcon /> Frame
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* insert blocks */}
-      <button className="rainy-tool" onClick={() => createTextCard(editor)} title="Text">
-        <TextIcon />
-      </button>
-      <button className="rainy-tool" onClick={() => createVideoBlock(editor)} title="Video block">
-        <VideoIcon />
-      </button>
-      <button className="rainy-tool" onClick={() => createFrame(editor)} title="Frame">
-        <FrameIcon />
-      </button>
-      <span className="rainy-dock-sep" />
+      <div className="rainy-dock" onPointerDown={(e) => e.stopPropagation()}>
+        {/* navigation */}
+        {NAV.map((t) => (
+          <ToolButton key={t.id} editor={editor} def={t} active={tool === t.id} />
+        ))}
+        <span className="rainy-dock-sep" />
 
-      {/* dark mode */}
-      <button
-        className={`rainy-tool${dark ? ' on' : ''}`}
-        onClick={() => toggleDark()}
-        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {dark ? <MoonIcon /> : <SunIcon />}
-      </button>
-    </div>
+        {/* insert blocks */}
+        <button className="rainy-tool" onClick={() => createTextCard(editor)} title="Text">
+          <TextIcon />
+        </button>
+        <button className="rainy-tool" onClick={() => createVideoBlock(editor)} title="Video block">
+          <VideoIcon />
+        </button>
+        <button className="rainy-tool" onClick={() => createFrame(editor)} title="Frame">
+          <FrameIcon />
+        </button>
+        <span className="rainy-dock-sep" />
+
+        {/* zoom + recover — the always-available way back to your content */}
+        <button className="rainy-tool" onClick={() => zoomOutStep(editor)} title="Zoom out">
+          <MinusIcon />
+        </button>
+        <button
+          className="rainy-tool rainy-zoom"
+          onClick={() => resetZoom(editor)}
+          title="Reset to 100%"
+        >
+          {formatZoom(zoom)}
+        </button>
+        <button className="rainy-tool" onClick={() => zoomInStep(editor)} title="Zoom in">
+          <PlusIcon />
+        </button>
+        <button className="rainy-tool" onClick={() => fitOrRecenter(editor)} title="Zoom to fit / recenter">
+          <FitIcon />
+        </button>
+        <span className="rainy-dock-sep" />
+
+        {/* dark mode */}
+        <button
+          className={`rainy-tool${dark ? ' on' : ''}`}
+          onClick={() => toggleDark()}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {dark ? <MoonIcon /> : <SunIcon />}
+        </button>
+      </div>
+    </>
   )
 }
 
@@ -200,6 +248,27 @@ function MoonIcon() {
   return (
     <Svg>
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </Svg>
+  )
+}
+function MinusIcon() {
+  return (
+    <Svg>
+      <path d="M5 12h14" />
+    </Svg>
+  )
+}
+function PlusIcon() {
+  return (
+    <Svg>
+      <path d="M12 5v14M5 12h14" />
+    </Svg>
+  )
+}
+function FitIcon() {
+  return (
+    <Svg>
+      <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />
     </Svg>
   )
 }

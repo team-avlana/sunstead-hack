@@ -69,6 +69,8 @@ const SMALL_MAX_H = 150
  * only height tracks the content. Re-flowing the enclosing frame so siblings
  * don't overlap is delegated to lib/frameLayout `relayoutFrame`. */
 const MIN_H = 56
+/** Minimum card width on manual resize — keeps the card (and its chrome) grabbable. */
+const MIN_W = 200
 
 export class RainyTextShapeUtil extends ShapeUtil<RainyTextShape> {
   static override type = RAINY_TEXT
@@ -97,7 +99,12 @@ export class RainyTextShapeUtil extends ShapeUtil<RainyTextShape> {
   }
 
   override onResize(shape: RainyTextShape, info: TLResizeInfo<RainyTextShape>) {
-    return resizeBox(shape, info)
+    // Height is derived from content by the ResizeObserver auto-fit below, so a
+    // resize only changes WIDTH — keep the original height and vertical origin so
+    // top-anchored drags don't shift the card or fight the observer (which would
+    // otherwise snap the height back). A minimum width keeps the card grabbable.
+    const next = resizeBox(shape, info, { minWidth: MIN_W, minHeight: MIN_H })
+    return { ...next, y: shape.y, props: { ...next.props, h: shape.props.h } }
   }
 
   component(shape: RainyTextShape) {
@@ -180,7 +187,15 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
   // indicator is suppressed for this shape — see the util above).
   const isSelected = useValue('selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
   const [formatOpen, setFormatOpen] = useState(false)
-  const [zoneHover, setZoneHover] = useState(false)
+  // Hover on the floating toolbar itself, so it stays reachable across the small
+  // gap above the card. Replaces the old oversized invisible hover dome that
+  // created phantom hover targets over empty canvas (and bled onto neighbours).
+  const [menuHover, setMenuHover] = useState(false)
+  // Hover on the corner chrome (grip / trash), which sits just outside the card —
+  // keeps the chrome up while the pointer is on it or in its extended hit area, so
+  // the grip is reachable past the card's edge.
+  const [chromeHover, setChromeHover] = useState(false)
+  const [showMain, setShowMain] = useState(false)
 
   const saveTimer = useRef<number | undefined>(undefined)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -283,8 +298,19 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
   }, [tiptap, editor, shape.id])
 
   const isSmall = shape.props.h < SMALL_MAX_H
-  // Active area = the whole dome (card + space above), via the .rt-zone hover.
-  const showMain = zoneHover || isHovered || isEditing || formatOpen
+  // Reveal the card chrome from tldraw's tight geometry hover + selection/editing,
+  // plus the toolbar's own hover — and linger briefly when all go false so the
+  // pointer can cross the small gap from the card up to the toolbar without it
+  // closing. No more oversized interactive dome.
+  const wantMain = isHovered || isSelected || isEditing || formatOpen || menuHover || chromeHover
+  useEffect(() => {
+    if (wantMain) {
+      setShowMain(true)
+      return
+    }
+    const t = window.setTimeout(() => setShowMain(false), 160)
+    return () => window.clearTimeout(t)
+  }, [wantMain])
   // The format menu is only revealed once the user clicks "Aa".
   const showFormat = formatOpen
 
@@ -309,6 +335,7 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
   // that restructures the block into the chosen format. The choice is remembered
   // as the default for any newly-created text block.
   const currentFormat = inferFormat(shape.props.html || '')
+  const currentFormatLabel = FORMATS.find((f) => f.id === currentFormat)?.label ?? 'Plain text'
   const applyFormat = (next: TextFormat) => {
     const curHtml = isEditing && tiptap ? tiptap.getHTML() : shape.props.html || ''
     const nextHtml = restructure(curHtml, next)
@@ -330,13 +357,9 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
 
   return (
     <HTMLContainer className="rainy-text-host">
-      <div
-        className={`rt-zone${DEBUG_HOVER ? ' debug' : ''}${showMain ? ' on' : ''}`}
-        onMouseEnter={() => setZoneHover(true)}
-        onMouseLeave={() => setZoneHover(false)}
-      >
-        <DeleteButton editor={editor} id={shape.id} show={showMain} />
-        <DragHandle editor={editor} id={shape.id} show={showMain} />
+      <div className={`rt-zone${DEBUG_HOVER ? ' debug' : ''}${showMain ? ' on' : ''}`}>
+        <DeleteButton editor={editor} id={shape.id} show={showMain} onHoverChange={setChromeHover} />
+        <DragHandle editor={editor} id={shape.id} show={showMain} onHoverChange={setChromeHover} />
 
         <div
           ref={cardRef}
@@ -355,7 +378,12 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
           </div>
         </div>
 
-        <div className={`rt-actions${showMain ? ' show' : ''}`} onPointerDown={(e) => e.stopPropagation()}>
+        <div
+          className={`rt-actions${showMain ? ' show' : ''}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseEnter={() => setMenuHover(true)}
+          onMouseLeave={() => setMenuHover(false)}
+        >
           <div className={`rt-menu${showFormat ? ' show' : ''}`} role="menu">
             {FORMATS.map((f) => (
               <button
@@ -380,7 +408,7 @@ function RainyText({ shape }: { shape: RainyTextShape }) {
 
           <div className="rt-main">
             <button className={`rt-pill${showFormat ? ' on' : ''}`} onMouseDown={hold} onClick={() => setFormatOpen((o) => !o)} title="Text format">
-              Aa <span className="caret">⌄</span>
+              {currentFormatLabel} <span className="caret">⌄</span>
             </button>
             <button className="rt-icon" onMouseDown={hold} onClick={() => editor.duplicateShapes([shape.id], { x: 28, y: 28 })} title="Duplicate">
               <CopyIcon />

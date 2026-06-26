@@ -9,8 +9,13 @@ import Sidebar from './Sidebar'
 import { useRainyStore, type View } from '@/lib/store'
 import { setActiveProject } from '@/lib/api'
 
-// xterm touches the DOM on load; keep it out of the prerendered bundle.
-const ClaudePanel = dynamic(() => import('./ClaudePanel'), { ssr: false })
+// Right-side assistant: our agent (default) or the user's Claude Code. Both are
+// client-only (the agent is a live WS chat; Claude Code pulls in xterm).
+const RightPanel = dynamic(() => import('./RightPanel'), { ssr: false })
+
+// Dev-only Service Activity panel — self-gates to nothing unless
+// NEXT_PUBLIC_RAINY_DEV_PANEL is set, so it's invisible/inert in production.
+const DevActivityPanel = dynamic(() => import('./DevActivityPanel'), { ssr: false })
 
 // ssr:false is legal here because this file is a Client Component (App Router rule).
 const CanvasWorkspace = dynamic(() => import('./CanvasWorkspace'), {
@@ -72,10 +77,11 @@ export default function CanvasClient() {
     }
   }, [])
 
-  // One persistent app shell wraps BOTH Home and the canvas. <ClaudePanel/> is a
+  // One persistent app shell wraps BOTH Home and the canvas. <RightPanel/> is a
   // constant sibling at the same child position in either branch, so React keeps
-  // the single Claude session (websocket + PTY) mounted across every Home⇄canvas
-  // and project→project switch — the conversation never resets on navigation.
+  // the single assistant session (the agent's websocket, or Claude Code's PTY)
+  // mounted across every Home⇄canvas and project→project switch — the conversation
+  // never resets on navigation.
   // `claude-open` lets the CSS reserve the right gutter on Home.
   const appClass = `rainy-app${dark ? ' dark' : ''}${claudeOpen ? ' claude-open' : ''}`
 
@@ -83,7 +89,8 @@ export default function CanvasClient() {
     return (
       <div className={appClass}>
         <Home />
-        <ClaudePanel />
+        <RightPanel />
+        <DevActivityPanel />
       </div>
     )
   }
@@ -100,7 +107,8 @@ export default function CanvasClient() {
       {/* Same child index (1) as in the Home branch above → React preserves it
           across navigation instead of unmounting, so scrollback + the live
           conversation survive project switches. */}
-      <ClaudePanel />
+      <RightPanel />
+      <DevActivityPanel />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import type { Editor } from 'tldraw'
+import { fitOrRecenter } from './camera'
 import type { CanvasOp } from './remoteOps'
 
 /** JS -> Swift (fire-and-forget). No-op in a plain browser. */
@@ -35,7 +36,9 @@ export function installBridge(editor: Editor): () => void {
     },
   }
 
-  const onZoomFit = () => editor.zoomToFit()
+  // Fit into the visible region (clear of the floating panels), with a guaranteed
+  // recenter when the canvas is empty.
+  const onZoomFit = () => fitOrRecenter(editor)
   window.addEventListener('native:zoomToFit', onZoomFit)
 
   return () => {

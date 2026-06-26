@@ -19,9 +19,10 @@
 import { createShapeId, type Editor, type TLShapeId } from 'tldraw'
 import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, composeTextHtml, dims, type TextFormat, type VideoData } from '@/lib/blockTypes'
 import {
-  fetchProjectState,
+  fetchProjectStateResult,
   resolveAssetUrl,
   type EnrichedArtifact,
+  type ProjectLoad,
   type ProjectState,
 } from './api'
 import {
@@ -31,6 +32,7 @@ import {
   isElementPendingRemove,
   resolveArtRef,
 } from './backendSync'
+import { anchoredReflow, fitContentToVisible } from './camera'
 import { frameBox, relayoutFrame } from './frameLayout'
 import { useRainyStore } from './store'
 
@@ -194,7 +196,12 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
       // A block the user has moved/resized is pinned: keep it out of masonry.
       const meta = { pinned: el.pinned === true }
       if (el.type === 'video') {
-        children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: videoShapeProps(el) })
+        const vp = videoShapeProps(el)
+        // A manually-resized (pinned) video keeps its stored box as the seed; the
+        // auto-fit observer then owns its live height.
+        if (el.pinned === true && typeof el.w === 'number') vp.w = el.w
+        if (el.pinned === true && typeof el.h === 'number') vp.h = el.h
+        children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: vp })
       } else if (el.type === 'image') {
         children.push({ id, type: IMAGE_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: imageShapeProps(el) })
       } else {
@@ -219,12 +226,31 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
   return [{ id: artId(a.artifact_id), type: RAINY_TEXT, x, y, props: { w, h, html: textHtmlFor(a) } }]
 }
 
-/** Initial load: replace all backend shapes with the project's artifacts. Returns
- * false if there's no backend project to load (caller falls back to local XML). */
-export async function loadBackendProject(editor: Editor, projectId: string): Promise<boolean> {
-  const state = await fetchProjectState(projectId)
-  if (!state) return false
-  if (editor.isDisposed) return true
+/** The frame shape id that owns a child shape id (or null for a top-level shape). */
+function frameShapeIdOf(childId: TLShapeId): TLShapeId | null {
+  const ref = resolveArtRef(String(childId))
+  return ref?.elementId ? artId(ref.artifactId) : null
+}
+
+/**
+ * Initial load: replace all backend shapes with the project's artifacts. Returns
+ * the load outcome ('ok' | 'notfound' | 'unreachable' | 'no-backend') and sets the
+ * store's loadState so the canvas can show an error/retry overlay instead of a
+ * silently-blank canvas. Does NOT move the camera — the caller's settle-then-fit
+ * (camera.settleAndReveal) owns framing so the fit lands on the settled layout.
+ */
+export async function loadBackendProject(
+  editor: Editor,
+  projectId: string,
+): Promise<ProjectLoad['kind']> {
+  const res = await fetchProjectStateResult(projectId)
+  if (res.kind !== 'ok') {
+    if (res.kind === 'notfound') useRainyStore.getState().setLoadState('notfound')
+    else if (res.kind === 'unreachable') useRainyStore.getState().setLoadState('unreachable')
+    return res.kind
+  }
+  const state = res.state
+  if (editor.isDisposed) return 'ok'
 
   useRainyStore.getState().setTitle(state.project.name)
   const descs = state.artifacts.flatMap(expandArtifact)
@@ -249,98 +275,145 @@ export async function loadBackendProject(editor: Editor, projectId: string): Pro
     )
   })
 
-  if (descs.length) {
-    try {
-      editor.zoomToFit()
-    } catch {
-      /* no-op */
-    }
-  }
-  return true
+  useRainyStore.getState().setLoadState('ok')
+  return 'ok'
 }
 
 /** Re-pull + reconcile (used on a websocket signal or the poll fallback). Preserves
- * user-set position/zoom; only patches content, and height when status changes. */
+ * user-set position/zoom; only patches content, and height when status changes.
+ * Self-heals the load-state (so a recovered backend dismisses the error overlay)
+ * and keeps the camera anchored so background reflows don't slide content away. */
 export async function syncBackendProject(editor: Editor, projectId: string): Promise<void> {
-  const state: ProjectState | null = await fetchProjectState(projectId)
-  if (!state || editor.isDisposed) return
+  const res = await fetchProjectStateResult(projectId)
+  if (editor.isDisposed) return
+  const store = useRainyStore.getState()
+  if (res.kind !== 'ok') {
+    // A transient failure during background sync shouldn't blank the canvas; just
+    // reflect connection state. A confirmed 404 means the project is gone.
+    if (res.kind === 'notfound') store.setLoadState('notfound')
+    else if (res.kind === 'unreachable' && store.loadState !== 'ok') store.setLoadState('unreachable')
+    return
+  }
+  // Recovered from an error overlay → reframe once so recovered shapes aren't off
+  // screen, then mark ok.
+  const wasErrored = store.loadState === 'unreachable' || store.loadState === 'notfound'
+
+  const state: ProjectState = res.state
   const descs = state.artifacts.flatMap(expandArtifact)
   const desiredIds = new Set(descs.map((d) => d.id))
 
-  editor.store.mergeRemoteChanges(() => {
-    editor.run(
-      () => {
-        const existing = new Map(
-          editor
-            .getCurrentPageShapes()
-            .filter((sh) => isBackendShape(sh.id))
-            .map((sh) => [sh.id, sh] as const),
-        )
+  // Frames whose layout actually needs re-packing this pass (a child was
+  // added/removed or resized) — re-flowing only these avoids re-packing every
+  // frame on every signal (and shuffling frame B because frame A changed).
+  const touchedFrames = new Set<TLShapeId>()
 
-        for (const d of orderForCreate(descs)) {
-          // Skip artifacts the user is locally authoring (adopted shape owns them)
-          // or just deleted (don't resurrect from a stale read).
-          const ref = resolveArtRef(d.id)
-          if (ref && (isArtifactAdopted(ref.artifactId) || isArtifactPendingDelete(ref.artifactId))) {
-            continue
-          }
-          if (ref?.elementId && isElementPendingRemove(ref.artifactId, ref.elementId)) continue
+  anchoredReflow(editor, () => {
+    editor.store.mergeRemoteChanges(() => {
+      editor.run(
+        () => {
+          const existing = new Map(
+            editor
+              .getCurrentPageShapes()
+              .filter((sh) => isBackendShape(sh.id))
+              .map((sh) => [sh.id, sh] as const),
+          )
 
-          const cur = existing.get(d.id)
-          if (!cur) {
-            try {
-              editor.createShape(d as any)
-            } catch {
-              /* skip */
+          for (const d of orderForCreate(descs)) {
+            // Skip artifacts the user is locally authoring (adopted shape owns them)
+            // or just deleted (don't resurrect from a stale read).
+            const ref = resolveArtRef(d.id)
+            if (ref && (isArtifactAdopted(ref.artifactId) || isArtifactPendingDelete(ref.artifactId))) {
+              continue
             }
-            continue
-          }
-          // Patch content in place; keep the user's x/y + chosen disclosure level,
-          // but always refit w/h to that view + the latest content so growth (e.g.
-          // a storyboard arriving) never clips.
-          if (d.type === VIDEO_BLOCK) {
-            const view = ((cur as any).props?.view as View) || 'compact'
-            const size = dims(view, JSON.parse(d.props.data as string))
-            editor.updateShape({
-              id: d.id,
-              type: VIDEO_BLOCK,
-              props: { data: d.props.data, w: size.w, h: size.h },
-            } as any)
-          } else if (d.type === FRAME) {
-            // Size + child layout are owned by relayoutFrame (run after this loop,
-            // and again as blocks auto-fit). Here we only refresh the name, and
-            // only when the user isn't mid-rename.
-            if (!isContentDirty(editor, d.id)) {
-              editor.updateShape({ id: d.id, type: FRAME, props: { name: d.props.name } } as any)
-            }
-          } else if (d.type === IMAGE_BLOCK) {
-            // Refresh the image source + caption (the underlying frame/panel can
-            // change), but keep the user's chosen size (w/h aren't patched, so a
-            // manual resize survives the re-pull).
-            editor.updateShape({
-              id: d.id,
-              type: IMAGE_BLOCK,
-              props: { src: d.props.src, caption: d.props.caption, shotType: d.props.shotType },
-            } as any)
-          } else if (d.type === RAINY_TEXT) {
-            // Don't overwrite text the user is editing / just edited before it
-            // round-trips to the DB.
-            if (!isContentDirty(editor, d.id)) {
-              editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)
-            }
-          }
-        }
+            if (ref?.elementId && isElementPendingRemove(ref.artifactId, ref.elementId)) continue
 
-        // Remove backend shapes whose artifact no longer exists.
-        for (const [id] of existing) {
-          if (!desiredIds.has(id)) editor.deleteShapes([id])
-        }
+            const cur = existing.get(d.id)
+            if (!cur) {
+              try {
+                editor.createShape(d as any)
+                if (d.parentId) touchedFrames.add(d.parentId)
+                else if (d.type === FRAME) touchedFrames.add(d.id)
+              } catch {
+                /* skip */
+              }
+              continue
+            }
+            // Patch content in place; keep the user's x/y + chosen disclosure level,
+            // but always refit w/h to that view + the latest content so growth (e.g.
+            // a storyboard arriving) never clips.
+            if (d.type === VIDEO_BLOCK) {
+              const cp = (cur as any).props ?? {}
+              const pinned = (cur.meta as { pinned?: unknown })?.pinned === true
+              const view = (cp.view as View) || 'compact'
+              const size = dims(view, JSON.parse(d.props.data as string))
+              // Keep the user's width if they manually resized it; height is owned by
+              // the in-card auto-fit observer, so we never overwrite it on re-pull.
+              const w = pinned ? cp.w : size.w
+              if (cp.data !== d.props.data || cp.w !== w) {
+                editor.updateShape({
+                  id: d.id,
+                  type: VIDEO_BLOCK,
+                  props: { data: d.props.data, w },
+                } as any)
+                if (d.parentId) touchedFrames.add(d.parentId)
+              }
+            } else if (d.type === FRAME) {
+              // Size + child layout are owned by relayoutFrame (run after this loop,
+              // and again as blocks auto-fit). Here we only refresh the name, and
+              // only when the user isn't mid-rename.
+              if (!isContentDirty(editor, d.id) && (cur as any).props?.name !== d.props.name) {
+                editor.updateShape({ id: d.id, type: FRAME, props: { name: d.props.name } } as any)
+              }
+            } else if (d.type === IMAGE_BLOCK) {
+              // Refresh the image source + caption (the underlying frame/panel can
+              // change), but keep the user's chosen size (w/h aren't patched, so a
+              // manual resize survives the re-pull).
+              const cp = (cur as any).props ?? {}
+              if (cp.src !== d.props.src || cp.caption !== d.props.caption || cp.shotType !== d.props.shotType) {
+                editor.updateShape({
+                  id: d.id,
+                  type: IMAGE_BLOCK,
+                  props: { src: d.props.src, caption: d.props.caption, shotType: d.props.shotType },
+                } as any)
+              }
+            } else if (d.type === RAINY_TEXT) {
+              // Don't overwrite text the user is editing / just edited before it
+              // round-trips to the DB.
+              if (!isContentDirty(editor, d.id) && (cur as any).props?.html !== d.props.html) {
+                editor.updateShape({ id: d.id, type: RAINY_TEXT, props: { html: d.props.html } } as any)
+                if (d.parentId) touchedFrames.add(d.parentId)
+              }
+            }
+          }
 
-        // Re-flow each frame around the patched content (new video sizes, added
-        // blocks). Text height changes re-trigger relayout as the cards re-fit.
-        for (const d of descs) if (d.type === FRAME) relayoutFrame(editor, d.id)
-      },
-      { history: 'ignore' },
-    )
+          // Remove backend shapes whose artifact no longer exists — but never yank
+          // one out from under an active interaction (editing / selected / just
+          // edited), and never while a delete↔undo restore is mid-flight. A lingering
+          // ghost self-heals on the next sync once the interaction ends.
+          const editingId = editor.getEditingShapeId()
+          const selected = new Set(editor.getSelectedShapeIds().map(String))
+          for (const [id] of existing) {
+            if (desiredIds.has(id)) continue
+            if (id === editingId || selected.has(String(id)) || isContentDirty(editor, id)) continue
+            const ref = resolveArtRef(String(id))
+            if (ref && isArtifactPendingDelete(ref.artifactId)) continue
+            const fid = frameShapeIdOf(id)
+            editor.deleteShapes([id])
+            if (fid) touchedFrames.add(fid)
+          }
+
+          // Re-flow only the frames that actually changed this pass. Height-driven
+          // reflow (a text/video card growing) is self-triggered by the shape utils,
+          // so we don't need to re-pack untouched frames here.
+          for (const fid of touchedFrames) relayoutFrame(editor, fid)
+        },
+        { history: 'ignore' },
+      )
+    })
   })
+
+  if (wasErrored) {
+    store.setLoadState('ok')
+    fitContentToVisible(editor, { animation: { duration: 200 } })
+  }
 }

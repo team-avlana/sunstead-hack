@@ -14,10 +14,11 @@ import {
   useEditor,
   useValue,
 } from 'tldraw'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import s from './VideoBlock.module.css'
 import {
   VIDEO_BLOCK,
+  VIDEO_VIEW_OPTIONS,
   DEFAULT_DATA,
   STATUS_LABEL,
   dims,
@@ -35,6 +36,35 @@ import { DeleteButton, DragHandle } from './ShapeChrome'
 // The video taxonomy (status lifecycle, detail levels, sizing, parsing) lives in
 // lib/blockTypes so the adaptive sidebar can read + drive it from outside <Tldraw>.
 type View = VideoView
+
+/** Manual-resize floors. minHeight stays ≤ the compact card height so a user can
+ * still drag an expanded card back near its compact footprint. */
+const VB_MIN_W = 240
+const VB_MIN_H = 80
+
+/** Density preview per view level (reuses the text menu's stacked-bar previews) —
+ * compact = header only, expanded = + summary, full = + transcript/storyboard. */
+const VIEW_PREVIEW: Record<VideoView, ReactNode> = {
+  compact: (
+    <>
+      <i className="t" />
+    </>
+  ),
+  expanded: (
+    <>
+      <i className="t" />
+      <i className="b" />
+    </>
+  ),
+  full: (
+    <>
+      <i className="t" />
+      <i className="b" />
+      <i className="b2" />
+    </>
+  ),
+}
+const VIEW_OPTIONS = VIDEO_VIEW_OPTIONS.map((o) => ({ ...o, preview: VIEW_PREVIEW[o.id] }))
 
 /**
  * Video Block — the fundamental interface for a video + its analysed data.
@@ -89,7 +119,11 @@ export class VideoBlockShapeUtil extends ShapeUtil<VideoBlockShape> {
   }
 
   override onResize(shape: VideoBlockShape, info: TLResizeInfo<VideoBlockShape>) {
-    return resizeBox(shape, info)
+    // Width-only: height is owned by the in-card auto-fit observer (so the
+    // storyboard toggle is always reachable). Keep the original height + vertical
+    // origin so a top-edge drag neither shifts the card nor fights the observer.
+    const next = resizeBox(shape, info, { minWidth: VB_MIN_W, minHeight: VB_MIN_H })
+    return { ...next, y: shape.y, props: { ...next.props, h: shape.props.h } }
   }
 
   component(shape: VideoBlockShape) {
@@ -113,18 +147,81 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   const d = useValue('data', () => parse(shape.props.data), [shape.props.data])
   const status: VideoStatus = d.status ?? 'empty'
 
-  // Hover/selection drives the delete affordance. The button straddles the
-  // corner (outside geometry), so we OR in its own hover to keep it alive.
+  // Chrome reveal: the delete/grip + the floating view menu all show together on
+  // hover/selection, kept alive by their own hover with a short linger so the menu
+  // above the card stays reachable across the gap (same pattern as the text card).
   const isHovered = useValue('hovered', () => editor.getHoveredShapeId() === shape.id, [editor, shape.id])
   const isSelected = useValue('selected', () => editor.getSelectedShapeIds().includes(shape.id), [editor, shape.id])
-  const [trashHover, setTrashHover] = useState(false)
+  const [chromeHover, setChromeHover] = useState(false) // grip / trash
+  const [menuHover, setMenuHover] = useState(false) // the floating toolbar
+  const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  const [showMain, setShowMain] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  const wantMain = isHovered || isSelected || chromeHover || menuHover || viewMenuOpen
+  useEffect(() => {
+    if (wantMain) {
+      setShowMain(true)
+      return
+    }
+    const t = window.setTimeout(() => setShowMain(false), 160)
+    return () => window.clearTimeout(t)
+  }, [wantMain])
+  // Close the view menu whenever the chrome hides.
+  useEffect(() => {
+    if (!showMain) setViewMenuOpen(false)
+  }, [showMain])
+
+  // Auto-fit the card height to its content so a rich expanded card never clips the
+  // storyboard toggle (the only way into 'full' view). The card is overflow:hidden
+  // height:100%, so scrollHeight reports the full (clipped) content height; we grow
+  // the shape to match. Height patches are derived (history-ignored, never synced),
+  // mirroring the text card; setView still seeds the height, then this corrects it.
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+    const fit = () => {
+      if (card.offsetParent === null) return // culled offscreen → don't measure 0
+      const cur = editor.getShape<VideoBlockShape>(shape.id)
+      if (!cur) return
+      const target = Math.ceil(card.scrollHeight)
+      if (target < 1 || Math.abs(target - cur.props.h) <= 1) return
+      editor.store.mergeRemoteChanges(() =>
+        editor.run(() => editor.updateShape({ id: shape.id, type: VIDEO_BLOCK, props: { h: target } }), {
+          history: 'ignore',
+        }),
+      )
+      if (cur.parentId) relayoutFrame(editor, cur.parentId as TLShapeId)
+    }
+    const ro = new ResizeObserver(fit)
+    ro.observe(card)
+    fit()
+    return () => ro.disconnect()
+  }, [editor, shape.id])
 
   const setView = (next: View) => {
+    const cur = editor.getShape<VideoBlockShape>(shape.id)
+    if (!cur) return
+    const pinned = (cur.meta as { pinned?: unknown }).pinned === true
     const size = dims(next, d)
-    editor.updateShape({ id: shape.id, type: VIDEO_BLOCK, props: { view: next, ...size } })
-    // Re-flow the enclosing frame so expanding/collapsing never overlaps siblings.
-    const parent = editor.getShape(shape.id)?.parentId
-    if (parent) relayoutFrame(editor, parent as TLShapeId)
+    // `view` is a content edit (persists to the artifact). The size is view-DERIVED,
+    // so apply it as a remote/history-ignored change — otherwise the w/h delta would
+    // echo back through outbound sync as a manual resize and pin the block out of
+    // auto-layout. A user-pinned width is respected; height is then auto-fit.
+    editor.updateShape({ id: shape.id, type: VIDEO_BLOCK, props: { view: next } })
+    editor.store.mergeRemoteChanges(() =>
+      editor.run(
+        () =>
+          editor.updateShape({
+            id: shape.id,
+            type: VIDEO_BLOCK,
+            props: { w: pinned ? cur.props.w : size.w, h: size.h },
+          }),
+        { history: 'ignore' },
+      ),
+    )
+    // Re-flow the enclosing frame so changing the view never overlaps siblings.
+    if (cur.parentId) relayoutFrame(editor, cur.parentId as TLShapeId)
   }
 
   // Trigger analysis from the in-block controls (URL entry / Analyse / Retry).
@@ -142,25 +239,23 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   }, [backend, status, d.video_id, editor, shape.id])
 
   const stop = (e: React.PointerEvent) => e.stopPropagation()
+  // Keep selection/hover when pressing a toolbar control (don't let it reach tldraw).
+  const hold = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
   const canStoryboard = status === 'analysed' && (d.storyboard?.length ?? 0) > 0
   const expanded = view !== 'compact'
+  const currentView = VIEW_OPTIONS.find((o) => o.id === view) ?? VIEW_OPTIONS[1]
 
   return (
     <HTMLContainer>
       {/* host isolates the appear-animation aurora behind the card (see VideoBlock.module.css) */}
       <div className={s.host}>
-        <div className={`${s.card} ${s[status]}`} onPointerDown={(e) => { if (expanded) e.stopPropagation() }}>
-          <Header
-            d={d}
-            status={status}
-            view={view}
-            onToggle={() => setView(view === 'compact' ? 'expanded' : 'compact')}
-            stop={stop}
-          />
+        <div ref={cardRef} className={`${s.card} ${s[status]}`} onPointerDown={(e) => { if (expanded) e.stopPropagation() }}>
+          <Header d={d} status={status} view={view} />
 
-          {expanded && status === 'analysed' && (
-            <Body d={d} view={view} canStoryboard={canStoryboard} setView={setView} stop={stop} />
-          )}
+          {expanded && status === 'analysed' && <Body d={d} view={view} canStoryboard={canStoryboard} />}
           {expanded && status === 'analysing' && <Analysing d={d} />}
           {expanded && status === 'error' && <ErrorState d={d} onAnalyse={analyse} stop={stop} />}
           {expanded && status === 'not_analysed' && <NotAnalysed d={d} onAnalyse={analyse} stop={stop} />}
@@ -171,19 +266,89 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
       <DeleteButton
         editor={editor}
         id={shape.id}
-        show={isHovered || isSelected || trashHover}
-        onHoverChange={setTrashHover}
+        show={showMain}
+        onHoverChange={setChromeHover}
         className="vb-trash"
       />
 
       <DragHandle
         editor={editor}
         id={shape.id}
-        show={isHovered || isSelected || trashHover}
-        onHoverChange={setTrashHover}
+        show={showMain}
+        onHoverChange={setChromeHover}
         className="vb-grip"
       />
+
+      {/* Floating view picker — the video's equivalent of the text card's format
+          menu: choose Compact / Expanded / Full instead of the in-block chevron. */}
+      <div
+        className={`vb-actions${showMain ? ' show' : ''}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseEnter={() => setMenuHover(true)}
+        onMouseLeave={() => setMenuHover(false)}
+      >
+        <div className={`rt-menu${viewMenuOpen ? ' show' : ''}`} role="menu">
+          {VIEW_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              role="menuitemradio"
+              aria-checked={view === o.id}
+              className={`rt-menu-item${view === o.id ? ' on' : ''}`}
+              onMouseDown={hold}
+              onClick={() => {
+                setView(o.id)
+                setViewMenuOpen(false)
+              }}
+              title={o.label}
+            >
+              <span className="rt-menu-preview">{o.preview}</span>
+              <span className="rt-menu-label">{o.label}</span>
+              {view === o.id && (
+                <span className="rt-menu-check">
+                  <CheckIcon />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="rt-main">
+          <button
+            className={`rt-pill${viewMenuOpen ? ' on' : ''}`}
+            onMouseDown={hold}
+            onClick={() => setViewMenuOpen((o) => !o)}
+            title="View detail"
+          >
+            {currentView.label} <span className="caret">⌄</span>
+          </button>
+          <button
+            className="rt-icon"
+            onMouseDown={hold}
+            onClick={() => editor.duplicateShapes([shape.id], { x: 28, y: 28 })}
+            title="Duplicate"
+          >
+            <CopyIcon />
+          </button>
+        </div>
+      </div>
     </HTMLContainer>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   )
 }
 
@@ -207,19 +372,7 @@ function Thumb({ d, wide }: { d: VideoData; wide?: boolean }) {
   )
 }
 
-function Header({
-  d,
-  status,
-  view,
-  onToggle,
-  stop,
-}: {
-  d: VideoData
-  status: VideoStatus
-  view: View
-  onToggle: () => void
-  stop: (e: React.PointerEvent) => void
-}) {
+function Header({ d, status, view }: { d: VideoData; status: VideoStatus; view: View }) {
   const wide = view !== 'compact' && status !== 'empty'
   const title = d.title || (status === 'empty' ? 'Empty — ready for input' : 'Untitled video')
   return (
@@ -235,16 +388,6 @@ function Header({
           {status === 'analysed' && d.shot_count ? <span>{d.shot_count} shots</span> : null}
         </div>
       </div>
-      <button
-        className={`${s.chev} ${view !== 'compact' ? s.chevUp : ''}`}
-        onPointerDown={stop}
-        onClick={onToggle}
-        title={view === 'compact' ? 'Expand' : 'Collapse'}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
     </div>
   )
 }
@@ -253,14 +396,10 @@ function Body({
   d,
   view,
   canStoryboard,
-  setView,
-  stop,
 }: {
   d: VideoData
   view: View
   canStoryboard: boolean
-  setView: (v: View) => void
-  stop: (e: React.PointerEvent) => void
 }) {
   return (
     <div className={s.body}>
@@ -295,16 +434,6 @@ function Body({
         <div>
           <div className={s.storyHead}>
             <div className={s.sectionLabel}>Storyboard · {d.storyboard!.length} scenes</div>
-            <button
-              className={s.storyToggle}
-              onPointerDown={stop}
-              onClick={() => setView(view === 'full' ? 'expanded' : 'full')}
-            >
-              {view === 'full' ? 'Hide' : 'Show'}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: view === 'full' ? 'rotate(180deg)' : 'none' }}>
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
           </div>
           {view === 'full' ? <Storyboard scenes={d.storyboard!} /> : null}
         </div>
@@ -377,8 +506,9 @@ type StateProps = {
 }
 
 /** URL field + Analyse button — the in-block way to add a source and kick off
- * analysis (the empty + not-analysed states share it). Enter submits. */
-function UrlEntry({ d, onAnalyse, stop, hint, cta }: StateProps & { hint: string; cta: string }) {
+ * analysis (the empty + not-analysed states share it). Enter submits. The
+ * `https://…` placeholder is self-explanatory, so there's no hint line above it. */
+function UrlEntry({ d, onAnalyse, stop, cta }: StateProps & { cta: string }) {
   const [url, setUrl] = useState(d.source_url || '')
   const trimmed = url.trim()
   const submit = () => {
@@ -386,7 +516,6 @@ function UrlEntry({ d, onAnalyse, stop, hint, cta }: StateProps & { hint: string
   }
   return (
     <div className={s.empties}>
-      <span className={s.emptyHint}>{hint}</span>
       <div className={s.urlRow}>
         <input
           className={s.urlInput}
@@ -437,25 +566,9 @@ function NotAnalysed({ d, onAnalyse, stop }: StateProps) {
       </div>
     )
   }
-  return (
-    <UrlEntry
-      d={d}
-      onAnalyse={onAnalyse}
-      stop={stop}
-      hint="Add a video URL to analyse, or ask Rainy to add one to this project."
-      cta="Analyse video"
-    />
-  )
+  return <UrlEntry d={d} onAnalyse={onAnalyse} stop={stop} cta="Analyse video" />
 }
 
 function Empty({ d, onAnalyse, stop }: StateProps) {
-  return (
-    <UrlEntry
-      d={d}
-      onAnalyse={onAnalyse}
-      stop={stop}
-      hint="Paste a video URL, or ask Rainy to add one to this project."
-      cta="Analyse"
-    />
-  )
+  return <UrlEntry d={d} onAnalyse={onAnalyse} stop={stop} cta="Analyse" />
 }

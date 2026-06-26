@@ -29,13 +29,18 @@
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat } from '@/lib/blockTypes'
 import {
-  createArtifact,
-  deleteArtifact,
+  createArtifactResult,
+  deleteArtifactResult,
+  isTerminalHttp,
+  restoreArtifactResult,
   updateArtifact,
+  updateArtifactResult,
   type ArtifactPatch,
+  type CreateArtifactBody,
   type NewArtifact,
 } from './api'
 import { frameBox, packColumns, type LayoutBox } from './frameLayout'
+import { useRainyStore } from './store'
 
 /** tldraw's built-in frame shape type (used as a flow container). */
 const FRAME = 'frame'
@@ -84,10 +89,22 @@ const pendingDelete = new Set<string>()
 const pendingRemove = new Set<string>()
 /** shapeId → epoch-ms until which its content is considered locally owned. */
 const dirtyUntil = new Map<string, number>()
+/** shapeIds whose content write is in-flight (or retrying). The reconcile loop
+ * treats these as dirty so a slow/failed PUT can't be reverted by a re-pull that
+ * lands before the write confirms — content-ownership is held until CONFIRMATION,
+ * not a fixed wall-clock window. */
+const inFlightContent = new Set<string>()
 
-const CONTENT_GRACE_MS = 2000
+const CONTENT_GRACE_MS = 2500
 /** How long a pending delete/remove suppresses re-creation (covers the round-trip). */
 const PENDING_TTL_MS = 1500
+/** Cap + base for capped-exponential-backoff retries of failed writes. */
+const MAX_ATTEMPTS = 5
+const backoffMs = (attempt: number) => Math.min(8000, 600 * 2 ** attempt)
+/** Defer the actual DELETE so an immediate Cmd+Z cancels it with no HTTP at all. */
+const DELETE_DEFER_MS = 550
+/** How long after a sent delete an undo can still restore the same artifact. */
+const RESTORE_WINDOW_MS = 12000
 
 const markContentDirty = (id: string) => dirtyUntil.set(id, Date.now() + CONTENT_GRACE_MS)
 
@@ -95,12 +112,24 @@ export const isArtifactPendingDelete = (artifactId: string): boolean => pendingD
 export const isElementPendingRemove = (artifactId: string, elementId: string): boolean =>
   pendingRemove.has(`${artifactId}::${elementId}`)
 
-/** True while a shape's content is being actively edited or was just edited — the
- * reconcile loop skips overwriting its content from the DB during this window. */
+/** True while a shape's content is being actively edited, was just edited, or has
+ * a write still in-flight — the reconcile loop skips overwriting its content from
+ * the DB during this window. */
 export function isContentDirty(editor: Editor, shapeId: TLShapeId): boolean {
   if (editor.getEditingShapeId() === shapeId) return true
+  if (inFlightContent.has(shapeId)) return true
   const until = dirtyUntil.get(shapeId)
   return until !== undefined && until > Date.now()
+}
+
+/** A stable client-side id used both as the canvas shape's artifact mapping and
+ * the server idempotency key, so a retried create never duplicates. */
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
 }
 
 // ── change → write translation ────────────────────────────────────────────────
@@ -143,9 +172,10 @@ function buildPatch(shape: any, cats: Set<Cat>, ref: ArtRef): ArtifactPatch | nu
     if (cats.has('geom')) {
       ep.x = num(shape.x)
       ep.y = num(shape.y)
-      // Text + image carry a meaningful box; a video's size is derived from its
-      // view, so we don't persist w/h for it.
-      if (shape.type === RAINY_TEXT || shape.type === IMAGE_BLOCK) {
+      // Persist the box for any block the user can resize. A pinned video keeps
+      // its user width on re-pull (height stays content-derived via the auto-fit
+      // observer); text + image keep both dimensions.
+      if (shape.type === RAINY_TEXT || shape.type === IMAGE_BLOCK || shape.type === VIDEO_BLOCK) {
         ep.w = num(p.w)
         ep.h = num(p.h)
       }
@@ -194,6 +224,39 @@ function draftArtifact(shape: any): NewArtifact | null {
 }
 
 const CREATABLE = new Set<string>([RAINY_TEXT, VIDEO_BLOCK, FRAME])
+
+/** Reconstruct a full element payload from a removed child shape record, so an undo
+ * can re-add the element to its frame (the backend element_patch upserts). Returns
+ * undefined for shape types that don't map to a frame element. */
+function reconstructElementPatch(rec: any): Record<string, unknown> | undefined {
+  const p = rec.props ?? {}
+  const ep: Record<string, unknown> = {
+    x: num(rec.x),
+    y: num(rec.y),
+    pinned: (rec.meta as { pinned?: unknown })?.pinned === true,
+  }
+  if (rec.type === RAINY_TEXT) {
+    ep.type = 'text'
+    ep.w = num(p.w)
+    ep.h = num(p.h)
+    Object.assign(ep, textElementParts(p.html ?? ''))
+  } else if (rec.type === IMAGE_BLOCK) {
+    ep.type = 'image'
+    ep.w = num(p.w)
+    ep.h = num(p.h)
+    ep.src = p.src ?? ''
+    ep.caption = p.caption ?? ''
+    ep.shot_type = p.shotType ?? ''
+  } else if (rec.type === VIDEO_BLOCK) {
+    ep.type = 'video'
+    ep.w = num(p.w)
+    ep.h = num(p.h)
+    ep.view = p.view ?? 'expanded'
+  } else {
+    return undefined
+  }
+  return ep
+}
 
 /**
  * Manual "tidy" — re-flow EVERY block in a frame into the clean, non-overlapping
@@ -270,8 +333,32 @@ export function tidyFrame(editor: Editor, frameId: TLShapeId): void {
 export function attachBackendSync(editor: Editor, projectId: string): () => void {
   const updateTimers = new Map<string, number>()
   const updateCats = new Map<string, Set<Cat>>()
+  const updateAttempts = new Map<string, number>()
   const createTimers = new Map<string, number>()
+  const createAttempts = new Map<string, number>()
+  /** artifactId → timer for a deferred top-level DELETE (cancellable by undo). */
+  const deleteTimers = new Map<string, number>()
+  /** `${art}::${el}` → timer for a deferred child element_remove. */
+  const removeTimers = new Map<string, number>()
+  /** artifactIds whose DELETE was sent — an undo within the window restores them. */
+  const recentlyDeleted = new Set<string>()
+  /** `${art}::${el}` → reconstructed element so an undo can re-add the child. */
+  const recentlyRemoved = new Map<string, Record<string, unknown>>()
+  /** Keys (shapeId / artifactId / element key) with a write currently failing —
+   * drives the "Changes not saved" chip via the store's unsaved counter. */
+  const failing = new Set<string>()
+  let disposed = false
 
+  const markFailing = (key: string) => {
+    if (disposed || failing.has(key)) return
+    failing.add(key)
+    useRainyStore.getState().bumpUnsaved(1)
+  }
+  const clearFailing = (key: string) => {
+    if (failing.delete(key)) useRainyStore.getState().bumpUnsaved(-1)
+  }
+
+  // ── content / geom updates (confirmation-held, retried) ──────────────────────
   const flushUpdate = (shapeId: TLShapeId) => {
     updateTimers.delete(shapeId)
     const cats = updateCats.get(shapeId)
@@ -282,7 +369,44 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
     const ref = resolveArtRef(shapeId)
     if (!ref || isArtifactPendingDelete(ref.artifactId)) return
     const body = buildPatch(shape, cats, ref)
-    if (body) void updateArtifact(ref.artifactId, body)
+    if (!body) return
+    const ownsContent = cats.has('content')
+    if (ownsContent) inFlightContent.add(shapeId) // hold ownership until confirmed
+    void updateArtifactResult(ref.artifactId, body).then((res) => {
+      if (disposed) return
+      if (res.ok) {
+        updateAttempts.delete(shapeId)
+        clearFailing(shapeId)
+        if (ownsContent) {
+          inFlightContent.delete(shapeId)
+          markContentDirty(shapeId) // re-arm the grace from CONFIRMATION (covers a stale read already in flight)
+        }
+        return
+      }
+      if (isTerminalHttp(res) || editor.isDisposed || !editor.getShape(shapeId)) {
+        // Artifact gone / shape gone — drop the write.
+        updateAttempts.delete(shapeId)
+        if (ownsContent) inFlightContent.delete(shapeId)
+        clearFailing(shapeId)
+        return
+      }
+      const n = (updateAttempts.get(shapeId) ?? 0) + 1
+      if (n > MAX_ATTEMPTS) {
+        updateAttempts.delete(shapeId)
+        if (ownsContent) inFlightContent.delete(shapeId)
+        markFailing(shapeId)
+        return
+      }
+      // Transient — retry, re-reading the LATEST shape state next flush.
+      updateAttempts.set(shapeId, n)
+      markFailing(shapeId)
+      const set = updateCats.get(shapeId) ?? new Set<Cat>()
+      cats.forEach((c) => set.add(c))
+      updateCats.set(shapeId, set)
+      if (ownsContent) markContentDirty(shapeId)
+      window.clearTimeout(updateTimers.get(shapeId))
+      updateTimers.set(shapeId, window.setTimeout(() => flushUpdate(shapeId), backoffMs(n)))
+    })
   }
 
   const scheduleUpdate = (shapeId: TLShapeId, cat: Cat) => {
@@ -297,17 +421,52 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
     updateTimers.set(shapeId, window.setTimeout(() => flushUpdate(shapeId), 350))
   }
 
+  // ── creates (idempotent via a client id registered up-front, retried) ────────
   const flushCreate = (shapeId: TLShapeId) => {
     createTimers.delete(shapeId)
     const shape = editor.getShape(shapeId)
-    if (!shape || isBackendManaged(shapeId)) return
+    if (!shape) return
     const draft = draftArtifact(shape)
     if (!draft) return
-    void createArtifact(projectId, draft).then((res) => {
-      // Adopt only if the shape still exists (user may have undone the create).
-      if (!res || editor.isDisposed || !editor.getShape(shapeId)) return
-      tempToArt.set(shapeId, res.artifact_id)
-      artToTemp.set(res.artifact_id, shapeId)
+    // Register the mapping BEFORE the POST so (a) the reconcile won't spawn a
+    // duplicate while it's in flight (isArtifactAdopted is true), and (b) a retry
+    // reuses the same id → the backend upserts instead of inserting twice.
+    let artifactId = tempToArt.get(shapeId)
+    if (!artifactId) {
+      artifactId = uuid()
+      tempToArt.set(shapeId, artifactId)
+      artToTemp.set(artifactId, shapeId)
+    }
+    const body: CreateArtifactBody = { ...draft, client_id: artifactId }
+    void createArtifactResult(projectId, body).then((res) => {
+      if (disposed) return
+      if (res.ok) {
+        createAttempts.delete(shapeId)
+        clearFailing(shapeId)
+        return
+      }
+      if (editor.isDisposed || !editor.getShape(shapeId)) {
+        // The user undid the create — drop it (the deferred-delete path, if any,
+        // will tidy the server copy).
+        createAttempts.delete(shapeId)
+        clearFailing(shapeId)
+        return
+      }
+      if (isTerminalHttp(res)) {
+        createAttempts.delete(shapeId)
+        markFailing(shapeId) // e.g. unknown project — surface, don't silently drop
+        return
+      }
+      const n = (createAttempts.get(shapeId) ?? 0) + 1
+      if (n > MAX_ATTEMPTS) {
+        createAttempts.delete(shapeId)
+        markFailing(shapeId)
+        return
+      }
+      createAttempts.set(shapeId, n)
+      markFailing(shapeId)
+      window.clearTimeout(createTimers.get(shapeId))
+      createTimers.set(shapeId, window.setTimeout(() => flushCreate(shapeId), backoffMs(n)))
     })
   }
 
@@ -316,15 +475,119 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
     createTimers.set(shapeId, window.setTimeout(() => flushCreate(shapeId), 500))
   }
 
+  // ── deletes / removes (deferred so undo can cancel; retried; restorable) ─────
+  const persistDelete = (artifactId: string, attempt: number) => {
+    void deleteArtifactResult(artifactId).then((res) => {
+      if (disposed) return
+      if (res.ok || isTerminalHttp(res)) {
+        clearFailing(artifactId)
+        window.setTimeout(() => pendingDelete.delete(artifactId), PENDING_TTL_MS)
+        return
+      }
+      const n = attempt + 1
+      if (n > MAX_ATTEMPTS) {
+        markFailing(artifactId) // keep pendingDelete set: suppress resurrection
+        return
+      }
+      markFailing(artifactId)
+      window.setTimeout(() => persistDelete(artifactId, n), backoffMs(n))
+    })
+  }
+  const commitDelete = (artifactId: string) => {
+    deleteTimers.delete(artifactId)
+    recentlyDeleted.add(artifactId)
+    persistDelete(artifactId, 0)
+    window.setTimeout(() => recentlyDeleted.delete(artifactId), RESTORE_WINDOW_MS)
+  }
+
+  const persistRemove = (artifactId: string, elementId: string, key: string, attempt: number) => {
+    void updateArtifactResult(artifactId, { element_remove: elementId }).then((res) => {
+      if (disposed) return
+      if (res.ok || isTerminalHttp(res)) {
+        clearFailing(key)
+        window.setTimeout(() => pendingRemove.delete(key), PENDING_TTL_MS)
+        return
+      }
+      const n = attempt + 1
+      if (n > MAX_ATTEMPTS) {
+        markFailing(key)
+        return
+      }
+      markFailing(key)
+      window.setTimeout(() => persistRemove(artifactId, elementId, key, n), backoffMs(n))
+    })
+  }
+  const commitRemove = (artifactId: string, elementId: string, key: string) => {
+    removeTimers.delete(key)
+    persistRemove(artifactId, elementId, key, 0)
+    window.setTimeout(() => recentlyRemoved.delete(key), RESTORE_WINDOW_MS)
+  }
+
   const cancelPending = (shapeId: TLShapeId) => {
     window.clearTimeout(updateTimers.get(shapeId))
     updateTimers.delete(shapeId)
     updateCats.delete(shapeId)
+    updateAttempts.delete(shapeId)
+    inFlightContent.delete(shapeId)
     window.clearTimeout(createTimers.get(shapeId))
     createTimers.delete(shapeId)
+    createAttempts.delete(shapeId)
   }
 
   const handleAdded = (rec: any) => {
+    const ref = resolveArtRef(rec.id)
+    // Undo of a top-level delete: restore the SAME artifact (no new id, no dup).
+    if (ref && !ref.elementId && String(rec.id).startsWith(ART_PREFIX)) {
+      const aid = ref.artifactId
+      const t = deleteTimers.get(aid)
+      if (t !== undefined) {
+        // DELETE not sent yet — cancelling is free, no HTTP.
+        window.clearTimeout(t)
+        deleteTimers.delete(aid)
+        pendingDelete.delete(aid)
+        clearFailing(aid)
+        return
+      }
+      if (recentlyDeleted.has(aid)) {
+        recentlyDeleted.delete(aid)
+        pendingDelete.add(aid) // suppress resurrection until restore round-trips
+        void restoreArtifactResult(aid).then((res) => {
+          if (disposed) return
+          clearFailing(aid)
+          if (!res.ok && !isTerminalHttp(res)) markFailing(aid)
+          window.setTimeout(() => pendingDelete.delete(aid), PENDING_TTL_MS)
+        })
+        return
+      }
+      return // a backend shape re-added but not from our delete — leave it
+    }
+    // Undo of a child-block removal.
+    if (ref && ref.elementId && String(rec.id).startsWith(ART_PREFIX)) {
+      const key = `${ref.artifactId}::${ref.elementId}`
+      const t = removeTimers.get(key)
+      if (t !== undefined) {
+        window.clearTimeout(t)
+        removeTimers.delete(key)
+        pendingRemove.delete(key)
+        clearFailing(key)
+        return
+      }
+      const patch = recentlyRemoved.get(key)
+      if (patch) {
+        recentlyRemoved.delete(key)
+        pendingRemove.add(key)
+        // element_patch upserts on the backend, so this re-adds the element.
+        void updateArtifactResult(ref.artifactId, { element_id: ref.elementId, element_patch: patch }).then((res) => {
+          if (disposed) return
+          clearFailing(key)
+          if (!res.ok && !isTerminalHttp(res)) markFailing(key)
+          window.setTimeout(() => pendingRemove.delete(key), PENDING_TTL_MS)
+        })
+        return
+      }
+      return // agent-authored child re-added — backend owns it
+    }
+    // A brand-new user-authored shape → create it.
     if (isBackendManaged(rec.id) || !CREATABLE.has(rec.type)) return
     // Only adopt top-level shapes — a frame's children are authored by the agent.
     if (typeof rec.parentId === 'string' && rec.parentId.startsWith('shape:')) return
@@ -382,9 +645,10 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
         artToTemp.delete(artifactId)
         tempToArt.delete(tempId)
       }
-      void deleteArtifact(artifactId).finally(() => {
-        window.setTimeout(() => pendingDelete.delete(artifactId), PENDING_TTL_MS)
-      })
+      // Defer the actual DELETE so an immediate Cmd+Z cancels it with no HTTP at
+      // all; otherwise it's sent (and stays restorable) after the defer window.
+      window.clearTimeout(deleteTimers.get(artifactId))
+      deleteTimers.set(artifactId, window.setTimeout(() => commitDelete(artifactId), DELETE_DEFER_MS))
     }
     for (const rec of records) {
       const ref = resolveArtRef(rec.id)
@@ -392,9 +656,10 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
       if (deletedArtifacts.has(ref.artifactId)) continue // its frame is going away
       const key = `${ref.artifactId}::${ref.elementId}`
       pendingRemove.add(key)
-      void updateArtifact(ref.artifactId, { element_remove: ref.elementId }).finally(() => {
-        window.setTimeout(() => pendingRemove.delete(key), PENDING_TTL_MS)
-      })
+      const patch = reconstructElementPatch(rec)
+      if (patch) recentlyRemoved.set(key, patch) // so an undo can re-add the child
+      window.clearTimeout(removeTimers.get(key))
+      removeTimers.set(key, window.setTimeout(() => commitRemove(ref.artifactId, ref.elementId as string, key), DELETE_DEFER_MS))
     }
   }
 
@@ -416,16 +681,29 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
   )
 
   return () => {
+    disposed = true
     unlisten()
     updateTimers.forEach((t) => window.clearTimeout(t))
     createTimers.forEach((t) => window.clearTimeout(t))
+    deleteTimers.forEach((t) => window.clearTimeout(t))
+    removeTimers.forEach((t) => window.clearTimeout(t))
     updateTimers.clear()
     updateCats.clear()
+    updateAttempts.clear()
     createTimers.clear()
+    createAttempts.clear()
+    deleteTimers.clear()
+    removeTimers.clear()
+    recentlyDeleted.clear()
+    recentlyRemoved.clear()
+    // Release the unsaved counter for anything still failing on this canvas.
+    failing.forEach(() => useRainyStore.getState().bumpUnsaved(-1))
+    failing.clear()
     tempToArt.clear()
     artToTemp.clear()
     pendingDelete.clear()
     pendingRemove.clear()
     dirtyUntil.clear()
+    inFlightContent.clear()
   }
 }

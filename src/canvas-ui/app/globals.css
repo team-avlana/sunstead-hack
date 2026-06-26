@@ -701,6 +701,182 @@ button, input { font-family: inherit; }
 .rainy-claude-show:hover { background: #fff; }
 .rainy-claude-show:active { transform: scale(0.94); }
 
+/* ---------- Agent panel (Rainey) — chat body inside the shared .cc shell ---------- */
+.cc-head-actions { display: inline-flex; align-items: center; gap: 6px; }
+.cc-model {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-dim);
+  background: rgba(18, 24, 48, 0.05); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 8px; cursor: pointer;
+}
+.cc-model:hover { color: var(--ink); }
+
+/* Scrolling transcript */
+.cc-chat {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 10px;
+}
+.cc-chat::-webkit-scrollbar { width: 8px; }
+.cc-chat::-webkit-scrollbar-thumb { background: rgba(18, 24, 48, 0.18); border-radius: 8px; }
+.cc-empty { color: var(--ink-dim); font-size: 12.5px; line-height: 1.5; padding: 8px 4px; }
+
+.cc-msg {
+  max-width: 86%; padding: 8px 11px; border-radius: 13px;
+  font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;
+}
+.cc-msg.user {
+  align-self: flex-end; background: var(--brand, #0C76FF); color: #fff;
+  border-bottom-right-radius: 5px;
+}
+.cc-msg.assistant {
+  align-self: flex-start; background: rgba(18, 24, 48, 0.06); color: var(--ink);
+  border-bottom-left-radius: 5px;
+}
+
+/* Tool-call chip + thinking + error, inline in the transcript */
+.cc-tool {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-dim);
+  background: rgba(12, 118, 255, 0.08); border: 1px solid rgba(12, 118, 255, 0.18);
+  border-radius: 999px; padding: 3px 9px; text-transform: capitalize;
+}
+.cc-think {
+  align-self: flex-start; max-width: 86%; font-size: 12px; line-height: 1.5;
+  color: var(--ink-dim); font-style: italic; opacity: 0.85; white-space: pre-wrap;
+}
+.cc-err {
+  align-self: stretch; font-size: 12px; line-height: 1.45; color: #b42318;
+  background: rgba(217, 45, 32, 0.08); border: 1px solid rgba(217, 45, 32, 0.2);
+  border-radius: 10px; padding: 7px 10px; white-space: pre-wrap;
+}
+
+/* Typing indicator */
+.cc-typing { display: inline-flex; gap: 4px; align-items: center; }
+.cc-typing span {
+  width: 6px; height: 6px; border-radius: 999px; background: var(--ink-dim);
+  opacity: 0.5; animation: cc-bounce 1.2s infinite ease-in-out;
+}
+.cc-typing span:nth-child(2) { animation-delay: 0.15s; }
+.cc-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes cc-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 0.9; } }
+
+/* Composer */
+.cc-compose {
+  flex: none; display: flex; align-items: flex-end; gap: 8px;
+  padding: 10px 12px 12px; border-top: 1px solid var(--border);
+}
+.cc-input {
+  flex: 1; resize: none; max-height: 140px;
+  font: inherit; font-size: 13px; line-height: 1.45; color: var(--ink);
+  background: rgba(18, 24, 48, 0.05); border: 1px solid var(--border);
+  border-radius: 12px; padding: 9px 11px; outline: none;
+  transition: border-color .14s ease, background .14s ease;
+}
+.cc-input:focus { border-color: var(--brand, #0C76FF); background: rgba(18, 24, 48, 0.03); }
+.cc-input:disabled { opacity: 0.6; }
+.cc-send {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: var(--brand, #0C76FF); color: #fff; cursor: pointer;
+  transition: opacity .14s ease, transform .1s ease;
+}
+.cc-send:hover { opacity: 0.92; }
+.cc-send:active { transform: scale(0.94); }
+.cc-send:disabled { opacity: 0.4; cursor: default; }
+
+/* MCP connection pill — shows whether the agent reached the canvas MCP server,
+   and how many of its tools loaded. Colour + dot encode the state. */
+.cc-mcp {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 8px 3px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--ink-dim);
+  background: rgba(18, 24, 48, 0.04); white-space: nowrap; user-select: none;
+}
+.cc-mcp-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex: none; }
+.cc-mcp.connecting { color: var(--ink-dim); }
+.cc-mcp.connecting .cc-mcp-dot { animation: cc-dotpulse 1.4s ease-in-out infinite; }
+.cc-mcp.connected {
+  color: #1c8c50; border-color: rgba(46, 193, 107, 0.35); background: rgba(46, 193, 107, 0.1);
+}
+.cc-mcp.error {
+  color: #b42318; border-color: rgba(217, 45, 32, 0.3); background: rgba(217, 45, 32, 0.08);
+}
+
+/* ---------- Agent panel: streaming micro-animations ---------- */
+/* Each new bubble / chip eases in: a gentle fade + rise, once on mount. */
+.cc-msg, .cc-tool, .cc-think, .cc-err {
+  animation: cc-rise 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes cc-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Streaming caret — a soft blinking bar trailing the live assistant text. */
+.cc-caret {
+  display: inline-block; width: 2px; height: 1.05em; margin-left: 2px;
+  vertical-align: text-bottom; border-radius: 1px;
+  background: var(--brand, #0C76FF);
+  animation: cc-blink 1.05s steps(1) infinite;
+}
+@keyframes cc-blink { 0%, 50% { opacity: 0.9; } 50.01%, 100% { opacity: 0; } }
+
+/* Thinking text, while it's still streaming, breathes gently. */
+.cc-think.live { animation: cc-breathe 1.8s ease-in-out infinite; }
+@keyframes cc-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+
+/* In-flight tool chip: a tiny rotating ring + a soft ring-glow pulse. */
+.cc-tool.active { animation: cc-rise 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) both, cc-toolpulse 1.6s ease-in-out infinite; }
+@keyframes cc-toolpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(12, 118, 255, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(12, 118, 255, 0.12); }
+}
+.cc-spin {
+  width: 11px; height: 11px; margin-left: 1px; border-radius: 999px;
+  border: 1.6px solid rgba(12, 118, 255, 0.25); border-top-color: var(--brand, #0C76FF);
+  animation: cc-rot 0.7s linear infinite;
+}
+@keyframes cc-rot { to { transform: rotate(360deg); } }
+
+/* The MCP pill's dot pulses softly while connecting (steady once connected). */
+@keyframes cc-dotpulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+
+/* Always-present status line between the transcript and composer. It reserves a
+   constant strip so its appearance never jolts the layout — only the content fades. */
+.cc-status {
+  flex: none; min-height: 22px; display: flex; align-items: center; gap: 8px;
+  padding: 1px 14px 3px; opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.cc-status.show { opacity: 1; }
+.cc-status-text {
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-dim);
+}
+.cc-status-orb {
+  width: 8px; height: 8px; border-radius: 999px; flex: none;
+  background: var(--ink-dim);
+  animation: cc-orb 1.4s ease-in-out infinite;
+}
+@keyframes cc-orb {
+  0%, 100% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+/* Phase tints — thinking is violet, tools are brand blue, writing is green. */
+.cc-status-orb[data-phase='waiting'],
+.cc-status-orb[data-phase='thinking'] { background: #8b6dff; }
+.cc-status-orb[data-phase='tool'] { background: var(--brand, #0C76FF); }
+.cc-status-orb[data-phase='writing'] { background: #2ec16b; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-msg, .cc-tool, .cc-tool.active, .cc-think, .cc-err { animation: none; }
+  .cc-caret { animation: none; opacity: 0.9; }
+  .cc-think.live { animation: none; opacity: 0.85; }
+  .cc-spin { animation-duration: 1.4s; }
+  .cc-mcp.connecting .cc-mcp-dot { animation: none; opacity: 0.5; }
+  .cc-status-orb { animation: none; opacity: 0.9; }
+}
+
 /* ---------- Sidebar shell (header + adaptive body) ---------- */
 .ci { display: flex; flex-direction: column; gap: 12px; padding: 16px 14px; height: 100%; min-height: 0; }
 .ci-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
@@ -882,13 +1058,21 @@ button, input { font-family: inherit; }
   font-variant-numeric: tabular-nums;
 }
 .outline {
-  flex: 1; min-height: 0; overflow-y: auto;
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  /* Keep scroll momentum inside the list — don't chain out to the canvas/page
+     when you hit the top or bottom (which otherwise reads as "can't scroll"). */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; gap: 1px;
   margin: 0 -6px; padding: 2px 0;
   animation: inspIn .26s ease both;
 }
 .outline-row {
   position: relative;
+  /* flex: none so rows keep a fixed 28px height regardless of how many there
+     are — otherwise the flex column shrinks them to fit and the spacing
+     visibly changes with the element count. They overflow-scroll instead. */
+  flex: none;
   display: flex; align-items: center; gap: 7px;
   height: 28px; padding-right: 10px;
   border-radius: 8px; cursor: default; user-select: none;
@@ -973,6 +1157,19 @@ button, input { font-family: inherit; }
   fill: #fcfdff;
   stroke: var(--primary-border);
   stroke-width: calc(1px * var(--tl-scale));
+  transition: stroke 120ms ease;
+}
+/* Selection / hover outline painted on the body (the overlay indicator + bounds
+   stroke are suppressed in FrameShape so they can't paint over the chrome). Uses
+   --tl-scale so the ring stays a constant on-screen width at any zoom, matching
+   tldraw's own selection stroke. */
+.rainy-frame-svg.is-hovered .rainy-frame-body {
+  stroke: color-mix(in srgb, var(--tl-color-selected, #0c76ff) 45%, transparent);
+  stroke-width: calc(1.5px * var(--tl-scale));
+}
+.rainy-frame-svg.is-selected .rainy-frame-body {
+  stroke: var(--tl-color-selected, #0c76ff);
+  stroke-width: calc(1.5px * var(--tl-scale));
 }
 
 /* Frame heading (title above the frame): quieter, app-matched type. */
@@ -1029,7 +1226,11 @@ button, input { font-family: inherit; }
   left: calc(-1 * var(--zx));
   right: calc(-1 * var(--zx));
   bottom: calc(-1 * var(--zb));
-  pointer-events: auto;
+  /* Click-through: the oversized dome used to capture hover over empty canvas (and
+     bleed onto neighbouring cards). Chrome now reveals from the card's own tight
+     geometry hover + the toolbar's own hover; only the visible children
+     (toolbar / grip / trash) take pointer events. */
+  pointer-events: none;
   /* arched/domed top to match the active-area mock */
   border-radius: 46% 46% 18px 18px / 42% 42% 6% 6%;
 }
@@ -1133,6 +1334,26 @@ button, input { font-family: inherit; }
   pointer-events: none;
 }
 .rt-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* Video block's floating view picker — reuses the text toolbar's inner pieces
+   (.rt-main / .rt-menu / .rt-pill / .rt-icon) but positions the column centered
+   just above the video card's top edge (standardised with the text + frame menus). */
+.vb-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 6;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+.vb-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
 .rt-main { display: inline-flex; align-items: center; gap: 2px; }
 
@@ -1243,8 +1464,10 @@ button, input { font-family: inherit; }
 /* Video + image — straddling the card's top-left corner. */
 .vb-trash,
 .ib-trash { top: -15px; left: -15px; }
-/* Frame — the name heading lives above the top edge, so tuck the button just
-   inside the top-left, straddling the left edge below the heading band. */
+/* Frame chrome is a passthrough layer; its children take pointer events only when
+   shown. Delete stays at the top-left corner (Apple convention), tucked just below
+   the name heading band; Auto-arrange floats above the top edge (see
+   `.frame-arrange` below). */
 .frame-chrome { pointer-events: none; }
 .frame-trash { top: 14px; left: -15px; }
 
@@ -1277,9 +1500,44 @@ button, input { font-family: inherit; }
 .shape-tidy.show { opacity: 1; transform: scale(1); pointer-events: auto; }
 .shape-tidy:hover { color: var(--ink); box-shadow: var(--shadow-md); }
 .shape-tidy:active { transform: scale(0.94); }
-.frame-tidy { top: 14px; right: -15px; }
 .rainy-root.dark .shape-tidy { background: #232a39; color: #8b93a6; }
 .rainy-root.dark .shape-tidy:hover { color: #e6eaf2; }
+
+/* Auto-arrange — a single floating button that sits ABOVE the frame's top edge,
+   horizontally CENTERED over the frame (standardised with the text card's toolbar,
+   which also centers over its element), revealed on hover/selection. Reflows the
+   blocks into a clean, non-overlapping grid. */
+.frame-arrange {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
+  transition: opacity 130ms ease, transform 130ms ease, background 130ms ease;
+  pointer-events: none;
+}
+.frame-arrange.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.frame-arrange:hover { background: rgba(18, 24, 48, 0.04); box-shadow: var(--shadow-md); }
+.frame-arrange:active { transform: translateX(-50%) scale(0.97); }
+.frame-arrange-label { line-height: 1; }
+.rainy-root.dark .frame-arrange { background: #232a39; border-color: rgba(255, 255, 255, 0.08); color: #e6eaf2; }
+.rainy-root.dark .frame-arrange:hover { background: #2b3344; }
 
 /* ============================================================
    Shared block chrome — the Notion-style "drag" grip
@@ -1312,6 +1570,21 @@ button, input { font-family: inherit; }
 .shape-grip:hover { color: var(--ink); box-shadow: var(--shadow-md); }
 .shape-grip:active,
 .shape-grip.dragging { cursor: grabbing; }
+
+/* Expand the grip's discoverable/hoverable area a bit BEYOND the visible pill —
+   especially toward the element's edge — so once the chrome is up, drifting toward
+   the left edge reaches the grip without a dead gap, and it's easier to find/grab.
+   Same principle as the text card's top menu region. Transparent, and pointer-
+   events is inherited, so it's inert until the grip is shown → never blocks the
+   canvas at rest. The right extension bridges the ~8px gap to the element edge. */
+.shape-grip::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  left: -12px;
+  right: -10px;
+}
 
 /* Left edge, vertically centred — for video + image + frame (relative to the shape). */
 .vb-grip,
@@ -1552,3 +1825,179 @@ button, input { font-family: inherit; }
 .rainy-app.dark .cc-term .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
 .rainy-app.dark .rainy-claude-show { background: rgba(34, 40, 54, 0.92); }
 .rainy-app.dark .rainy-claude-show:hover { background: rgba(44, 51, 68, 0.96); }
+/* Agent panel (Rainey) on dark glass */
+.rainy-app.dark .cc-model { background: rgba(255, 255, 255, 0.06); }
+.rainy-app.dark .cc-chat::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
+.rainy-app.dark .cc-msg.assistant { background: rgba(255, 255, 255, 0.08); }
+.rainy-app.dark .cc-input { background: rgba(255, 255, 255, 0.06); }
+.rainy-app.dark .cc-input:focus { background: rgba(255, 255, 255, 0.04); }
+.rainy-app.dark .cc-mcp.connecting { background: rgba(255, 255, 255, 0.06); }
+.rainy-app.dark .cc-mcp.connected { color: #54d98c; background: rgba(46, 193, 107, 0.14); }
+.rainy-app.dark .cc-mcp.error { color: #ff9b91; background: rgba(217, 45, 32, 0.16); }
+.rainy-app.dark .cc-err { color: #ff9b91; background: rgba(217, 45, 32, 0.14); border-color: rgba(217, 45, 32, 0.3); }
+
+/* ============================================================
+   Canvas stability UI — zoom readout, connection chip, error
+   overlay, first-run empty state. (Added in the stability pass.)
+   ============================================================ */
+
+/* Live zoom % button in the dock — fixed width so the pill doesn't reflow as the
+   value changes (10%…800%), tabular figures so digits don't jitter. */
+.rainy-tool.rainy-zoom {
+  width: auto;
+  min-width: 46px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--ink-dim);
+}
+.rainy-tool.rainy-zoom:hover { color: var(--ink); }
+
+/* Connection / save-health chip — bottom-left, clear of the centered dock. */
+.rainy-comms {
+  position: absolute;
+  left: 18px;
+  bottom: 26px;
+  z-index: 401;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--primary-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  animation: rainy-comms-in 220ms ease-out;
+}
+.rainy-comms-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-dim);
+  animation: rainy-comms-pulse 1.4s ease-in-out infinite;
+}
+.rainy-comms.warn { color: #9a6a00; border-color: rgba(214, 158, 46, 0.4); }
+.rainy-comms.warn .rainy-comms-dot { background: #e0a93a; }
+@keyframes rainy-comms-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes rainy-comms-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+.rainy-app.dark .rainy-comms { background: rgba(24, 28, 40, 0.82); }
+@media (prefers-reduced-motion: reduce) {
+  .rainy-comms, .rainy-comms-dot { animation: none; }
+}
+
+/* Failure fallback over the canvas — a clear card instead of a blank board. */
+.rainy-error {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.rainy-error-card {
+  max-width: 340px;
+  text-align: center;
+  padding: 0 24px;
+}
+.rainy-error-glyph {
+  color: var(--ink-dim);
+  margin-bottom: 14px;
+}
+.rainy-error-title {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.rainy-error-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin-bottom: 20px;
+}
+.rainy-error-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.rainy-error-btn {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--primary-border);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 140ms ease, transform 90ms ease;
+}
+.rainy-error-btn:hover { background: rgba(var(--primary-rgb), 0.08); }
+.rainy-error-btn:active { transform: scale(0.97); }
+.rainy-error-btn.primary {
+  border-color: transparent;
+  background: var(--primary);
+  color: #fff;
+}
+.rainy-error-btn.primary:hover { background: color-mix(in srgb, var(--primary) 88%, #000); }
+
+/* First-run empty state — a centered hint above the dock. Backdrop is click-
+   through so canvas pan/zoom still work; only the card + CTAs are interactive. */
+.rainy-empty {
+  position: absolute;
+  inset: 0 0 120px 0;
+  z-index: 390;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.rainy-empty-card {
+  text-align: center;
+  pointer-events: auto;
+  padding: 20px 26px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  border: 1px solid var(--primary-border);
+  box-shadow: var(--shadow-md);
+  animation: rainy-comms-in 280ms ease-out;
+}
+.rainy-empty-title { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.rainy-empty-sub { font-size: 12.5px; color: var(--ink-dim); margin-bottom: 16px; }
+.rainy-empty-cta { display: inline-flex; gap: 8px; }
+.rainy-empty-cta button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--primary-border);
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: background 140ms ease, transform 90ms ease;
+}
+.rainy-empty-cta button:hover { background: rgba(var(--primary-rgb), 0.08); }
+.rainy-empty-cta button:active { transform: scale(0.96); }
+.rainy-empty-cta button svg { width: 15px; height: 15px; }
+.rainy-app.dark .rainy-empty-card { background: rgba(24, 28, 40, 0.7); }
+.rainy-app.dark .rainy-empty-cta button { background: rgba(34, 40, 54, 0.6); }
+@media (prefers-reduced-motion: reduce) {
+  .rainy-empty-card { animation: none; }
+}
