@@ -416,13 +416,6 @@ function Body({
 
       {d.hook?.text ? <Hook hook={d.hook} /> : null}
 
-      {d.description ? (
-        <div>
-          <div className={s.sectionLabel}>Summary</div>
-          <p className={s.desc}>{d.description}</p>
-        </div>
-      ) : null}
-
       {view === 'full' && d.transcript ? (
         <div>
           <div className={s.sectionLabel}>Transcript</div>
@@ -433,9 +426,9 @@ function Body({
       {canStoryboard ? (
         <div>
           <div className={s.storyHead}>
-            <div className={s.sectionLabel}>Storyboard · {d.storyboard!.length} scenes</div>
+            <div className={s.sectionLabel}>Scenes · {d.storyboard!.length}</div>
           </div>
-          {view === 'full' ? <Storyboard scenes={d.storyboard!} /> : null}
+          <Storyboard scenes={d.storyboard!} />
         </div>
       ) : null}
     </div>
