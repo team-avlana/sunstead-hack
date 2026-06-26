@@ -58,6 +58,43 @@ class ImageConfig:
 
 
 @dataclass
+class AgentConfig:
+    """Our own assistant, built on the Claude Agent SDK and hosted by this service
+    (the default right-panel experience — see canvas-ui/components/AgentPanel.tsx).
+
+    Unlike the Claude Code PTY path (which runs under the user's own login), the
+    agent authenticates with a COMPANY-OWNED credential read from the process env,
+    so end users never supply Claude credentials. Provider routing for the Agent
+    SDK is global env config read at engine startup, NOT a per-call base_url:
+
+      - `base_url` → exported as ANTHROPIC_BASE_URL. Point this at an Anthropic-
+        compatible endpoint (e.g. the Azure Foundry endpoint — the same one the
+        analysis-worker uses via AnthropicFoundry) to bill agent inference through
+        Azure. Leave empty for the direct Anthropic API.
+      - `api_key`  → exported as ANTHROPIC_API_KEY (falls back to the Azure / direct
+        Anthropic key already configured under [llm]).
+
+    AZURE FOUNDRY (verified working): the Agent SDK / Claude Code engine does NOT
+    ride Azure via a plain ANTHROPIC_BASE_URL — that makes it send first-party-only
+    beta headers Azure rejects (400). Instead it has a dedicated Foundry mode keyed
+    off `foundry_resource`: when set, agent_bridge exports CLAUDE_CODE_USE_FOUNDRY=1
+    + ANTHROPIC_FOUNDRY_RESOURCE + ANTHROPIC_FOUNDRY_API_KEY (and leaves the
+    first-party vars unset). The resource is the first label of the Azure host
+    (e.g. `avlana-gpt-sweden-resource` from `avlana-gpt-sweden-resource.services.ai.azure.com`).
+    Only models actually deployed in that resource work (here: sonnet / haiku, not
+    opus). With no Foundry resource we fall back to direct Anthropic via base_url +
+    api_key (ANTHROPIC_BASE_URL / ANTHROPIC_API_KEY).
+    """
+
+    enabled: bool = True
+    model: str = "claude-sonnet-4-6"
+    base_url: str = ""
+    api_key: str = ""
+    # Azure Foundry resource name; when set the agent uses Foundry mode (above).
+    foundry_resource: str = ""
+
+
+@dataclass
 class TerminalConfig:
     """The Claude Code CLI hosted in a PTY for the canvas's right-side panel.
 
@@ -71,13 +108,25 @@ class TerminalConfig:
 
 
 @dataclass
+class DevConfig:
+    """Development-only observability. When `logs` is on (env RAINY_DEV_LOGS), the
+    service runs an in-memory activity/timing event bus and exposes /dev/events so
+    the canvas-ui can render the Service Activity panel. Off by default — never
+    enable in a shared/exposed deployment (it streams internal logs + timings)."""
+
+    logs: bool = False
+
+
+@dataclass
 class Settings:
     db: DbConfig = field(default_factory=DbConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     worker: WorkerConfig = field(default_factory=WorkerConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     image: ImageConfig = field(default_factory=ImageConfig)
+    agent: AgentConfig = field(default_factory=AgentConfig)
     terminal: TerminalConfig = field(default_factory=TerminalConfig)
+    dev: DevConfig = field(default_factory=DevConfig)
 
 
 def load() -> Settings:
@@ -93,7 +142,13 @@ def load() -> Settings:
     wkr_raw = raw.get("worker", {})
     llm_raw = raw.get("llm", {})
     img_raw = raw.get("image", {})
+    agent_raw = raw.get("agent", {})
     term_raw = raw.get("terminal", {})
+    dev_raw = raw.get("dev", {})
+
+    dev_logs = str(
+        os.environ.get("RAINY_DEV_LOGS", dev_raw.get("logs", False))
+    ).lower() in ("1", "true", "yes", "on")
 
     # Env vars override config.toml for credentials
     conn_str = os.environ.get("DB_CONNECTION_STRING") or db_raw.get(
@@ -124,6 +179,39 @@ def load() -> Settings:
     openai_storyboard_deployment = os.environ.get("AZURE_OPENAI_STORYBOARD_DEPLOYMENT") or img_raw.get(
         "azure_openai_storyboard_deployment", ImageConfig.azure_openai_storyboard_deployment
     )
+
+    # The agent's provider defaults to the same credentials the rest of the service
+    # already has: an explicit ANTHROPIC_BASE_URL, else the Azure Foundry endpoint;
+    # the key falls back to the direct-Anthropic key, then the Azure key.
+    agent_model = os.environ.get("RAINY_AGENT_MODEL") or agent_raw.get(
+        "model", AgentConfig.model
+    )
+    agent_base_url = (
+        os.environ.get("ANTHROPIC_BASE_URL")
+        or agent_raw.get("base_url", "")
+        or azure_url
+    )
+    agent_api_key = (
+        os.environ.get("ANTHROPIC_API_KEY")
+        or agent_raw.get("api_key", "")
+        or anthropic_key
+        or azure_key
+    )
+    # Azure Foundry resource: explicit env/config, else derived from the Azure host's
+    # first label (avlana-gpt-sweden-resource.services.ai.azure.com → the label).
+    agent_foundry_resource = (
+        os.environ.get("ANTHROPIC_FOUNDRY_RESOURCE")
+        or agent_raw.get("foundry_resource", "")
+    )
+    if not agent_foundry_resource and azure_url:
+        from urllib.parse import urlparse
+
+        host = urlparse(azure_url).hostname or ""
+        if host.endswith(".services.ai.azure.com"):
+            agent_foundry_resource = host.split(".")[0]
+    agent_enabled = str(
+        os.environ.get("RAINY_AGENT_ENABLED", agent_raw.get("enabled", True))
+    ).lower() not in ("0", "false", "no")
 
     return Settings(
         db=DbConfig(connection_string=conn_str),
@@ -156,6 +244,13 @@ def load() -> Settings:
             azure_openai_deployment=openai_deployment,
             azure_openai_storyboard_deployment=openai_storyboard_deployment,
         ),
+        agent=AgentConfig(
+            enabled=agent_enabled,
+            model=agent_model,
+            base_url=agent_base_url,
+            api_key=agent_api_key,
+            foundry_resource=agent_foundry_resource,
+        ),
         terminal=TerminalConfig(
             enabled=str(
                 os.environ.get("RAINY_TERMINAL_ENABLED", term_raw.get("enabled", True))
@@ -168,6 +263,7 @@ def load() -> Settings:
             ),
             cwd=os.environ.get("RAINY_CLAUDE_CWD") or term_raw.get("cwd", ""),
         ),
+        dev=DevConfig(logs=dev_logs),
     )
 
 

@@ -15,6 +15,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 import db
+import dev_events
 import image_gen
 
 
@@ -79,12 +80,13 @@ def register(mcp: FastMCP) -> None:
                     }
 
         # ── generate the image ────────────────────────────────────────────────
-        png_bytes = image_gen.generate_storyboard_frame(
-            concept,
-            shot_type=shot_type,
-            style_hints=style_hints,
-            aspect_ratio=aspect_ratio,
-        )
+        with dev_events.track("image", f"storyboard frame ({shot_type})", detail=concept[:80]):
+            png_bytes = image_gen.generate_storyboard_frame(
+                concept,
+                shot_type=shot_type,
+                style_hints=style_hints,
+                aspect_ratio=aspect_ratio,
+            )
 
         # ── persist to DB ─────────────────────────────────────────────────────
         frame_id = db.save_storyboard_frame(

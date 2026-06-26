@@ -25,13 +25,16 @@ import uvicorn
 from fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
-from starlette.routing import Mount, WebSocketRoute
+from starlette.routing import Mount, Route, WebSocketRoute
 
+import agent_bridge
 import db
+import dev_events
 import notify
 import pty_bridge
 from block_normalize import BLOCK_TAXONOMY_GUIDE, WRITING_STYLE_GUIDE
 from config import settings
+from review_workflow import UGC_REVIEW_GUIDE
 from routes_api import routes as api_routes
 from tools import analysis, artifacts, creators, memory, projects, storyboard
 
@@ -122,6 +125,8 @@ mcp = FastMCP(
         + BLOCK_TAXONOMY_GUIDE
         + "\n\n"
         + WRITING_STYLE_GUIDE
+        + "\n\n"
+        + UGC_REVIEW_GUIDE
     ),
 )
 
@@ -144,6 +149,10 @@ _mcp_asgi = mcp.http_app()
 @asynccontextmanager
 async def lifespan(app: Starlette):
     async with _mcp_asgi.router.lifespan_context(app):
+        # Dev-only activity bus: hand it the running loop so cross-thread emits land
+        # safely, and forward stdlib logs into it. Both are no-ops unless enabled.
+        dev_events.set_loop(asyncio.get_running_loop())
+        dev_events.install_log_handler()
         # Bridge cross-process changes (analysis-worker, analyze_video) to WS.
         listener = asyncio.create_task(notify.pg_listen(settings.db.connection_string))
         try:
@@ -162,12 +171,21 @@ _app = Starlette(
     routes=[
         # Order matters: specific routes before the catch-all MCP mount at "/".
         WebSocketRoute("/ws", notify.websocket_endpoint),
-        # Hosts the user's own `claude` CLI in a PTY for the canvas right panel.
+        # Our own assistant (Claude Agent SDK) — the default right-panel agent.
+        WebSocketRoute("/agent", agent_bridge.agent_endpoint),
+        # Hosts the user's own `claude` CLI in a PTY (opt-in via Settings).
         WebSocketRoute("/pty", pty_bridge.terminal_endpoint),
+        # Dev-only activity/timing stream (gated by RAINY_DEV_LOGS).
+        WebSocketRoute("/dev/events", dev_events.events_websocket),
+        Route("/api/dev/events", dev_events.events_snapshot),
+        Route("/api/dev/status", dev_events.status_endpoint),
         *api_routes,
         Mount("/", app=_mcp_asgi),
     ],
 )
+
+# Time every HTTP request as a span on the activity bus (no-op when disabled).
+_app = dev_events.TimingMiddleware(_app)
 
 # NOTE: wildcard CORS + no auth is intended for LOCAL use only — the server binds
 # 127.0.0.1. Before any non-local/exposed deployment, restrict allow_origins to the

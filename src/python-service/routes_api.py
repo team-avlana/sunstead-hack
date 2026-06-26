@@ -8,6 +8,7 @@ Mounted alongside the MCP server in server.py.
     GET    /api/artifacts/{artifact_id}      -> enriched artifact
     PUT    /api/artifacts/{artifact_id}      -> update; broadcasts WS change signal
     DELETE /api/artifacts/{artifact_id}      -> soft-delete; broadcasts WS change signal
+    POST   /api/artifacts/{artifact_id}/restore -> undo soft-delete; broadcasts WS change signal
     POST   /api/analyze                      -> start analysis for a URL -> {video_id}
     GET    /api/videos/{video_id}            -> {video, shots_summary}
     GET    /api/videos/{video_id}/status     -> lightweight status poll
@@ -30,6 +31,7 @@ from starlette.routing import Route
 
 import active_project
 import db
+import dev_events
 import notify
 import video_view
 from tools.analysis import start_channel_analysis
@@ -152,6 +154,7 @@ async def create_artifact(request: Request) -> JSONResponse:
                 title=body.get("title"),
                 payload=body.get("payload") or {},
                 position=body.get("position"),
+                client_id=body.get("client_id"),
             )
         )
     except Exception:
@@ -225,6 +228,27 @@ async def delete_artifact(request: Request) -> JSONResponse:
         project_id=result["project_id"],
     )
     return JSONResponse({"ok": True})
+
+
+async def restore_artifact(request: Request) -> JSONResponse:
+    """Undo a delete: clear the soft-delete so the same artifact id comes back.
+    Idempotent; broadcasts the same change signal so every client re-pulls it."""
+    aid = request.path_params["artifact_id"]
+    result = await run_in_threadpool(db.restore_artifact, aid)
+    if result is None:
+        return JSONResponse({"error": "artifact not found"}, status_code=404)
+
+    await notify.broadcast(
+        {
+            "type": "artifact",
+            "action": "restored",
+            "artifact_id": aid,
+            "project_id": result["project_id"],
+            "version": result["version"],
+        },
+        project_id=result["project_id"],
+    )
+    return JSONResponse({"artifact_id": aid, "version": result["version"]})
 
 
 async def get_video_status(request: Request) -> JSONResponse:
@@ -375,9 +399,10 @@ async def post_creator_room_image(request: Request) -> JSONResponse:
         pass  # body is optional — proceed without
 
     try:
-        png_bytes = await run_in_threadpool(
-            lambda: image_gen.generate(cid, profile, avatar_photo, prompt)
-        )
+        with dev_events.track("image", "generate room image", detail=cid):
+            png_bytes = await run_in_threadpool(
+                lambda: image_gen.generate(cid, profile, avatar_photo, prompt)
+            )
     except RuntimeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=503)
     except Exception as exc:
@@ -565,6 +590,7 @@ routes = [
     Route("/api/artifacts/{artifact_id}", get_artifact, methods=["GET", "HEAD"]),
     Route("/api/artifacts/{artifact_id}", update_artifact, methods=["PUT"]),
     Route("/api/artifacts/{artifact_id}", delete_artifact, methods=["DELETE"]),
+    Route("/api/artifacts/{artifact_id}/restore", restore_artifact, methods=["POST"]),
     Route("/api/analyze", analyze, methods=["POST"]),
     Route("/api/analyze-channel", analyze_channel, methods=["POST"]),
     Route("/api/videos/{video_id}/status", get_video_status),

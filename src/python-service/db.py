@@ -424,13 +424,43 @@ def create_artifact(
     title: str | None,
     payload: Any,
     position: Any = None,
+    client_id: str | None = None,
 ) -> dict:
+    """Create an artifact. When the canvas supplies a `client_id` (a UUID it
+    generated and already mapped to the on-canvas shape), the insert is idempotent:
+    a retried create after a lost response upserts on that id (ON CONFLICT DO
+    NOTHING) and returns the existing row instead of inserting a duplicate. The
+    conflict lookup is scoped to the requesting project so a client-supplied id
+    can't address another project's artifact."""
     payload = block_normalize.normalize_payload(payload)
+    pos = json.dumps(position) if position else None
     with get_conn() as conn:
+        if client_id:
+            row = conn.execute(
+                "INSERT INTO artifacts (id, project_id, type, title, payload, position) "
+                "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING RETURNING id, version",
+                (client_id, project_id, type_, title, json.dumps(payload), pos),
+            ).fetchone()
+            if row is None:
+                # Conflict: the id already exists. Return it if it's ours (same
+                # project); otherwise (a cross-project id collision) fall back to a
+                # server-generated id so we never leak/hijack another project's row.
+                row = conn.execute(
+                    "SELECT id, version FROM artifacts WHERE id = %s AND project_id = %s",
+                    (client_id, project_id),
+                ).fetchone()
+                if row is None:
+                    row = conn.execute(
+                        "INSERT INTO artifacts (project_id, type, title, payload, position) "
+                        "VALUES (%s, %s, %s, %s, %s) RETURNING id, version",
+                        (project_id, type_, title, json.dumps(payload), pos),
+                    ).fetchone()
+            return {"artifact_id": str(row["id"]), "version": row["version"], "project_id": project_id}
+
         row = conn.execute(
             "INSERT INTO artifacts (project_id, type, title, payload, position) "
             "VALUES (%s, %s, %s, %s, %s) RETURNING id, version",
-            (project_id, type_, title, json.dumps(payload), json.dumps(position) if position else None),
+            (project_id, type_, title, json.dumps(payload), pos),
         ).fetchone()
         return {"artifact_id": str(row["id"]), "version": row["version"], "project_id": project_id}
 
@@ -446,8 +476,13 @@ def update_artifact(
     title: str | None = None,
 ) -> dict | None:
     with get_conn() as conn:
+        # FOR UPDATE locks the row for this transaction so the payload.elements
+        # read-modify-write below is atomic: concurrent element patches/removes to
+        # the SAME frame (a Tidy fan-out, or several blocks flushing at once) can no
+        # longer lose each other's writes (which the canvas reconcile would then see
+        # as a dropped element and DELETE). Same-connection per request via the pool.
         row = conn.execute(
-            "SELECT id, project_id, payload FROM artifacts WHERE id = %s AND deleted_at IS NULL",
+            "SELECT id, project_id, payload FROM artifacts WHERE id = %s AND deleted_at IS NULL FOR UPDATE",
             (artifact_id,),
         ).fetchone()
         if not row:
@@ -457,13 +492,20 @@ def update_artifact(
         project_id = str(row["project_id"])
 
         if element_id is not None and element_patch is not None:
-            # Addressed element update — merge the patch into the matching element.
+            # Addressed element update — merge the patch into the matching element,
+            # or UPSERT it (append) if absent. The upsert lets an undo re-add a
+            # just-removed child (and a block moved into a frame) round-trip instead
+            # of vanishing on the next reconcile.
             if isinstance(current_payload, dict):
                 elements = list(current_payload.get("elements", []) or [])
+                found = False
                 for i, el in enumerate(elements):
                     if isinstance(el, dict) and el.get("id") == element_id:
                         elements[i] = {**el, **element_patch}
+                        found = True
                         break
+                if not found:
+                    elements.append({**element_patch, "id": element_id})
                 current_payload = {**current_payload, "elements": elements}
             new_payload = current_payload
         elif element_remove is not None:
@@ -550,6 +592,25 @@ def delete_artifact(artifact_id: str) -> dict | None:
     if not row:
         return None
     return {"ok": True, "artifact_id": str(row["id"]), "project_id": str(row["project_id"])}
+
+
+def restore_artifact(artifact_id: str) -> dict | None:
+    """Undo a soft-delete: clear deleted_at so the SAME artifact id comes back (no
+    id drift, no duplicate). Idempotent — restoring a live artifact is a no-op.
+    Returns None only if the id doesn't exist at all."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "UPDATE artifacts SET deleted_at = NULL WHERE id = %s RETURNING id, project_id, version",
+            (artifact_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "ok": True,
+        "artifact_id": str(row["id"]),
+        "project_id": str(row["project_id"]),
+        "version": row["version"],
+    }
 
 
 def _artifact_row(row: dict) -> dict:

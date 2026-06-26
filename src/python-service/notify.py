@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 import db
+import dev_events
 
 log = logging.getLogger("rainy.notify")
 
@@ -72,9 +73,17 @@ async def broadcast(signal: dict[str, Any], project_id: str) -> None:
 
 
 async def websocket_endpoint(ws: WebSocket) -> None:
+    # Two subscription scopes share this endpoint:
+    #   ?project_id=… → artifact change-signals for a project (the canvas re-pulls).
+    #   ?video_id=…   → updates for ONE video (a local Video Block watching its own
+    #                   analysis live, without an artifact to scope it). Keyed
+    #                   "video:{id}" so a local block gets pushed stage/done signals
+    #                   instead of polling GET /api/videos/{id}.
     project_id: str | None = ws.query_params.get("project_id")
+    video_id: str | None = ws.query_params.get("video_id")
+    key = f"video:{video_id}" if video_id else project_id
     await ws.accept()
-    await register(ws, project_id)
+    await register(ws, key)
     try:
         while True:
             # Keep connection alive; clients don't send data
@@ -82,7 +91,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     except (WebSocketDisconnect, Exception):
         pass
     finally:
-        await unregister(ws, project_id)
+        await unregister(ws, key)
 
 
 # ── Postgres LISTEN/NOTIFY bridge ──────────────────────────────────────────────
@@ -92,7 +101,22 @@ async def _route_change(payload: dict[str, Any]) -> None:
     kind = payload.get("type")
     if kind == "video":
         video_id = payload.get("video_id")
-        signal = {"type": "video", "action": payload.get("action"), "video_id": video_id}
+        action = payload.get("action")
+        stage = payload.get("stage")
+        # Surface analysis lifecycle on the dev activity bus (no-op when disabled).
+        dev_events.emit_event(
+            "log", "analysis",
+            f"video {action}" + (f": {stage}" if stage else ""), "INFO",
+            detail=str(video_id),
+        )
+        signal = {"type": "video", "action": action, "video_id": video_id}
+        if stage:
+            signal["stage"] = stage
+        # Local Video Blocks subscribe by video_id — push straight to them so they
+        # never poll. (Their canvas project may not reference the video as an
+        # artifact, so the project routing below wouldn't reach them.)
+        if video_id:
+            await broadcast(signal, project_id=f"video:{video_id}")
         project_ids = []
         if video_id:
             try:
@@ -102,8 +126,8 @@ async def _route_change(payload: dict[str, Any]) -> None:
         if project_ids:
             for pid in project_ids:
                 await broadcast(signal, project_id=pid)
-        else:
-            # Nothing references it yet — tell any unscoped (all-projects) listeners.
+        elif not video_id:
+            # Nothing to scope to — tell any unscoped (all-projects) listeners.
             await broadcast(signal, project_id="__all__")
     elif kind == "artifact":
         pid = payload.get("project_id")
