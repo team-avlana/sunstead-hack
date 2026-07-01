@@ -261,3 +261,4 @@ docs/tasks/**
 # python-service / comms-service (local config holds secrets)
 src/python-service/config.toml
 src/comms-service/config.toml
+backups/
