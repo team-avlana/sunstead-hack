@@ -17,7 +17,19 @@
  */
 
 import { createShapeId, type Editor, type TLShapeId } from 'tldraw'
-import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, composeTextHtml, dims, type TextFormat, type VideoData } from '@/lib/blockTypes'
+import {
+  IMAGE_BLOCK,
+  KEYFRAME_DEFAULT_DIMS,
+  KEYFRAME_TRACK,
+  RAINY_TEXT,
+  VIDEO_BLOCK,
+  composeTextHtml,
+  dims,
+  type Keyframe,
+  type KeyframeTrackData,
+  type TextFormat,
+  type VideoData,
+} from '@/lib/blockTypes'
 import {
   fetchProjectStateResult,
   resolveAssetUrl,
@@ -104,6 +116,23 @@ function imageShapeProps(el: Record<string, unknown>): { w: number; h: number; s
   const caption = str('caption') ?? str('concept') ?? str('label') ?? ''
   const shotType = str('shot_type') ?? str('shotType') ?? ''
   return { w, h, src, caption, shotType }
+}
+
+/** A Keyframe Track shape's `data` JSON from an artifact payload (standalone) or a
+ * `keyframe-track` frame element. The whole track is self-contained: explicit
+ * `keyframes` (each a direct image URL the agent pulled from the avlana clips) or
+ * a `video_id` the shape self-populates from. Keyframe srcs are resolved at render
+ * (per tile), so relative `/frames/{id}` and absolute avlana URLs both work. */
+function keyframeTrackData(src: Record<string, unknown>): string {
+  const str = (k: string): string | null => (typeof src[k] === 'string' ? (src[k] as string) : null)
+  const data: KeyframeTrackData = {
+    title: str('title'),
+    source_url: str('source_url') ?? str('url'),
+    video_id: str('video_id'),
+    view: src.view === 'grid' ? 'grid' : 'strip',
+    keyframes: Array.isArray(src.keyframes) ? (src.keyframes as Keyframe[]) : [],
+  }
+  return JSON.stringify(data)
 }
 
 /** A text element's body. Prefer the self-describing structured form
@@ -204,6 +233,10 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
         children.push({ id, type: VIDEO_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: vp })
       } else if (el.type === 'image') {
         children.push({ id, type: IMAGE_BLOCK, x: ex, y: ey, parentId: frameId, meta, props: imageShapeProps(el) })
+      } else if (el.type === 'keyframe-track' || el.type === 'keyframes') {
+        const kw = typeof el.w === 'number' ? el.w : KEYFRAME_DEFAULT_DIMS.w
+        const kh = typeof el.h === 'number' ? el.h : KEYFRAME_DEFAULT_DIMS.h
+        children.push({ id, type: KEYFRAME_TRACK, x: ex, y: ey, parentId: frameId, meta, props: { w: kw, h: kh, data: keyframeTrackData(el) } })
       } else {
         const ew = typeof el.w === 'number' ? el.w : 320
         const eh = typeof el.h === 'number' ? el.h : 200
@@ -219,6 +252,14 @@ function expandArtifact(a: EnrichedArtifact, index: number): ShapeDesc[] {
   if (a.type === 'video') {
     const payload = (a.payload ?? {}) as Record<string, unknown>
     return [{ id: artId(a.artifact_id), type: VIDEO_BLOCK, x, y, props: videoShapeProps({ ...payload, video: a.video, title: a.title }) }]
+  }
+  if (a.type === KEYFRAME_TRACK || a.type === 'keyframes') {
+    const payload = (a.payload ?? {}) as Record<string, unknown>
+    const kw = typeof pos.w === 'number' ? pos.w : KEYFRAME_DEFAULT_DIMS.w
+    const kh = typeof pos.h === 'number' ? pos.h : KEYFRAME_DEFAULT_DIMS.h
+    // Carry the artifact title down when the payload doesn't name the track itself.
+    const data = keyframeTrackData({ title: a.title ?? undefined, ...payload })
+    return [{ id: artId(a.artifact_id), type: KEYFRAME_TRACK, x, y, props: { w: kw, h: kh, data } }]
   }
   // Match the default text-card footprint (= analysed/expanded video block).
   const w = typeof pos.w === 'number' ? pos.w : 360
@@ -375,6 +416,16 @@ export async function syncBackendProject(editor: Editor, projectId: string): Pro
                   type: IMAGE_BLOCK,
                   props: { src: d.props.src, caption: d.props.caption, shotType: d.props.shotType },
                 } as any)
+              }
+            } else if (d.type === KEYFRAME_TRACK) {
+              // Refresh the track's data (keyframes / video_id / view / title) when
+              // the artifact changed, but never while the user is mid-edit (set a
+              // video, toggle the view) before that round-trips. Size stays the
+              // user's (w/h aren't patched).
+              const cp = (cur as any).props ?? {}
+              if (!isContentDirty(editor, d.id) && cp.data !== d.props.data) {
+                editor.updateShape({ id: d.id, type: KEYFRAME_TRACK, props: { data: d.props.data } } as any)
+                if (d.parentId) touchedFrames.add(d.parentId)
               }
             } else if (d.type === RAINY_TEXT) {
               // Don't overwrite text the user is editing / just edited before it

@@ -32,12 +32,14 @@ import { RainyFrameShapeUtil } from './FrameShape'
 import { RainyTextShapeUtil } from './RainyTextShape'
 import { VideoBlockShapeUtil } from './VideoBlockShape'
 import { ImageBlockShapeUtil } from './ImageBlockShape'
+import { KeyframeTrackShapeUtil } from './KeyframeTrackShape'
 
 const shapeUtils: TLShapeUtilConstructor<any>[] = [
   RainyFrameShapeUtil,
   RainyTextShapeUtil,
   VideoBlockShapeUtil,
   ImageBlockShapeUtil,
+  KeyframeTrackShapeUtil,
 ]
 
 const isBackendShapeId = (id: string) => id.startsWith('shape:art-')

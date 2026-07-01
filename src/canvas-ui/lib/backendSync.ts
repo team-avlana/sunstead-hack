@@ -27,7 +27,7 @@
  */
 
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
-import { IMAGE_BLOCK, RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat } from '@/lib/blockTypes'
+import { IMAGE_BLOCK, KEYFRAME_TRACK, RAINY_TEXT, VIDEO_BLOCK, getTextParts, inferFormat, parseKeyframeData } from '@/lib/blockTypes'
 import {
   createArtifactResult,
   deleteArtifactResult,
@@ -175,7 +175,12 @@ function buildPatch(shape: any, cats: Set<Cat>, ref: ArtRef): ArtifactPatch | nu
       // Persist the box for any block the user can resize. A pinned video keeps
       // its user width on re-pull (height stays content-derived via the auto-fit
       // observer); text + image keep both dimensions.
-      if (shape.type === RAINY_TEXT || shape.type === IMAGE_BLOCK || shape.type === VIDEO_BLOCK) {
+      if (
+        shape.type === RAINY_TEXT ||
+        shape.type === IMAGE_BLOCK ||
+        shape.type === VIDEO_BLOCK ||
+        shape.type === KEYFRAME_TRACK
+      ) {
         ep.w = num(p.w)
         ep.h = num(p.h)
       }
@@ -186,6 +191,7 @@ function buildPatch(shape: any, cats: Set<Cat>, ref: ArtRef): ArtifactPatch | nu
     if (cats.has('content')) {
       if (shape.type === RAINY_TEXT) Object.assign(ep, textElementParts(p.html ?? ''))
       else if (shape.type === VIDEO_BLOCK) ep.view = p.view
+      else if (shape.type === KEYFRAME_TRACK) Object.assign(ep, parseKeyframeData(p.data ?? ''))
     }
     return Object.keys(ep).length ? { element_id: ref.elementId, element_patch: ep } : null
   }
@@ -194,16 +200,23 @@ function buildPatch(shape: any, cats: Set<Cat>, ref: ArtRef): ArtifactPatch | nu
   const body: ArtifactPatch = {}
   if (cats.has('geom')) body.position = geomOf(shape)
   if (cats.has('content')) {
-    const pp: Record<string, unknown> = {}
-    if (shape.type === RAINY_TEXT) pp.content = p.html ?? ''
-    else if (shape.type === VIDEO_BLOCK) pp.view = p.view
-    else if (shape.type === FRAME) {
-      pp.label = p.name ?? ''
-      body.title = p.name ?? '' // keep the artifact title in step with the frame name
+    if (shape.type === KEYFRAME_TRACK) {
+      // The track's whole content lives in `data` — replace the payload with it.
+      const data = parseKeyframeData(p.data ?? '')
+      body.payload = { ...data }
+      body.title = data.title || ''
+    } else {
+      const pp: Record<string, unknown> = {}
+      if (shape.type === RAINY_TEXT) pp.content = p.html ?? ''
+      else if (shape.type === VIDEO_BLOCK) pp.view = p.view
+      else if (shape.type === FRAME) {
+        pp.label = p.name ?? ''
+        body.title = p.name ?? '' // keep the artifact title in step with the frame name
+      }
+      if (Object.keys(pp).length) body.payload_patch = pp
     }
-    if (Object.keys(pp).length) body.payload_patch = pp
   }
-  return body.position || body.payload_patch || body.title !== undefined ? body : null
+  return body.position || body.payload || body.payload_patch || body.title !== undefined ? body : null
 }
 
 /** Build the create body for a user-authored shape (always top-level). */
@@ -220,10 +233,16 @@ function draftArtifact(shape: any): NewArtifact | null {
     const name = p.name ?? 'Flow'
     return { type: 'frame', title: name, payload: { label: name, elements: [] }, position }
   }
+  if (shape.type === KEYFRAME_TRACK) {
+    // The whole track is self-contained in `data` — store it as the payload so it
+    // round-trips (explicit keyframes, or a video_id the canvas self-populates from).
+    const data = parseKeyframeData(p.data ?? '')
+    return { type: KEYFRAME_TRACK, title: data.title || null, payload: { ...data }, position }
+  }
   return null
 }
 
-const CREATABLE = new Set<string>([RAINY_TEXT, VIDEO_BLOCK, FRAME])
+const CREATABLE = new Set<string>([RAINY_TEXT, VIDEO_BLOCK, FRAME, KEYFRAME_TRACK])
 
 /** Reconstruct a full element payload from a removed child shape record, so an undo
  * can re-add the element to its frame (the backend element_patch upserts). Returns
@@ -252,6 +271,11 @@ function reconstructElementPatch(rec: any): Record<string, unknown> | undefined 
     ep.w = num(p.w)
     ep.h = num(p.h)
     ep.view = p.view ?? 'expanded'
+  } else if (rec.type === KEYFRAME_TRACK) {
+    ep.type = KEYFRAME_TRACK
+    ep.w = num(p.w)
+    ep.h = num(p.h)
+    Object.assign(ep, parseKeyframeData(p.data ?? ''))
   } else {
     return undefined
   }
@@ -621,6 +645,7 @@ export function attachBackendSync(editor: Editor, projectId: string): () => void
     if (pf.w !== pt.w || pf.h !== pt.h) geom = true
     if (to.type === RAINY_TEXT && pf.html !== pt.html) content = true
     if (to.type === VIDEO_BLOCK && pf.view !== pt.view) content = true
+    if (to.type === KEYFRAME_TRACK && pf.data !== pt.data) content = true
     if (to.type === FRAME && pf.name !== pt.name) content = true
     if (geom) {
       scheduleUpdate(to.id, 'geom')

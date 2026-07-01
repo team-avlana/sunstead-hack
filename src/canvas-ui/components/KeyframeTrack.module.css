@@ -1,0 +1,445 @@
+/* Keyframe Track — a scrubbable filmstrip of a video's keyframes.
+   Scoped CSS Module. Reuses the Rainy design tokens (--ink, --primary-rgb, …)
+   from app/globals.css and the same card aesthetic + appear motion as the
+   Image / Video block modules. */
+
+.host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+}
+.host::after {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border-radius: 28px;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(58% 58% at 26% 22%, rgba(40, 210, 255, 0.32), transparent 70%),
+    radial-gradient(58% 58% at 78% 80%, rgba(132, 86, 255, 0.28), transparent 70%),
+    radial-gradient(82% 82% at 50% 50%, rgba(var(--primary-rgb), 0.26), transparent 72%);
+  filter: blur(11px);
+  opacity: 0;
+  animation: kt-aurora 820ms ease-out;
+}
+@keyframes kt-aurora {
+  0%   { opacity: 0;    transform: scale(0.9) rotate(-7deg); }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0;    transform: scale(1.18) rotate(5deg); }
+}
+@keyframes kt-blup {
+  0%   { transform: scale(0.86); opacity: 0; }
+  55%  { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes kt-shimmer { 0% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
+
+/* ── card ─────────────────────────────────────────────────────────────────── */
+.card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid rgba(18, 24, 48, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(18, 24, 48, 0.06), 0 14px 34px rgba(18, 24, 48, 0.1);
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: var(--ink, #191d28);
+  -webkit-font-smoothing: antialiased;
+  /* Card is inert so taps on its chrome-free areas (the header) fall through to
+     tldraw for select/drag; the interactive strip + controls re-enable below. */
+  pointer-events: none;
+  transform-origin: center;
+  animation: kt-blup 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── header ───────────────────────────────────────────────────────────────── */
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(18, 24, 48, 0.06);
+}
+.headMain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--ink, #2c3342);
+}
+.headMain svg { color: rgb(var(--primary-rgb)); flex: none; }
+.title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.count {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgb(var(--primary-rgb));
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.viewToggle {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(18, 24, 48, 0.05);
+  border-radius: 9px;
+  pointer-events: auto;
+}
+.viewBtn {
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim, #6b7283);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.viewOn {
+  background: #fff;
+  color: var(--ink, #2c3342);
+  box-shadow: 0 1px 2px rgba(18, 24, 48, 0.12);
+}
+
+/* ── track (the filmstrip) ────────────────────────────────────────────────── */
+.track {
+  flex: 1;
+  min-height: 0;
+  pointer-events: auto;
+  background: #eef0f6;
+}
+.strip {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  padding: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+}
+
+/* a tile = one keyframe still + its index / timecode */
+.tile {
+  flex: 0 0 auto;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 10px;
+}
+.strip .tile { height: 100%; }
+.grid .tile { width: 100%; aspect-ratio: 4 / 3; }
+.tileMedia {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #d7dbe6;
+  box-shadow: 0 1px 2px rgba(18, 24, 48, 0.18);
+  outline: 1.5px solid transparent;
+  transition: outline-color 120ms ease, transform 120ms ease;
+}
+.strip .tileMedia { width: auto; min-width: 64px; aspect-ratio: auto; }
+.tile:hover .tileMedia { outline-color: rgb(var(--primary-rgb)); transform: translateY(-1px); }
+.tileImg {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+.strip .tileImg { width: auto; }
+.tileBroken {
+  height: 100%;
+  width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aa3b5;
+}
+.tileIdx {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.58);
+  border-radius: 5px;
+  padding: 1px 5px;
+  letter-spacing: 0.01em;
+}
+.tileTime {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.58);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-variant-numeric: tabular-nums;
+}
+.tileShot {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(var(--primary-rgb), 0.82);
+  border-radius: 5px;
+  padding: 1px 5px;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tileSkeleton {
+  flex: 0 0 auto;
+  height: 100%;
+  width: 86px;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #e0e4ee 30%, #eef1f7 50%, #e0e4ee 70%);
+  background-size: 220% 100%;
+  animation: kt-shimmer 1.3s ease-in-out infinite;
+}
+.grid .tileSkeleton { width: 100%; aspect-ratio: 4 / 3; }
+.note {
+  margin: auto;
+  padding: 20px;
+  color: var(--ink-dim, #868d9e);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── empty state / picker ─────────────────────────────────────────────────── */
+.empty {
+  flex: 1;
+  min-height: 0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px;
+  text-align: center;
+}
+.emptyHint {
+  margin: 0;
+  max-width: 340px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-dim, #6b7283);
+}
+.btn {
+  border: 0;
+  border-radius: 10px;
+  background: rgba(18, 24, 48, 0.06);
+  color: var(--ink, #2c3342);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover { background: rgba(18, 24, 48, 0.1); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btnPrimary { background: rgb(var(--primary-rgb)); color: #fff; }
+.btnPrimary:hover { background: rgb(var(--primary-rgb)); filter: brightness(1.06); }
+
+.picker { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 8px; }
+.pickerList {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+.pickerItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: rgba(18, 24, 48, 0.04);
+  border-radius: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.pickerItem:hover { background: rgba(var(--primary-rgb), 0.12); }
+.pickerTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink, #2c3342);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pickerCreator { flex: none; font-size: 10.5px; color: var(--ink-dim, #868d9e); }
+.manualRow { display: flex; gap: 6px; }
+.manualInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(18, 24, 48, 0.14);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  background: #fff;
+  color: var(--ink, #2c3342);
+}
+.manualInput:focus { outline: none; border-color: rgb(var(--primary-rgb)); }
+
+/* ── peek overlay (portal to body) ────────────────────────────────────────── */
+.peekBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw;
+  background: rgba(10, 14, 26, 0.62);
+  backdrop-filter: blur(6px);
+  animation: kt-fade 160ms ease-out;
+}
+@keyframes kt-fade { from { opacity: 0; } to { opacity: 1; } }
+.peek {
+  display: flex;
+  flex-direction: column;
+  max-width: min(880px, 92vw);
+  max-height: 92vh;
+  background: #11151f;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.peekStage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.peekImg { max-width: 100%; max-height: 74vh; object-fit: contain; display: block; }
+.peekBroken { color: #9aa3b5; padding: 60px; font-size: 13px; font-weight: 600; }
+.peekNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.peekNav:hover { background: rgba(0, 0, 0, 0.7); }
+.peekPrev { left: 10px; }
+.peekNext { right: 10px; }
+.peekBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  background: #161b27;
+}
+.peekMeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: #cfd6e4; font-size: 12px; }
+.peekIdx { font-weight: 800; color: #fff; }
+.peekTime { font-variant-numeric: tabular-nums; color: #aeb7c8; }
+.peekPos { color: #828ca0; }
+.peekShot {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(var(--primary-rgb), 0.85);
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.peekActions { display: flex; gap: 8px; }
+.peekCaption {
+  flex: none;
+  padding: 10px 14px;
+  background: #11151f;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #aeb7c8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ── dark mode ────────────────────────────────────────────────────────────── */
+:global(.rainy-root.dark) .card {
+  background: #1a1f2c;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+:global(.rainy-root.dark) .head { border-bottom-color: rgba(255, 255, 255, 0.08); }
+:global(.rainy-root.dark) .headMain { color: #d3d9e6; }
+:global(.rainy-root.dark) .title { color: #e6eaf2; }
+:global(.rainy-root.dark) .track { background: #141926; }
+:global(.rainy-root.dark) .viewToggle { background: rgba(255, 255, 255, 0.06); }
+:global(.rainy-root.dark) .viewOn { background: #2a3142; color: #e6eaf2; }
+:global(.rainy-root.dark) .btn { background: rgba(255, 255, 255, 0.08); color: #d3d9e6; }
+:global(.rainy-root.dark) .btn:hover { background: rgba(255, 255, 255, 0.14); }
+:global(.rainy-root.dark) .btnPrimary { color: #fff; }
+:global(.rainy-root.dark) .pickerItem { background: rgba(255, 255, 255, 0.05); }
+:global(.rainy-root.dark) .pickerTitle { color: #d3d9e6; }
+:global(.rainy-root.dark) .manualInput { background: #222a3c; border-color: rgba(255, 255, 255, 0.12); color: #e6eaf2; }
+:global(.rainy-root.dark) .tileMedia { background: #2b3346; }
+
+@media (prefers-reduced-motion: reduce) {
+  .host::after { animation: none; opacity: 0; }
+  .card { animation: none; }
+  .peekBackdrop { animation: none; }
+}

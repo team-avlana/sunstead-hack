@@ -1,7 +1,7 @@
 'use client'
 
 import { createShapeId, useEditor, useValue, type Editor } from 'tldraw'
-import { RAINY_TEXT, VIDEO_BLOCK, getDefaultTextFormat, templateHtml } from '@/lib/blockTypes'
+import { KEYFRAME_TRACK, RAINY_TEXT, VIDEO_BLOCK, getDefaultTextFormat, templateHtml } from '@/lib/blockTypes'
 import { fitOrRecenter, formatZoom, resetZoom, zoomInStep, zoomOutStep } from '@/lib/camera'
 import { useRainyStore } from '@/lib/store'
 
@@ -66,6 +66,25 @@ function createVideoBlock(editor: Editor) {
   })
 }
 
+/** Drop a fresh, empty Keyframe Track (ready to pick a video) at the centre. */
+function createKeyframeTrack(editor: Editor) {
+  const c = center(editor)
+  const id = createShapeId()
+  const data = JSON.stringify({ title: '', view: 'strip', keyframes: [] })
+  const w = 600
+  const h = 226
+  editor.run(() => {
+    editor.createShape({
+      id,
+      type: KEYFRAME_TRACK,
+      x: c.x - w / 2,
+      y: c.y - h / 2,
+      props: { w, h, data },
+    })
+    editor.select(id)
+  })
+}
+
 const createFrame = (editor: Editor) => createCentered(editor, 'frame', 420, 300, { w: 420, h: 300 })
 
 // ---- tool tables ----------------------------------------------------------
@@ -106,6 +125,9 @@ export default function BottomDock() {
               <button onClick={() => createVideoBlock(editor)}>
                 <VideoIcon /> Video
               </button>
+              <button onClick={() => createKeyframeTrack(editor)}>
+                <KeyframesIcon /> Keyframes
+              </button>
               <button onClick={() => createFrame(editor)}>
                 <FrameIcon /> Frame
               </button>
@@ -127,6 +149,9 @@ export default function BottomDock() {
         </button>
         <button className="rainy-tool" onClick={() => createVideoBlock(editor)} title="Video block">
           <VideoIcon />
+        </button>
+        <button className="rainy-tool" onClick={() => createKeyframeTrack(editor)} title="Keyframe track">
+          <KeyframesIcon />
         </button>
         <button className="rainy-tool" onClick={() => createFrame(editor)} title="Frame">
           <FrameIcon />
@@ -233,6 +258,15 @@ function FrameIcon() {
   return (
     <Svg>
       <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+    </Svg>
+  )
+}
+function KeyframesIcon() {
+  // A filmstrip: a frame with sprocket holes down each side.
+  return (
+    <Svg>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4" />
     </Svg>
   )
 }

@@ -309,3 +309,70 @@ export interface ImageData {
 
 /** Image blocks default to a 16:9 storyboard-panel footprint. */
 export const IMAGE_DEFAULT_DIMS = { w: 360, h: 224 } as const
+
+// ===========================================================================
+// Keyframe track
+// ===========================================================================
+
+export const KEYFRAME_TRACK = 'keyframe-track' as const
+
+/** Compactness of a keyframe track. `strip` = one scrollable row; `grid` = wrap. */
+export type KeyframeView = 'strip' | 'grid'
+
+/**
+ * One keyframe = the representative still of a clip/cut. `src` is a loadable image
+ * URL: a video frame (`/frames/{id}`), an absolute http(s) URL on the avlana media
+ * server (the "use image URLs directly" path), or a data: URL. `idx` is the clip
+ * index (the cut number the editing script references), `start_sec`/`end_sec` its
+ * span. `label`/`shot_type` are optional captions shown on the tile.
+ */
+export interface Keyframe {
+  src?: string | null
+  idx?: number
+  start_sec?: number | null
+  end_sec?: number | null
+  label?: string | null
+  shot_type?: string | null
+}
+
+/**
+ * A keyframe track's content (stored as JSON in the shape's `data` prop, and as
+ * the artifact payload on the backend — see backendCanvas/backendSync). Two ways
+ * to fill it, checked in order:
+ *   1. explicit `keyframes` — what an agent writes after fetching clip data from
+ *      the avlana MCP (each with a direct image URL). Rendered as-is.
+ *   2. a `video_id` — the track self-populates from this analysed video's shots
+ *      (`/api/videos/{id}/shots`), one keyframe per shot. No keyframes stored.
+ * `source_url` is the original video URL (used for the "play" affordance).
+ */
+export interface KeyframeTrackData {
+  title?: string | null
+  source_url?: string | null
+  video_id?: string | null
+  view?: KeyframeView
+  keyframes?: Keyframe[]
+}
+
+export const KEYFRAME_DEFAULT_DATA: KeyframeTrackData = { title: '', view: 'strip', keyframes: [] }
+
+/** A keyframe track defaults to a wide single-row filmstrip. */
+export const KEYFRAME_DEFAULT_DIMS = { w: 600, h: 226 } as const
+
+/** On-tile thumbnail height (px, page space). Width is derived per image aspect. */
+export const KEYFRAME_TILE_H = 132
+
+export function parseKeyframeData(json: string): KeyframeTrackData {
+  if (!json) return KEYFRAME_DEFAULT_DATA
+  try {
+    const d = JSON.parse(json) as KeyframeTrackData
+    return { ...KEYFRAME_DEFAULT_DATA, ...d }
+  } catch {
+    return KEYFRAME_DEFAULT_DATA
+  }
+}
+
+/** The detail levels offered for a keyframe track (single row vs wrapped grid). */
+export const KEYFRAME_VIEW_OPTIONS: { id: KeyframeView; label: string }[] = [
+  { id: 'strip', label: 'Filmstrip' },
+  { id: 'grid', label: 'Grid' },
+]

@@ -32,6 +32,7 @@ import {
 import { analyseVideoShape, isBackendShape, pollVideo } from '@/lib/videoAnalysis'
 import { relayoutFrame } from '@/lib/frameLayout'
 import { DeleteButton, DragHandle } from './ShapeChrome'
+import { VideoPeek } from './VideoPeek'
 
 // The video taxonomy (status lifecycle, detail levels, sizing, parsing) lives in
 // lib/blockTypes so the adaptive sidebar can read + drive it from outside <Tldraw>.
@@ -156,6 +157,7 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   const [menuHover, setMenuHover] = useState(false) // the floating toolbar
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const [showMain, setShowMain] = useState(false)
+  const [playing, setPlaying] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const wantMain = isHovered || isSelected || chromeHover || menuHover || viewMenuOpen
@@ -247,13 +249,16 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
   const canStoryboard = status === 'analysed' && (d.storyboard?.length ?? 0) > 0
   const expanded = view !== 'compact'
   const currentView = VIEW_OPTIONS.find((o) => o.id === view) ?? VIEW_OPTIONS[1]
+  // A clip is playable once it has a source (a video_id to map a local file to, or
+  // a URL the peek can play / embed / fall back to mapping for).
+  const canPlay = !!(d.source_url || d.video_id)
 
   return (
     <HTMLContainer>
       {/* host isolates the appear-animation aurora behind the card (see VideoBlock.module.css) */}
       <div className={s.host}>
         <div ref={cardRef} className={`${s.card} ${s[status]}`} onPointerDown={(e) => { if (expanded) e.stopPropagation() }}>
-          <Header d={d} status={status} view={view} />
+          <Header d={d} status={status} view={view} onPlay={canPlay ? () => setPlaying(true) : undefined} />
 
           {expanded && status === 'analysed' && <Body d={d} view={view} canStoryboard={canStoryboard} />}
           {expanded && status === 'analysing' && <Analysing d={d} />}
@@ -331,6 +336,15 @@ function VideoBlock({ shape }: { shape: VideoBlockShape }) {
           </button>
         </div>
       </div>
+
+      {playing ? (
+        <VideoPeek
+          videoId={d.video_id ?? null}
+          sourceUrl={d.source_url ?? null}
+          title={d.title}
+          onClose={() => setPlaying(false)}
+        />
+      ) : null}
     </HTMLContainer>
   )
 }
@@ -352,9 +366,14 @@ function CheckIcon() {
   )
 }
 
-function Thumb({ d, wide }: { d: VideoData; wide?: boolean }) {
+function Thumb({ d, wide, onPlay }: { d: VideoData; wide?: boolean; onPlay?: () => void }) {
   const palette = d.palette?.length ? d.palette : ['#c7cdd9', '#aeb6c6']
   const grad = `linear-gradient(135deg, ${palette.slice(0, 4).join(', ')})`
+  const glyph = (
+    <svg width={wide ? 26 : 20} height={wide ? 26 : 20} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  )
   return (
     <div className={`${s.thumb} ${wide ? s.thumbWide : s.thumbCompact}`}>
       {d.thumbnail ? (
@@ -362,22 +381,36 @@ function Thumb({ d, wide }: { d: VideoData; wide?: boolean }) {
         <img src={d.thumbnail} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
       ) : null}
       <div className={s.thumbGrad} style={{ background: grad, position: d.thumbnail ? 'absolute' : 'static', inset: 0, zIndex: -1 }} />
-      <div className={s.playGlyph}>
-        <svg width={wide ? 26 : 20} height={wide ? 26 : 20} viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
-      </div>
+      {onPlay ? (
+        // The play glyph becomes the in-canvas "play this clip" button (opens the
+        // centre peek). Stop the press from starting a tldraw select/drag.
+        <button
+          className={s.playGlyph}
+          style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onPlay()
+          }}
+          title="Play video"
+          aria-label="Play video"
+        >
+          {glyph}
+        </button>
+      ) : (
+        <div className={s.playGlyph}>{glyph}</div>
+      )}
       {d.duration_sec ? <span className={s.thumbBadge}>{fmtTime(d.duration_sec)}</span> : null}
     </div>
   )
 }
 
-function Header({ d, status, view }: { d: VideoData; status: VideoStatus; view: View }) {
+function Header({ d, status, view, onPlay }: { d: VideoData; status: VideoStatus; view: View; onPlay?: () => void }) {
   const wide = view !== 'compact' && status !== 'empty'
   const title = d.title || (status === 'empty' ? 'Empty — ready for input' : 'Untitled video')
   return (
     <div className={s.header}>
-      <Thumb d={d} wide={wide} />
+      <Thumb d={d} wide={wide} onPlay={onPlay} />
       <div className={s.headMain}>
         <p className={`${s.title} ${status === 'empty' && !d.title ? s.titleEmpty : ''}`}>{title}</p>
         <div className={s.metaRow}>
